@@ -1,0 +1,117 @@
+# Coin Autopilot Agent — Configuration
+# Copy to config.yaml and fill in your values
+
+agent:
+  id: "autopilot-001"
+  mode: "paper"                    # paper | live
+  log_level: "info"                # trace | debug | info | warn | error
+
+grpc:
+  server_address: "localhost:50051"
+  use_tls: false
+  # cert_file: ""
+  # key_file: ""
+
+exchanges:
+  upbit:
+    enabled: true
+    api_key: ""
+    api_secret: ""
+    rate_limit_per_second: 8
+    ws_url: "wss://api.upbit.com/websocket/v1"
+    rest_url: "https://api.upbit.com"
+
+  okx:
+    enabled: true
+    api_key: ""
+    api_secret: ""
+    passphrase: ""
+    rate_limit_per_second: 20
+    ws_url: "wss://ws.okx.com:8443/ws/v5/public"
+    ws_private_url: "wss://ws.okx.com:8443/ws/v5/private"
+    rest_url: "https://www.okx.com"
+    simulated: false               # true = OKX demo trading
+
+risk:
+  profile: "moderate"              # conservative | moderate | aggressive
+  max_daily_loss_pct: 2.0
+  max_single_loss_pct: 0.30
+  max_drawdown_pct: 15.0
+  drawdown_halt_pct: 25.0
+  max_positions: 5
+  max_leverage: 2.0
+  margin_mode: "isolated"
+  max_margin_usage_pct: 35.0
+
+strategies:
+  - name: "BTC Regime + Alt Mean Reversion"
+    type: "regime_mean_reversion"
+    enabled: true
+    params:
+      timeframe: "4h"
+      btc_ema_len: 200
+      btc_rsi_len: 14
+      btc_rsi_risk_on_min: 52
+      btc_rsi_risk_on_max: 70
+      btc_rsi_risk_off: 45
+      btc_atr_len: 14
+      btc_atr_risk_on_max: 0.045
+      btc_atr_risk_off_min: 0.065
+      alt_rsi_len: 14
+      alt_rsi_entry_max: 78
+      zscore_window: 20
+      zscore_entry: -1.0
+      zscore_exit: 0.0
+      stop_atr_mult: 2.7
+      max_hold_bars: 8
+      spread_max_bp: 15
+
+  - name: "BTC Dominance Rotation"
+    type: "dominance_rotation"
+    enabled: false
+    params:
+      btc_d_ma_fast: 20
+      btc_d_ma_slow: 50
+      usdt_d_rsi_len: 14
+      usdt_d_rsi_max: 50
+      btc_atr_max: 0.04
+
+  - name: "Volatility Timing"
+    type: "volatility_timing"
+    enabled: false
+    params:
+      btc_atr_low: 0.03
+      btc_atr_high: 0.055
+      btc_ma_len: 200
+
+  - name: "Funding Arbitrage"
+    type: "funding_arbitrage"
+    enabled: false
+    params:
+      funding_threshold_annualized: 0.30
+      basis_zscore_window: 20
+
+universe:
+  min_volume_krw: 5000000000       # 50억 KRW
+  min_volume_usd: 10000000         # $10M
+  max_spread_bp: 20
+  exclude_patterns:
+    - ".*USDT$"                    # 스테이블
+    - ".*USDC$"
+    - ".*DAI$"
+    - ".*3L$"                      # 레버리지 토큰
+    - ".*3S$"
+  new_listing_exclude_days: 14
+  tier_allocation:
+    large_cap_pct: 60              # Top 20
+    mid_cap_pct: 30                # Top 50
+    small_cap_pct: 10              # Top 100
+
+alerts:
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_id: ""
+  discord:
+    enabled: false
+    webhook_url: ""

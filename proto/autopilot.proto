@@ -1,0 +1,172 @@
+syntax = "proto3";
+
+package autopilot;
+
+option cc_enable_arenas = true;
+
+// ============================================================
+// Messages
+// ============================================================
+
+message Ack {
+  bool success = 1;
+  string message = 2;
+}
+
+// --- Agent Status ---
+message AgentStatus {
+  string agent_id = 1;
+  AgentState state = 2;
+  int64 timestamp_ms = 3;
+  double uptime_seconds = 4;
+  int32 active_positions = 5;
+  int32 active_strategies = 6;
+  double cpu_usage_pct = 7;
+  double memory_usage_mb = 8;
+  map<string, bool> ws_connections = 9;  // exchange -> connected
+}
+
+enum AgentState {
+  AGENT_IDLE = 0;
+  AGENT_RUNNING = 1;
+  AGENT_PAUSED = 2;
+  AGENT_ERROR = 3;
+}
+
+// --- Trade Report ---
+message TradeReport {
+  string trade_id = 1;
+  string strategy_id = 2;
+  string session_id = 3;       // empty = live trade
+  string exchange = 4;
+  string symbol = 5;
+  Side side = 6;
+  OrderType order_type = 7;
+  double qty = 8;
+  double price = 9;
+  double fee = 10;
+  double pnl = 11;
+  double pnl_pct = 12;
+  string reason = 13;          // entry_signal, stop_loss, take_profit, time_exit, regime_stop
+  int64 executed_at_ms = 14;
+}
+
+enum Side {
+  BUY = 0;
+  SELL = 1;
+}
+
+enum OrderType {
+  MARKET = 0;
+  LIMIT = 1;
+  STOP = 2;
+}
+
+// --- Position Snapshot ---
+message PositionSnapshot {
+  string strategy_id = 1;
+  string session_id = 2;
+  string exchange = 3;
+  string symbol = 4;
+  Side side = 5;
+  double qty = 6;
+  double entry_price = 7;
+  double current_price = 8;
+  double unrealized_pnl = 9;
+  double stop_price = 10;
+  double leverage = 11;
+  string margin_mode = 12;
+  int64 opened_at_ms = 13;
+  int64 updated_at_ms = 14;
+}
+
+// --- Market Data ---
+message MarketTick {
+  string exchange = 1;
+  string symbol = 2;
+  double price = 3;
+  double volume_24h = 4;
+  double bid = 5;
+  double ask = 6;
+  int64 timestamp_ms = 7;
+}
+
+message Candle {
+  string exchange = 1;
+  string symbol = 2;
+  string timeframe = 3;
+  int64 open_time_ms = 4;
+  double open = 5;
+  double high = 6;
+  double low = 7;
+  double close = 8;
+  double volume = 9;
+}
+
+// --- Regime ---
+message RegimeStatus {
+  RegimeState state = 1;
+  double btc_price = 2;
+  double btc_ema200 = 3;
+  double btc_rsi14 = 4;
+  double btc_atr_pct = 5;
+  int64 timestamp_ms = 6;
+}
+
+enum RegimeState {
+  RISK_ON = 0;
+  RISK_OFF = 1;
+  NEUTRAL = 2;
+}
+
+// --- Strategy Config ---
+message StrategyConfig {
+  string strategy_id = 1;
+  string type = 2;
+  string risk_profile = 3;
+  string mode = 4;               // live, paper
+  map<string, string> params = 5;
+  bool is_active = 6;
+}
+
+// --- Agent Command ---
+message AgentCommand {
+  CommandType command = 1;
+  string strategy_id = 2;       // optional, empty = all
+}
+
+enum CommandType {
+  CMD_START = 0;
+  CMD_STOP = 1;
+  CMD_PAUSE = 2;
+  CMD_RESUME = 3;
+  CMD_RELOAD_CONFIG = 4;
+}
+
+// --- Risk Profile ---
+message RiskProfile {
+  string profile = 1;           // conservative, moderate, aggressive
+  double max_leverage = 2;
+  int32 max_positions = 3;
+  double max_daily_loss_pct = 4;
+  double max_drawdown_pct = 5;
+  double stop_atr_mult = 6;
+}
+
+// ============================================================
+// Service
+// ============================================================
+
+service AutopilotService {
+  // Agent → Server (streaming)
+  rpc StreamStatus (stream AgentStatus) returns (Ack);
+  rpc ReportTrade (TradeReport) returns (Ack);
+  rpc StreamPositions (stream PositionSnapshot) returns (Ack);
+  rpc StreamMarketData (stream MarketTick) returns (Ack);
+  rpc ReportRegime (RegimeStatus) returns (Ack);
+
+  // Server → Agent (commands)
+  rpc UpdateStrategy (StrategyConfig) returns (Ack);
+  rpc ControlAgent (AgentCommand) returns (Ack);
+  rpc UpdateRiskProfile (RiskProfile) returns (Ack);
+}

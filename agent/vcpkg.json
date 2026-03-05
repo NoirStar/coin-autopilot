@@ -1,0 +1,16 @@
+{
+  "name": "coin-autopilot-agent",
+  "version": "0.1.0",
+  "dependencies": [
+    "boost-beast",
+    "boost-system",
+    "boost-asio",
+    "openssl",
+    "spdlog",
+    "grpc",
+    "protobuf",
+    "simdjson",
+    "yaml-cpp",
+    "gtest"
+  ]
+}
