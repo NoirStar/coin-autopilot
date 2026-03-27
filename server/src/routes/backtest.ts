@@ -1,6 +1,9 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
+import { BtcEmaCrossoverStrategy } from '../strategy/btc-ema-crossover.js'
+import { BtcBollingerReversionStrategy } from '../strategy/btc-bollinger-reversion.js'
+import { AltDetectionStrategy } from '../strategy/alt-detection-strategy.js'
 import { loadCandles } from '../data/candle-collector.js'
 import { runBacktest } from '../services/backtest-engine.js'
 import { supabase } from '../services/database.js'
@@ -11,7 +14,7 @@ export const backtestRoutes = new Hono()
 const TARGET_SYMBOLS = ['ETH', 'XRP', 'SOL', 'DOGE', 'ADA', 'AVAX', 'DOT', 'LINK', 'ATOM']
 
 const runBacktestSchema = z.object({
-  strategyId: z.enum(['alt_mean_reversion']).default('alt_mean_reversion'),
+  strategyId: z.enum(['alt_mean_reversion', 'btc_ema_crossover', 'btc_bollinger_reversion', 'alt_detection']).default('alt_mean_reversion'),
   initialCapital: z.number().min(100_000).max(1_000_000_000).default(10_000_000),
   params: z.object({
     zScoreEntry: z.number().min(-3).max(0).optional(),
@@ -38,20 +41,31 @@ backtestRoutes.post('/run', async (c) => {
     let strategy
     if (strategyId === 'alt_mean_reversion') {
       strategy = new AltMeanReversionStrategy(params)
+    } else if (strategyId === 'btc_ema_crossover') {
+      strategy = new BtcEmaCrossoverStrategy(params)
+    } else if (strategyId === 'btc_bollinger_reversion') {
+      strategy = new BtcBollingerReversionStrategy(params)
+    } else if (strategyId === 'alt_detection') {
+      strategy = new AltDetectionStrategy(params)
     } else {
       return c.json({ error: '지원하지 않는 전략입니다' }, 400)
     }
 
-    // DB에서 캔들 로드
+    // DB에서 캔들 로드 (전략의 거래소에 맞�� 분기)
     const candleMap: CandleMap = new Map()
-    const btcCandles = await loadCandles('upbit', 'BTC', '4h', 2000)
+    const exchange = strategy.config.exchange === 'okx' ? 'okx' : 'upbit'
+    const timeframe = strategy.config.timeframe
+
+    const btcCandles = await loadCandles(exchange, 'BTC', timeframe, 2000)
     if (btcCandles.length < 201) {
       return c.json({ error: 'BTC 캔들 데이터가 부족합니다 (최소 201개 필요)' }, 422)
     }
     candleMap.set('BTC', btcCandles)
 
-    for (const symbol of TARGET_SYMBOLS) {
-      const candles = await loadCandles('upbit', symbol, '4h', 2000)
+    // OKX 선물 전략은 ETH만 추가, 업비트 전략은 알트코인 전체
+    const symbols = strategy.config.exchange === 'okx' ? ['ETH'] : TARGET_SYMBOLS
+    for (const symbol of symbols) {
+      const candles = await loadCandles(exchange, symbol, timeframe, 2000)
       if (candles.length > 0) candleMap.set(symbol, candles)
     }
 

@@ -1,4 +1,4 @@
-import { EMA, RSI, ATR, BollingerBands } from 'technicalindicators'
+import { EMA, RSI, ATR, BollingerBands, ADX, MACD } from 'technicalindicators'
 
 /**
  * EMA 계산
@@ -85,6 +85,59 @@ export function calcBollingerBands(
     stdDev,
     values: closes,
   })
+}
+
+/**
+ * ADX (Average Directional Index) 계산 — 트렌드 강도 측정
+ * @returns ADX 값 배열 (0~100). 20 이상이면 트렌드 존재.
+ */
+export function calcADX(
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period: number
+): number[] {
+  const len = Math.min(highs.length, lows.length, closes.length)
+  if (len < period * 2) return []
+
+  const result = ADX.calculate({
+    period,
+    high: highs.slice(0, len),
+    low: lows.slice(0, len),
+    close: closes.slice(0, len),
+  })
+
+  return result.map((r) => r.adx)
+}
+
+/**
+ * MACD 계산
+ * @returns { MACD, signal, histogram } 배열
+ */
+export function calcMACD(
+  closes: number[],
+  fastPeriod: number = 12,
+  slowPeriod: number = 26,
+  signalPeriod: number = 9
+): Array<{ macd: number; signal: number; histogram: number }> {
+  if (closes.length < slowPeriod + signalPeriod) return []
+
+  const result = MACD.calculate({
+    values: closes,
+    fastPeriod,
+    slowPeriod,
+    signalPeriod,
+    SimpleMAOscillator: false,
+    SimpleMASignal: false,
+  })
+
+  return result
+    .filter((r) => r.MACD != null && r.signal != null && r.histogram != null)
+    .map((r) => ({
+      macd: r.MACD as number,
+      signal: r.signal as number,
+      histogram: r.histogram as number,
+    }))
 }
 
 /**

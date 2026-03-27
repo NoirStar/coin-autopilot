@@ -1,9 +1,10 @@
 // 전략 플러그인 인터페이스
 // 새로운 전략은 이 인터페이스를 구현하면 됨 (모멘텀, 볼륨 스파이크 등)
 
-export type Timeframe = '1h' | '4h' | '1d'
+export type Timeframe = '5m' | '15m' | '1h' | '4h' | '1d'
 export type Exchange = 'upbit' | 'okx'
 export type SignalDirection = 'buy' | 'sell'
+export type PositionDirection = 'long' | 'short'
 export type RegimeState = 'risk_on' | 'risk_off'
 
 export interface Candle {
@@ -30,6 +31,8 @@ export interface StrategyConfig {
 export interface StrategySignal {
   symbol: string
   direction: SignalDirection
+  positionSide?: PositionDirection
+  leverage?: number
   reasoning: Record<string, unknown>
 }
 

@@ -1,18 +1,26 @@
 import cron from 'node-cron'
 import { generateSignals } from '../services/signal-generator.js'
+import { runPaperTradingCycle } from '../services/paper-trading-engine.js'
 import { supabase } from '../services/database.js'
 
 /**
  * 크론 작업 시작
  *
- * 4시간마다 실행: 캔들 수집 → 지표 → 레짐 → 시그널
+ * 4시간마다 실행: 캔들 수집 → 지표 → 레짐 → 시그널 → 가상매매
  * UTC 기준: 0시, 4시, 8시, 12시, 16시, 20시
  */
 export function startCronJobs(): void {
-  // 4시간마다 시그널 생성
+  // 4시간마다 시그널 생성 + 가상매매
   cron.schedule('0 0,4,8,12,16,20 * * *', async () => {
     console.log(`[크론] 시그널 생성 시작: ${new Date().toISOString()}`)
     await generateSignals()
+
+    // 시그널 생성 후 가상매매 사이클 실행
+    try {
+      await runPaperTradingCycle()
+    } catch (err) {
+      console.error('[크론] 가상매매 사이클 오류:', err)
+    }
   })
 
   // 6시간마다 Supabase 헬스체크 (7일 미사용 정지 방지)

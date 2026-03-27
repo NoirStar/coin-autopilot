@@ -10,6 +10,7 @@ import { paperTradingRoutes } from './routes/paper-trading.js'
 import { portfolioRoutes } from './routes/portfolio.js'
 import { settingsRoutes } from './routes/settings.js'
 import { signalRoutes } from './routes/signals.js'
+import { detectionRoutes } from './routes/detection.js'
 import { startCronJobs } from './core/cron.js'
 import { authMiddleware } from './core/auth.js'
 
@@ -26,6 +27,7 @@ app.get('/health', (c) => c.json({ status: 'ok', uptime: process.uptime() }))
 app.route('/api/dashboard', dashboardRoutes)
 app.route('/api/signals', signalRoutes)
 app.route('/api/backtest', backtestRoutes)
+app.route('/api/detection', detectionRoutes)
 
 // 인증 필요 API (strategy GET /는 별도로 비인증 허용)
 app.route('/api/strategy', strategyRoutes)

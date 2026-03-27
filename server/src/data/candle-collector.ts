@@ -5,14 +5,14 @@ const UPBIT_API = 'https://api.upbit.com/v1'
 const OKX_API = 'https://www.okx.com/api/v5'
 
 /** 타임프레임 → 업비트 분봉 단위 */
-const TIMEFRAME_MINUTES: Record<Timeframe, number> = {
+const TIMEFRAME_MINUTES: Partial<Record<Timeframe, number>> = {
   '1h': 60,
   '4h': 240,
   '1d': 1440,
 }
 
 /** 타임프레임 → OKX bar 파라미터 */
-const OKX_BAR: Record<Timeframe, string> = {
+const OKX_BAR: Partial<Record<Timeframe, string>> = {
   '1h': '1H',
   '4h': '4H',
   '1d': '1D',
@@ -35,7 +35,7 @@ async function fetchUpbitCandles(
   count: number = 200,
   to?: string
 ): Promise<Candle[]> {
-  const minutes = TIMEFRAME_MINUTES[timeframe]
+  const minutes = TIMEFRAME_MINUTES[timeframe] ?? 240
   const url = new URL(`${UPBIT_API}/candles/minutes/${minutes}`)
   url.searchParams.set('market', market)
   url.searchParams.set('count', String(Math.min(count, 200)))
@@ -78,7 +78,7 @@ async function fetchOkxCandles(
   limit: number = 100,
   after?: string
 ): Promise<Candle[]> {
-  const bar = OKX_BAR[timeframe]
+  const bar = OKX_BAR[timeframe] ?? '4H'
   const url = new URL(`${OKX_API}/market/candles`)
   url.searchParams.set('instId', instId)
   url.searchParams.set('bar', bar)

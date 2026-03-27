@@ -60,6 +60,10 @@ export const api = {
   getPaperSessions: () => request('/api/paper-trading/sessions'),
   comparePaperSessions: () => request('/api/paper-trading/compare'),
 
+  // Detection (알트코인 탐지)
+  scanDetection: () => request('/api/detection/scan'),
+  getDetectionScore: (symbol: string) => request(`/api/detection/score/${symbol}`),
+
   // Settings
   getSettings: () => request('/api/settings'),
   getAgentStatus: () => request('/api/settings/agent-status'),
