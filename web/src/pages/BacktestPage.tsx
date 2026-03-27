@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import {
   Play,
   Loader2,
@@ -8,7 +8,6 @@ import {
   TrendingDown,
   Clock,
   ArrowUpRight,
-  ArrowDownRight,
   Activity,
   AlertTriangle,
   RotateCcw,
@@ -248,8 +247,8 @@ function BacktestResults({ result }: { result: BacktestResultData }) {
                 />
                 <Tooltip
                   contentStyle={{ background: '#111114', border: '1px solid #1e1e22', borderRadius: 6, fontSize: 11 }}
-                  labelFormatter={(t: string) => new Date(t).toLocaleString('ko-KR')}
-                  formatter={(v: number) => [`₩${v.toLocaleString('ko-KR')}`, '자산']}
+                  labelFormatter={(t) => new Date(String(t)).toLocaleString('ko-KR')}
+                  formatter={(v) => [`₩${Number(v).toLocaleString('ko-KR')}`, '자산']}
                 />
                 <Area
                   type="monotone"

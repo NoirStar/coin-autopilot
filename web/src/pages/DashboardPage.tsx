@@ -1,12 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  Wallet,
   TrendingDown,
   Target,
   Activity,
   ArrowUpRight,
   ArrowDownRight,
-  Minus,
   Layers,
   Radio,
   Clock,
