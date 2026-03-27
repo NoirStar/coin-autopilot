@@ -1,9 +1,21 @@
+import { supabase } from '../lib/supabase'
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    return { Authorization: `Bearer ${session.access_token}` }
+  }
+  return {}
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const authHeaders = await getAuthHeaders()
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...options?.headers,
     },
     ...options,
@@ -49,6 +61,8 @@ export const api = {
   comparePaperSessions: () => request('/api/paper-trading/compare'),
 
   // Settings
+  getSettings: () => request('/api/settings'),
   getAgentStatus: () => request('/api/settings/agent-status'),
   updateRiskProfile: (data: unknown) => request('/api/settings/risk-profile', { method: 'PUT', body: JSON.stringify(data) }),
+  updateAlerts: (data: unknown) => request('/api/settings/alerts', { method: 'PUT', body: JSON.stringify(data) }),
 }

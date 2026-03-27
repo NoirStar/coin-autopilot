@@ -82,6 +82,7 @@ create table if not exists positions (
   id bigint generated always as identity primary key,
   user_id uuid references auth.users,
   session_type text not null,
+  exchange text not null default 'upbit',
   strategy text not null,
   symbol text not null,
   direction text not null,
@@ -95,6 +96,70 @@ create table if not exists positions (
   closed_at timestamptz,
   created_at timestamptz default now()
 );
+
+-- 전략 설정 (사용자별)
+create table if not exists strategies (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users not null,
+  name text not null,
+  type text not null,
+  params jsonb not null default '{}',
+  risk_profile text not null default 'moderate',
+  is_active boolean default false,
+  mode text not null default 'paper',
+  exchange text not null default 'upbit',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_strategies_user
+  on strategies (user_id);
+
+-- 사용자 설정
+create table if not exists user_settings (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users not null unique,
+  risk_profile text not null default 'moderate',
+  daily_max_loss_pct numeric not null default 2.0,
+  position_max_loss_pct numeric not null default 0.30,
+  mdd_warning_pct numeric not null default 15.0,
+  mdd_stop_pct numeric not null default 25.0,
+  upbit_configured boolean default false,
+  okx_configured boolean default false,
+  telegram_enabled boolean default false,
+  telegram_bot_token text,
+  telegram_chat_id text,
+  discord_enabled boolean default false,
+  discord_webhook_url text,
+  alert_on_signal boolean default true,
+  alert_on_mdd boolean default true,
+  alert_on_regime boolean default true,
+  alert_on_execution boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- 가상매매 세션
+create table if not exists paper_sessions (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users not null,
+  strategy_id bigint references strategies,
+  name text not null,
+  initial_capital numeric not null default 10000000,
+  current_equity numeric not null default 10000000,
+  status text not null default 'running',
+  total_return numeric default 0,
+  sharpe_ratio numeric,
+  max_drawdown numeric default 0,
+  win_rate numeric,
+  total_trades int default 0,
+  started_at timestamptz default now(),
+  ended_at timestamptz,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_paper_sessions_user
+  on paper_sessions (user_id, status);
 
 -- RLS 정책
 
@@ -116,3 +181,15 @@ create policy "본인 읽기: backtest_results" on backtest_results
 alter table positions enable row level security;
 create policy "본인 읽기: positions" on positions
   for select using (auth.uid() = user_id);
+
+alter table strategies enable row level security;
+create policy "본인 CRUD: strategies" on strategies
+  for all using (auth.uid() = user_id);
+
+alter table user_settings enable row level security;
+create policy "본인 CRUD: user_settings" on user_settings
+  for all using (auth.uid() = user_id);
+
+alter table paper_sessions enable row level security;
+create policy "본인 CRUD: paper_sessions" on paper_sessions
+  for all using (auth.uid() = user_id);

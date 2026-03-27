@@ -14,6 +14,7 @@ const TERM_DICTIONARY: Record<string, string> = {
   win_rate: '전체 거래 중 이긴 거래의 비율. 50% 이상이면 절반 이상을 이겼다는 뜻',
   kimchi_premium: '한국 거래소와 해외 거래소의 가격 차이. 양수면 한국이 더 비쌈',
   mean_reversion: '가격이 평균으로 돌아오려는 성질. 많이 빠지면 반등할 가능성이 높다는 전략',
+  risk_profile: '투자 위험 허용 수준. 안전/중립/공격으로 나뉘며, 레버리지·동시보유·MDD 한도가 달라짐',
 }
 
 interface TermTooltipProps {
