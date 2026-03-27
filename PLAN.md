@@ -12,7 +12,7 @@ BTC(비트코인) 흐름을 선행 신호로 활용하여 알트코인에서 수
 |------|------|
 | **안전 우선** | MDD 제한, 레짐 필터, 포지션 사이징으로 "잃지 않는" 방향 |
 | **전략 검증** | 백테스팅 → 가상매매(페이퍼) → 실전 3단계 파이프라인 |
-| **고속 체결** | C++ 에이전트로 지연 최소화 (WebSocket + REST) |
+| **통합 서버** | Node.js 서버에서 매매·전략·데이터·모니터링 일원화 (운영 단순화) |
 | **실시간 모니터링** | 웹 대시보드에서 자산·손익·전략 상태 실시간 확인 |
 | **다중 전략 비교** | 여러 전략을 동시 가상매매하여 최적 전략 선별 |
 
@@ -40,21 +40,14 @@ BTC(비트코인) 흐름을 선행 신호로 활용하여 알트코인에서 수
 └──────────────────────────┼───────────────────────────────────┘
                            │
 ┌──────────────────────────┼───────────────────────────────────┐
-│                    Monitoring Server                          │
+│                     Trading Server                           │
 │            Node.js · Hono · Supabase · Socket.IO             │
 │    ┌──────────┬──────────┬──────────┬──────────┬──────────┐  │
-│    │REST API  │WebSocket │백테스트   │DB 관리    │알림      │  │
-│    │          │브릿지     │엔진(서버) │          │(Telegram)│  │
-│    └──────────┴──────────┴──────────┴──────────┴──────────┘  │
-│                          ▲ gRPC / WebSocket                  │
-└──────────────────────────┼───────────────────────────────────┘
-                           │
-┌──────────────────────────┼───────────────────────────────────┐
-│                    C++ Trading Agent                          │
-│         Boost.Beast · simdjson · spdlog · gRPC               │
-│    ┌──────────┬──────────┬──────────┬──────────┬──────────┐  │
-│    │시장 데이터│전략 엔진  │주문 관리  │리스크 관리│상태 보고 │  │
-│    │(WS수신)  │          │(REST발신) │          │(gRPC)   │  │
+│    │시장 데이터│전략 엔진  │주문 관리  │리스크 관리│REST API  │  │
+│    │(WS수신)  │+지표 계산 │(REST발신) │+포지션관리│+WebSocket│  │
+│    ├──────────┼──────────┼──────────┼──────────┼──────────┤  │
+│    │백테스트   │가상매매   │DB 관리    │알림      │스케줄러   │  │
+│    │엔진      │매니저    │(Supabase) │(Telegram)│(cron)    │  │
 │    └──────────┴──────────┴──────────┴──────────┴──────────┘  │
 │         ▲ WebSocket              ▲ REST API                  │
 └─────────┼──────────────────────────┼─────────────────────────┘
@@ -67,29 +60,22 @@ BTC(비트코인) 흐름을 선행 신호로 활용하여 알트코인에서 수
 
 ### 2.2 컴포넌트 역할
 
-#### C++ Trading Agent (`/agent`)
+#### Trading Server (`/server`)
 
 | 모듈 | 역할 |
 |------|------|
-| `MarketDataManager` | 거래소 WebSocket 스트림 구독 (OHLCV, 호가, 체결) |
+| `MarketDataManager` | 거래소 WebSocket 스트림 구독 (OHLCV, 호가, 체결), ws 라이브러리 사용 |
 | `IndicatorEngine` | 기술지표 계산 (EMA, RSI, ATR, Bollinger, MACD, z-score) |
 | `StrategyEngine` | 전략 로직 실행, 진입/청산 신호 생성 |
 | `OrderManager` | 주문 생성·전송·추적·체결 확인 (Upbit REST, OKX REST) |
 | `RiskManager` | 포지션 사이징, 손절, MDD 모니터링, 레짐 스톱 |
-| `StateReporter` | gRPC로 모니터링 서버에 실시간 상태 전송 |
-| `ConfigLoader` | YAML 설정 파일 로드 (전략 파라미터, API 키, 리스크 한도) |
-
-#### Monitoring Server (`/server`)
-
-| 모듈 | 역할 |
-|------|------|
-| `AgentBridge` | gRPC 서버로 에이전트 상태 수신 |
+| `BacktestEngine` | 히스토리 데이터 + 전략 시뮬레이션 (워커 스레드) |
+| `PaperTradingManager` | 가상매매 세션 관리 (다중 전략 동시 실행) |
 | `REST API` | 웹 대시보드용 데이터 엔드포인트 |
 | `WebSocket Hub` | 실시간 데이터를 웹 클라이언트에 브로드캐스트 |
-| `BacktestEngine` | 서버사이드 백테스팅 (히스토리 데이터 + 전략 시뮬레이션) |
-| `PaperTradingManager` | 가상매매 세션 관리 (다중 전략 동시 실행) |
 | `AlertService` | Telegram/Discord 알림 전송 |
 | `DBService` | Supabase CRUD (거래 기록, 전략 설정, 성과 지표) |
+| `ConfigManager` | 전략 파라미터, API 키, 리스크 한도 관리 |
 
 #### Web Dashboard (`/web`)
 
@@ -107,19 +93,16 @@ BTC(비트코인) 흐름을 선행 신호로 활용하여 알트코인에서 수
 
 | 레이어 | 기술 | 선택 이유 |
 |--------|------|-----------|
-| **에이전트** | C++20, CMake, vcpkg | 최소 지연 체결, 메모리 제어 |
-| | Boost.Beast | HTTP/WebSocket 클라이언트 |
-| | simdjson | 초고속 JSON 파싱 (거래소 응답) |
-| | spdlog | 비동기 로깅 |
-| | gRPC (protobuf) | 서버 통신 (양방향 스트리밍) |
-| | OpenSSL | HMAC-SHA256/SHA512 서명 |
-| | yaml-cpp | 설정 파일 파싱 |
-| **서버** | Node.js, TypeScript | 웹 생태계 호환, 빠른 개발 |
+| **서버** | Node.js, TypeScript | 단일 언어 스택, WebSocket 네이티브 지원 |
 | | Hono | 경량 고성능 HTTP 프레임워크 |
-| | @grpc/grpc-js | gRPC 클라이언트/서버 |
+| | ws | 거래소 WebSocket 클라이언트 (네이티브 WS) |
 | | Socket.IO | 웹 클라이언트 실시간 통신 |
 | | Supabase (PostgreSQL) | 데이터 영속화, 인증 |
-| | Bull/BullMQ (Redis) | 백테스트 작업 큐 |
+| | BullMQ (Redis) | 백테스트 작업 큐, 스케줄링 |
+| | node-cron | 주기적 데이터 수집, 유니버스 갱신 |
+| | technicalindicators | EMA, RSI, ATR, Bollinger 등 지표 라이브러리 |
+| | decimal.js | 금융 연산 정밀도 (부동소수점 회피) |
+| | pino | 고성능 구조화 로깅 |
 | **웹** | React 19, Vite, TypeScript | 기존 프로젝트 일관성 |
 | | shadcn/ui, Radix UI | 접근성 기반 컴포넌트 |
 | | Tailwind CSS 4 | 유틸리티 기반 스타일링 |
@@ -348,7 +331,7 @@ MDD 25% 초과 → 매매 중단 + 원인 분석
 
 ```
 1. 전략 설정 (파라미터, 유니버스, 리스크 프로필)
-2. 가상매매 세션 시작 (에이전트에서 실행, 실제 주문 미발생)
+2. 가상매매 세션 시작 (서버에서 실행, 실제 주문 미발생)
 3. 실시간 모니터링 (웹 대시보드)
 4. 기간 종료 → 성과 리포트 자동 생성
 5. 최적 전략 선택 → 실전 전환
@@ -364,61 +347,43 @@ coin-autopilot/
 ├── README.md
 ├── .gitignore
 │
-├── agent/                          # C++ Trading Agent
-│   ├── CMakeLists.txt
-│   ├── vcpkg.json
-│   ├── src/
-│   │   ├── main.cpp
-│   │   ├── core/
-│   │   │   ├── engine.hpp / engine.cpp
-│   │   │   ├── config.hpp / config.cpp
-│   │   │   └── types.hpp
-│   │   ├── exchange/
-│   │   │   ├── exchange_base.hpp
-│   │   │   ├── upbit/
-│   │   │   │   ├── upbit_client.hpp / .cpp
-│   │   │   │   ├── upbit_ws.hpp / .cpp
-│   │   │   │   └── upbit_auth.hpp / .cpp
-│   │   │   └── okx/
-│   │   │       ├── okx_client.hpp / .cpp
-│   │   │       ├── okx_ws.hpp / .cpp
-│   │   │       └── okx_auth.hpp / .cpp
-│   │   ├── strategy/
-│   │   │   ├── strategy_base.hpp
-│   │   │   ├── btc_regime_filter.hpp / .cpp
-│   │   │   ├── alt_mean_reversion.hpp / .cpp
-│   │   │   ├── dominance_rotation.hpp / .cpp
-│   │   │   ├── volatility_timing.hpp / .cpp
-│   │   │   └── funding_arbitrage.hpp / .cpp
-│   │   ├── indicator/
-│   │   │   ├── indicator_engine.hpp / .cpp
-│   │   │   ├── ema.hpp / rsi.hpp / atr.hpp
-│   │   │   ├── bollinger.hpp / macd.hpp
-│   │   │   └── zscore.hpp
-│   │   ├── risk/
-│   │   │   ├── risk_manager.hpp / .cpp
-│   │   │   └── position_sizer.hpp / .cpp
-│   │   ├── order/
-│   │   │   ├── order_manager.hpp / .cpp
-│   │   │   └── order_types.hpp
-│   │   ├── data/
-│   │   │   ├── market_data.hpp / .cpp
-│   │   │   └── candle_store.hpp / .cpp
-│   │   └── comm/
-│   │       ├── grpc_reporter.hpp / .cpp
-│   │       └── proto/
-│   ├── tests/
-│   │   ├── test_indicators.cpp
-│   │   ├── test_strategies.cpp
-│   │   └── test_risk.cpp
-│   └── config/
-│       └── config.example.yaml
-│
-├── server/                         # Monitoring Server (Node.js)
+├── server/                         # Trading Server (Node.js)
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── src/
-│   │   ├── index.ts
+│   │   ├── index.ts                # 서버 엔트리포인트
+│   │   ├── exchange/
+│   │   │   ├── exchange-base.ts    # 거래소 공통 인터페이스
+│   │   │   ├── upbit/
+│   │   │   │   ├── upbit-client.ts # REST API 클라이언트
+│   │   │   │   ├── upbit-ws.ts     # WebSocket 스트림
+│   │   │   │   └── upbit-auth.ts   # JWT 인증
+│   │   │   └── okx/
+│   │   │       ├── okx-client.ts   # REST API 클라이언트
+│   │   │       ├── okx-ws.ts       # WebSocket 스트림
+│   │   │       └── okx-auth.ts     # HMAC-SHA256 인증
+│   │   ├── indicator/
+│   │   │   └── indicator-engine.ts # EMA, RSI, ATR, z-score 등
+│   │   ├── strategy/
+│   │   │   ├── strategy-base.ts
+│   │   │   ├── btc-regime-filter.ts
+│   │   │   ├── alt-mean-reversion.ts
+│   │   │   ├── dominance-rotation.ts
+│   │   │   ├── volatility-timing.ts
+│   │   │   └── funding-arbitrage.ts
+│   │   ├── risk/
+│   │   │   ├── risk-manager.ts
+│   │   │   └── position-sizer.ts
+│   │   ├── order/
+│   │   │   ├── order-manager.ts
+│   │   │   └── order-types.ts
+│   │   ├── data/
+│   │   │   ├── market-data.ts      # WebSocket 마켓 데이터 수집
+│   │   │   └── candle-store.ts     # 캔들 데이터 저장/관리
+│   │   ├── core/
+│   │   │   ├── engine.ts           # 메인 트레이딩 엔진 (전략 스케줄링)
+│   │   │   ├── config.ts           # 설정 관리
+│   │   │   └── types.ts            # 공통 타입
 │   │   ├── routes/
 │   │   │   ├── dashboard.ts
 │   │   │   ├── strategy.ts
@@ -427,23 +392,23 @@ coin-autopilot/
 │   │   │   ├── portfolio.ts
 │   │   │   └── settings.ts
 │   │   ├── services/
-│   │   │   ├── agent-bridge.ts
 │   │   │   ├── backtest-engine.ts
 │   │   │   ├── paper-trading-manager.ts
-│   │   │   ├── market-data.ts
 │   │   │   ├── alert.ts
-│   │   │   └── kimchi-premium.ts
+│   │   │   ├── kimchi-premium.ts
+│   │   │   └── database.ts
 │   │   ├── websocket/
 │   │   │   └── hub.ts
 │   │   ├── db/
 │   │   │   ├── schema.sql
 │   │   │   ├── client.ts
 │   │   │   └── migrations/
-│   │   ├── proto/
-│   │   │   └── autopilot.ts
 │   │   └── types/
 │   │       └── index.ts
 │   └── tests/
+│       ├── test-indicators.ts
+│       ├── test-strategies.ts
+│       └── test-risk.ts
 │
 ├── web/                            # React Dashboard
 │   ├── package.json
@@ -527,9 +492,6 @@ coin-autopilot/
 │   │       ├── utils.ts
 │   │       └── constants.ts
 │   └── tests/
-│
-├── proto/                          # Shared gRPC Definitions
-│   └── autopilot.proto
 │
 └── docs/
     ├── architecture.md
@@ -735,7 +697,7 @@ GET    /api/paper-trading/compare       다중 세션 비교 데이터
 
 PUT    /api/settings/risk-profile       리스크 프로필 변경
 PUT    /api/settings/alerts             알림 설정 변경
-GET    /api/settings/agent-status       에이전트 연결 상태
+GET    /api/settings/server-status      서버 상태 (WebSocket 연결, 전략 실행 여부)
 ```
 
 ### 8.2 WebSocket Events (Server → Web)
@@ -748,30 +710,13 @@ trade:executed       체결 알림
 equity:update        자산 업데이트
 regime:change        BTC 레짐 변경
 strategy:signal      전략 신호 발생
-agent:status         에이전트 상태
+server:status        서버 상태
 alert:new            알림 이벤트
 paper:update         가상매매 상태 업데이트
 
 [클라이언트 → 서버]
 subscribe:symbol     종목 구독
 strategy:command     전략 제어 (시작/중지)
-```
-
-### 8.3 gRPC (Agent ↔ Server)
-
-```protobuf
-service AutopilotAgent {
-  // 에이전트 → 서버 (스트리밍)
-  rpc StreamStatus (stream AgentStatus) returns (Ack);
-  rpc ReportTrade (TradeReport) returns (Ack);
-  rpc StreamPositions (stream PositionSnapshot) returns (Ack);
-  rpc StreamMarketData (stream MarketTick) returns (Ack);
-  
-  // 서버 → 에이전트 (명령)
-  rpc UpdateStrategy (StrategyConfig) returns (Ack);
-  rpc ControlAgent (AgentCommand) returns (Ack);     // start, stop, pause
-  rpc UpdateRiskProfile (RiskProfile) returns (Ack);
-}
 ```
 
 ---
@@ -782,11 +727,11 @@ service AutopilotAgent {
 |------|------|
 | **API 키 저장** | AES-256-GCM 암호화 후 DB 저장, 복호화는 서버 메모리에서만 |
 | **API 키 권한** | 거래/조회만 허용, 출금 비활성화 |
-| **IP 화이트리스트** | 에이전트 서버 IP만 거래소에 등록 |
+| **IP 화이트리스트** | 서버 IP만 거래소에 등록 |
 | **출금 화이트리스트** | 거래소에서 출금 주소 화이트리스트 설정 |
-| **gRPC 통신** | mTLS (상호 TLS) 인증 |
 | **웹 인증** | Supabase Auth (이메일/패스워드 + 2FA) |
 | **환경 변수** | .env 파일 (Git 제외), 프로덕션은 Vault 또는 KMS |
+| **프로세스 격리** | 서버는 Docker 컨테이너로 운영, 최소 권한 원칙 |
 
 ---
 
@@ -794,16 +739,15 @@ service AutopilotAgent {
 
 ### Phase 0: 프로젝트 세팅 (1주)
 - [x] 모노레포 구조 생성
-- [ ] C++ 빌드 환경 (CMake + vcpkg)
-- [ ] Node.js 서버 프로젝트 초기화
+- [ ] Node.js 서버 프로젝트 초기화 (Hono + TypeScript)
 - [ ] React 웹 프로젝트 초기화 (shadcn/ui + 다크 테마)
-- [ ] gRPC proto 정의
 - [ ] Supabase 데이터베이스 스키마 적용
+- [ ] Docker 개발 환경 설정 (서버 + Redis)
 - [ ] CI/CD 기본 설정
 
 ### Phase 1: 데이터 파이프라인 (2주)
-- [ ] 업비트 REST/WebSocket 클라이언트 (C++)
-- [ ] OKX REST/WebSocket 클라이언트 (C++)
+- [ ] 업비트 REST/WebSocket 클라이언트 (TypeScript)
+- [ ] OKX REST/WebSocket 클라이언트 (TypeScript)
 - [ ] 기술지표 엔진 (EMA, RSI, ATR, z-score)
 - [ ] OHLCV 데이터 수집 + DB 저장
 - [ ] 펀딩비 데이터 수집 (OKX)
@@ -817,12 +761,12 @@ service AutopilotAgent {
 - [ ] 전략 3: 변동성 타이밍
 - [ ] 전략 4: 펀딩비 차익
 - [ ] 리스크 매니저 + 포지션 사이저
-- [ ] 서버: 백테스팅 엔진
+- [ ] 백테스팅 엔진 (워커 스레드 기반)
 - [ ] 웹: 백테스팅 UI + 결과 시각화
 - [ ] 히스토리컬 데이터 백필
 
 ### Phase 3: 가상매매 (2주)
-- [ ] 에이전트: 페이퍼 트레이딩 모드
+- [ ] 서버: 페이퍼 트레이딩 모드 (전략 엔진 + 가상 체결)
 - [ ] 서버: 가상매매 세션 관리
 - [ ] 웹: 가상매매 대시보드
 - [ ] 다중 전략 동시 실행
@@ -830,7 +774,7 @@ service AutopilotAgent {
 - [ ] 가상매매 → 실전 전환 플로우
 
 ### Phase 4: 모니터링 대시보드 (2주)
-- [ ] gRPC 양방향 통신 구현
+- [ ] WebSocket 실시간 데이터 브로드캐스트
 - [ ] 웹: 실시간 대시보드 (자산, 포지션, 손익)
 - [ ] 웹: 캔들스틱 차트 + 전략 시그널 오버레이
 - [ ] 웹: 투자 성향 프로필 선택
@@ -841,9 +785,10 @@ service AutopilotAgent {
 - [ ] 주문 관리 시스템 (주문 생성·추적·체결 확인)
 - [ ] 업비트 현물 매매 통합
 - [ ] OKX 선물 매매 통합 (격리마진, reduce-only)
-- [ ] 장애 복구 (재접속, 주문 재조회, 포지션 검증)
+- [ ] 장애 복구 (WebSocket 재접속, 주문 재조회, 포지션 검증)
 - [ ] 레이트리밋 핸들링
 - [ ] 보안 하드닝 (IP 화이트리스트, 출금 차단)
+- [ ] 프로세스 매니저 (PM2) / Docker 배포 설정
 
 ### Phase 6: 고도화 (지속)
 - [ ] 김프 모니터링 + 차익거래 보조
@@ -870,8 +815,8 @@ service AutopilotAgent {
 
 ```
 매일 확인:
-  - 에이전트 프로세스 정상 여부
-  - WebSocket 연결 상태
+  - 서버 프로세스 정상 여부 (PM2 / Docker 헬스체크)
+  - WebSocket 연결 상태 (업비트, OKX)
   - 오늘 체결 건수 및 손익
   - 레짐 상태 (Risk-On / Risk-Off)
   - 거래소 잔고 정합성 (DB vs 실제)

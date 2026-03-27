@@ -6,7 +6,6 @@ BTC 흐름 기반 현물·선물 암호화폐 자동매매 플랫폼.
 
 | 모듈 | 설명 | 기술 |
 |------|------|------|
-| `agent/` | C++ 트레이딩 에이전트 | C++20, Boost.Beast, simdjson, gRPC |
 | `server/` | 모니터링 서버 | Node.js, Hono, Supabase, Socket.IO |
 | `web/` | 대시보드 프론트엔드 | React 19, Vite, shadcn/ui, TailwindCSS |
 | `proto/` | gRPC 프로토콜 정의 | Protocol Buffers 3 |
@@ -25,13 +24,6 @@ BTC 흐름 기반 현물·선물 암호화폐 자동매매 플랫폼.
 - 투자 성향 프로필 (안전 / 중립 / 공격)
 
 ## 개발 환경
-
-### Agent (C++)
-```bash
-cd agent
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=[vcpkg-root]/scripts/buildsystems/vcpkg.cmake
-cmake --build build
-```
 
 ### Server
 ```bash
