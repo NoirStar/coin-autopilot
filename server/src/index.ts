@@ -2,8 +2,6 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
-import { Server as SocketServer } from 'socket.io'
-import { createServer } from 'node:http'
 
 import { dashboardRoutes } from './routes/dashboard.js'
 import { strategyRoutes } from './routes/strategy.js'
@@ -11,7 +9,8 @@ import { backtestRoutes } from './routes/backtest.js'
 import { paperTradingRoutes } from './routes/paper-trading.js'
 import { portfolioRoutes } from './routes/portfolio.js'
 import { settingsRoutes } from './routes/settings.js'
-import { setupWebSocket } from './websocket/hub.js'
+import { signalRoutes } from './routes/signals.js'
+import { startCronJobs } from './core/cron.js'
 
 const app = new Hono()
 
@@ -29,20 +28,14 @@ app.route('/api/backtest', backtestRoutes)
 app.route('/api/paper-trading', paperTradingRoutes)
 app.route('/api/portfolio', portfolioRoutes)
 app.route('/api/settings', settingsRoutes)
+app.route('/api/signals', signalRoutes)
 
-// Create HTTP server
+// 서버 시작
 const port = parseInt(process.env.PORT || '3001', 10)
-const httpServer = createServer(serve({ fetch: app.fetch, port }).server)
 
-// WebSocket (Socket.IO)
-const io = new SocketServer(httpServer, {
-  cors: { origin: process.env.WEB_ORIGIN || 'http://localhost:5173' },
+serve({ fetch: app.fetch, port }, () => {
+  console.log(`coin-autopilot server running on port ${port}`)
+  startCronJobs()
 })
 
-setupWebSocket(io)
-
-httpServer.listen(port, () => {
-  console.log(`🚀 coin-autopilot server running on port ${port}`)
-})
-
-export { app, io }
+export { app }

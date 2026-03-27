@@ -7,7 +7,7 @@ export function SettingsPage() {
       </div>
 
       {/* API Keys */}
-      <div className="glass-panel rounded-lg p-6">
+      <div className="card-surface rounded-md p-5">
         <h3 className="data-table-header mb-4">API 키 관리</h3>
         <div className="space-y-3">
           <div className="flex items-center justify-between rounded-lg border border-border p-4">
@@ -32,7 +32,7 @@ export function SettingsPage() {
       </div>
 
       {/* Risk Parameters */}
-      <div className="glass-panel rounded-lg p-6">
+      <div className="card-surface rounded-md p-5">
         <h3 className="data-table-header mb-4">리스크 파라미터</h3>
         <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
           <div className="flex justify-between border-b border-border pb-2">
@@ -55,7 +55,7 @@ export function SettingsPage() {
       </div>
 
       {/* Alerts */}
-      <div className="glass-panel rounded-lg p-6">
+      <div className="card-surface rounded-md p-5">
         <h3 className="data-table-header mb-4">알림 설정</h3>
         <div className="space-y-3 text-sm text-muted-foreground">
           <div className="flex items-center justify-between">

@@ -6,11 +6,13 @@ import {
   PlayCircle,
   Wallet,
   Settings,
-  Bot,
+  Signal,
+  Orbit,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '대시보드' },
+  { to: '/signals', icon: Signal, label: '시그널' },
   { to: '/strategy', icon: Brain, label: '전략 관리' },
   { to: '/backtest', icon: FlaskConical, label: '백테스팅' },
   { to: '/paper-trading', icon: PlayCircle, label: '가상매매' },
@@ -20,47 +22,50 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <aside className="flex w-64 flex-col border-r border-border bg-card">
-      {/* Logo */}
-      <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <Bot className="h-5 w-5 text-primary-foreground" />
+    <aside className="flex w-60 flex-col border-r border-border-subtle">
+      {/* 로고 */}
+      <div className="flex items-center gap-3 px-5 py-5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--accent-bg)' }}>
+          <Orbit className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <h1 className="text-sm font-bold tracking-tight">Coin Autopilot</h1>
-          <p className="text-xs text-muted-foreground">자동매매 플랫폼</p>
+          <h1 className="text-[13px] font-semibold tracking-tight">Coin Autopilot</h1>
+          <p className="text-[10px] text-text-muted">BTC 기반 자동매매</p>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-3">
+      {/* 구분선 */}
+      <div className="mx-4 h-px bg-border-subtle" />
+
+      {/* 네비게이션 */}
+      <nav className="flex-1 space-y-0.5 px-3 py-3">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
                 isActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  ? 'text-primary' + ' bg-[var(--accent-bg)]'
+                  : 'text-text-muted hover:bg-surface-hover hover:text-foreground'
               }`
             }
           >
-            <item.icon className="h-4 w-4" />
+            <item.icon className="h-[15px] w-[15px]" />
             {item.label}
           </NavLink>
         ))}
       </nav>
 
-      {/* Agent Status */}
-      <div className="border-t border-border p-4">
-        <div className="glass-panel rounded-lg p-3">
+      {/* 에이전트 상태 */}
+      <div className="mx-3 mb-3">
+        <div className="card-surface rounded-md px-3 py-2.5">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-profit status-active" />
-            <span className="text-xs font-medium">에이전트 연결됨</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-profit status-active" />
+            <span className="text-[11px] font-medium text-text-primary">에이전트 연결됨</span>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">Mode: Paper Trading</p>
+          <p className="mt-0.5 pl-3.5 text-[10px] text-text-muted">Paper Trading</p>
         </div>
       </div>
     </aside>

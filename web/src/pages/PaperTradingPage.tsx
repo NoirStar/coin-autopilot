@@ -12,17 +12,17 @@ export function PaperTradingPage() {
       </div>
 
       {/* Active Sessions */}
-      <div className="glass-panel rounded-lg p-6">
+      <div className="card-surface rounded-md p-5">
         <h3 className="data-table-header mb-4">활성 세션</h3>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-text-muted">
           실행 중인 가상매매 세션이 없습니다. 새 세션을 시작하세요.
         </div>
       </div>
 
       {/* Strategy Comparison */}
-      <div className="glass-panel rounded-lg p-6">
+      <div className="card-surface rounded-md p-5">
         <h3 className="data-table-header mb-4">전략 비교</h3>
-        <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+        <div className="flex h-64 items-center justify-center text-sm text-text-muted">
           다중 세션 실행 시 전략 간 성과 비교가 표시됩니다
         </div>
       </div>

@@ -22,10 +22,10 @@ BTC 흐름 기반 현물·선물 암호화폐 자동매매 플랫폼.
 ## 기술 스택
 
 ```
-Backend:   Vercel Serverless Functions
+Backend:   Node.js + Hono (VPS, 24시간 실행)
 Database:  Supabase (PostgreSQL)
-Schedule:  Vercel Cron
-Deploy:    Vercel
+Schedule:  node-cron (VPS)
+Frontend:  Vercel (React + Vite)
 ```
 
 ## 코드 원칙
@@ -68,6 +68,19 @@ Deploy:    Vercel
   - `/guard` — 전체 안전 모드
   - `/unfreeze` — freeze 해제
   - `/gstack-upgrade` — gstack 업그레이드
+
+## 디자인 시스템
+
+DESIGN.md를 반드시 읽은 후 UI/비주얼 작업 진행.
+폰트, 색상, 스페이싱, 미학 방향 모두 DESIGN.md에 정의됨.
+사용자 승인 없이 DESIGN.md와 다른 디자인 결정 금지.
+QA 모드에서 DESIGN.md와 불일치하는 코드는 플래그 처리.
+
+핵심 규칙:
+- opacity 트릭 금지 (`text-muted-foreground/30` 등). 실제 색상 토큰만 사용
+- glass-panel, cosmic-surface, backdrop-filter, cosmic-bg, noise-overlay 사용 금지
+- 장식적 그라데이션, 파티클, 글로우 효과 금지
+- 이모지 금지, Lucide 아이콘만 사용
 
 ## 서브 가이드 참조
 

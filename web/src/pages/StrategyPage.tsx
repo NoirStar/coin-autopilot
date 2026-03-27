@@ -9,7 +9,7 @@ export function StrategyPage() {
       </div>
 
       {/* Risk Profile Selector */}
-      <div className="glass-panel rounded-lg p-6">
+      <div className="card-surface rounded-md p-5">
         <h3 className="data-table-header mb-4">투자 성향</h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <ProfileCard
@@ -38,7 +38,7 @@ export function StrategyPage() {
       </div>
 
       {/* Strategy List */}
-      <div className="glass-panel rounded-lg p-6">
+      <div className="card-surface rounded-md p-5">
         <h3 className="data-table-header mb-4">전략 목록</h3>
         <div className="space-y-3">
           <StrategyCard
@@ -80,10 +80,10 @@ function ProfileCard({ name, description, leverage, maxPositions, mdd, active }:
   active?: boolean
 }) {
   return (
-    <div className={`rounded-lg border p-4 transition-colors cursor-pointer ${
+    <div className={`rounded-md border p-4 transition-colors cursor-pointer ${
       active
-        ? 'border-primary bg-primary/5'
-        : 'border-border hover:border-muted-foreground'
+        ? 'border-primary bg-[var(--accent-bg)]'
+        : 'border-border-subtle hover:border-border'
     }`}>
       <h4 className="font-semibold">{name}</h4>
       <p className="mt-1 text-xs text-muted-foreground">{description}</p>
@@ -109,7 +109,7 @@ function StrategyCard({ name, type, status, description }: {
           <h4 className="font-medium">{name}</h4>
           <span className={`rounded px-2 py-0.5 text-xs font-medium ${
             status === 'active'
-              ? 'bg-profit/10 text-profit'
+              ? 'bg-[var(--profit-bg)] text-profit'
               : 'bg-muted text-muted-foreground'
           }`}>
             {status === 'active' ? '활성' : '비활성'}

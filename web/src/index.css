@@ -4,82 +4,68 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   Coin Autopilot — Dark Trading Theme
-   Design System: IBM Carbon + Fluent Design + GitHub Primer
+   Coin Autopilot — Terminal Ink Design System
+   Data-centric minimal dark UI. No decorative elements.
+   See DESIGN.md for full specification.
    ============================================================ */
 
+/* Dark mode only — no light theme needed */
 :root {
-  /* Light mode (fallback) */
-  --background: oklch(0.98 0.005 260);
-  --foreground: oklch(0.15 0.02 260);
-  --card: oklch(0.96 0.005 260);
-  --card-foreground: oklch(0.15 0.02 260);
-  --popover: oklch(0.98 0.005 260);
-  --popover-foreground: oklch(0.15 0.02 260);
-  --primary: oklch(0.55 0.15 145);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.92 0.01 260);
-  --secondary-foreground: oklch(0.20 0.02 260);
-  --muted: oklch(0.92 0.01 260);
-  --muted-foreground: oklch(0.50 0.01 260);
-  --accent: oklch(0.55 0.12 255);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.01 260);
-  --input: oklch(0.88 0.01 260);
-  --ring: oklch(0.55 0.15 145);
-  --radius: 0.5rem;
+  /* Neutrals (cool zinc) */
+  --background: #0a0a0c;
+  --foreground: #e4e4e7;
+  --card: #111114;
+  --card-foreground: #e4e4e7;
+  --popover: #111114;
+  --popover-foreground: #e4e4e7;
+  --primary: #a78bfa;
+  --primary-foreground: #0a0a0c;
+  --secondary: #18181b;
+  --secondary-foreground: #a1a1aa;
+  --muted: #18181b;
+  --muted-foreground: #71717a;
+  --accent: #a78bfa;
+  --accent-foreground: #0a0a0c;
+  --destructive: #f87171;
+  --destructive-foreground: #fafafa;
+  --border: #27272a;
+  --input: #18181b;
+  --ring: #a78bfa;
+  --radius: 0.375rem;
 
-  /* Trading-specific */
-  --profit: oklch(0.65 0.19 145);
-  --loss: oklch(0.60 0.22 25);
-  --warning: oklch(0.80 0.18 85);
-  --info: oklch(0.70 0.16 255);
-  --regime-on: oklch(0.65 0.19 145);
-  --regime-off: oklch(0.60 0.22 25);
-  --regime-neutral: oklch(0.75 0.15 85);
+  /* Surface variants */
+  --surface: #111114;
+  --surface-hover: #18181b;
+  --border-subtle: #1e1e22;
 
-  /* Chart colors */
-  --chart-1: oklch(0.65 0.19 145);
-  --chart-2: oklch(0.60 0.16 255);
-  --chart-3: oklch(0.70 0.18 85);
-  --chart-4: oklch(0.55 0.22 25);
-  --chart-5: oklch(0.60 0.14 320);
-}
+  /* Text hierarchy — NO opacity tricks */
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-faint: #52525b;
 
-.dark {
-  /* Primary dark theme — Deep navy trading UI */
-  --background: oklch(0.13 0.02 260);
-  --foreground: oklch(0.93 0.01 260);
-  --card: oklch(0.17 0.02 260);
-  --card-foreground: oklch(0.93 0.01 260);
-  --popover: oklch(0.15 0.02 260);
-  --popover-foreground: oklch(0.93 0.01 260);
-  --primary: oklch(0.65 0.19 145);
-  --primary-foreground: oklch(0.13 0.02 260);
-  --secondary: oklch(0.22 0.02 260);
-  --secondary-foreground: oklch(0.85 0.01 260);
-  --muted: oklch(0.22 0.02 260);
-  --muted-foreground: oklch(0.60 0.01 260);
-  --accent: oklch(0.70 0.16 255);
-  --accent-foreground: oklch(0.13 0.02 260);
-  --destructive: oklch(0.60 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.25 0.02 260);
-  --input: oklch(0.22 0.02 260);
-  --ring: oklch(0.65 0.19 145);
+  /* Semantic */
+  --profit: #2dd4a8;
+  --loss: #f87171;
+  --warning: #fbbf24;
+  --info: #60a5fa;
+  --regime-on: #2dd4a8;
+  --regime-off: #f87171;
+  --regime-neutral: #fbbf24;
 
-  --profit: oklch(0.65 0.19 145);
-  --loss: oklch(0.60 0.22 25);
-  --warning: oklch(0.80 0.18 85);
-  --info: oklch(0.70 0.16 255);
+  /* Semantic backgrounds (8-digit hex alpha, NOT opacity tricks) */
+  --profit-bg: #2dd4a812;
+  --loss-bg: #f8717112;
+  --warning-bg: #fbbf2410;
+  --info-bg: #60a5fa10;
+  --accent-bg: #a78bfa10;
 
-  --chart-1: oklch(0.65 0.19 145);
-  --chart-2: oklch(0.70 0.16 255);
-  --chart-3: oklch(0.80 0.18 85);
-  --chart-4: oklch(0.60 0.22 25);
-  --chart-5: oklch(0.65 0.14 320);
+  /* Charts */
+  --chart-1: #2dd4a8;
+  --chart-2: #a78bfa;
+  --chart-3: #fbbf24;
+  --chart-4: #f87171;
+  --chart-5: #60a5fa;
 }
 
 @theme inline {
@@ -104,13 +90,19 @@
   --color-ring: var(--ring);
   --radius: var(--radius);
 
-  /* Trading colors */
   --color-profit: var(--profit);
   --color-loss: var(--loss);
   --color-warning: var(--warning);
   --color-info: var(--info);
 
-  /* Chart */
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-subtle: var(--border-subtle);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -118,59 +110,82 @@
   --color-chart-5: var(--chart-5);
 }
 
-/* Fluent Design — Glassmorphism for cards */
-.glass-panel {
-  background: oklch(0.17 0.02 260 / 0.7);
-  backdrop-filter: blur(12px) saturate(1.5);
-  border: 1px solid oklch(0.30 0.02 260 / 0.3);
+/* Card — flat surface, no glass/blur/gradient */
+.card-surface {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
 }
 
-/* Status indicator pulse */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 4px var(--profit); }
-  50% { box-shadow: 0 0 12px var(--profit); }
+.card-surface:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+/* Status indicator — subtle pulse */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .status-active {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: status-pulse 2.5s ease-in-out infinite;
 }
 
-/* Data table styles (Carbon-inspired) */
+/* Skeleton shimmer for loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #18181b 25%,
+    #27272a 50%,
+    #18181b 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Data table header — DESIGN.md spec */
 .data-table-header {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-foreground);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
 }
 
-/* Scrollbar styling */
+/* Scrollbar — minimal */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--background);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+  background: #27272a80;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+  background: #52525b99;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--background);
+  color: var(--foreground);
 }
 
-/* Monospace for numbers/prices */
+/* Monospace for numbers */
 .font-mono-trading {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-variant-numeric: tabular-nums;
 }
