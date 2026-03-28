@@ -2,9 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Radar,
-  TrendingDown,
   Activity,
-  BarChart3,
   Clock,
   RefreshCw,
   Loader2,
@@ -14,7 +12,6 @@ import {
   Search,
 } from 'lucide-react'
 import { api } from '../services/api'
-import { TermTooltip } from '../components/ui/term-tooltip'
 
 interface DetectionSignal {
   active: boolean

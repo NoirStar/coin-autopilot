@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Orbit, ArrowRight, X, Shield, FlaskConical, PlayCircle } from 'lucide-react'
 

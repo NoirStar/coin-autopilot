@@ -8,19 +8,12 @@ import {
   Loader2,
   Inbox,
   BarChart3,
-  Clock,
-  TrendingUp,
-  TrendingDown,
-  ChevronDown,
   AlertTriangle,
-  RefreshCw,
   X,
 } from 'lucide-react'
 import { api } from '../services/api'
-import { usePaperTradingStore } from '../stores/paper-trading-store'
 import { TermTooltip } from '../components/ui/term-tooltip'
 import { formatPercent } from '../lib/utils'
-import type { PaperSession } from '../types/trading'
 
 interface SessionResponse {
   data: PaperSessionRow[]
