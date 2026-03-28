@@ -37,7 +37,7 @@ export function DetectionPage() {
   // 폴백: SSE 실패 시 POST /refresh로 스캔
   const fallbackScan = async () => {
     try {
-      setScanProgress({ current: 0, total: 1, symbol: '전체 스캔 중...' })
+      setScanProgress({ current: -1, total: 0, symbol: '서버에서 전체 스캔 중 (약 40초 소요)' })
       await api.refreshDetection()
       setScanProgress(null)
       setScanning(false)
@@ -126,18 +126,24 @@ export function DetectionPage() {
             <div className="flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
               <span className="text-text-muted">
-                <span className="font-medium text-text-secondary">{scanProgress.symbol || '마켓 목록 로딩'}</span> 스캔 중
+                <span className="font-medium text-text-secondary">{scanProgress.symbol || '마켓 목록 로딩'}</span>{scanProgress.current >= 0 ? ' 스캔 중' : ''}
               </span>
             </div>
-            <span className="font-mono-trading text-text-muted">
-              {scanProgress.current}/{scanProgress.total}
-            </span>
+            {scanProgress.current >= 0 && (
+              <span className="font-mono-trading text-text-muted">
+                {scanProgress.current}/{scanProgress.total}
+              </span>
+            )}
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
-            <div
-              className="h-full rounded-full bg-[var(--accent)] transition-all duration-150"
-              style={{ width: scanProgress.total > 0 ? `${(scanProgress.current / scanProgress.total) * 100}%` : '0%' }}
-            />
+            {scanProgress.current >= 0 ? (
+              <div
+                className="h-full rounded-full bg-[var(--accent)] transition-all duration-150"
+                style={{ width: scanProgress.total > 0 ? `${(scanProgress.current / scanProgress.total) * 100}%` : '0%' }}
+              />
+            ) : (
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-[var(--accent)]/60" style={{ animation: 'indeterminate 1.5s ease-in-out infinite' }} />
+            )}
           </div>
         </div>
       )}
@@ -432,7 +438,9 @@ function getAtrDesc(atr: number): string {
 }
 
 function getTimeAgo(timestamp: string): string {
-  const diff = Date.now() - new Date(timestamp).getTime()
+  const diff = Math.max(0, Date.now() - new Date(timestamp).getTime())
+  const seconds = Math.floor(diff / 1000)
+  if (seconds < 60) return '방금 전'
   const minutes = Math.floor(diff / 60_000)
   if (minutes < 60) return `${minutes}분 전`
   const hours = Math.floor(minutes / 60)

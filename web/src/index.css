@@ -131,6 +131,12 @@
   animation: status-pulse 2.5s ease-in-out infinite;
 }
 
+/* Indeterminate progress bar */
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
 /* Skeleton shimmer for loading */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
