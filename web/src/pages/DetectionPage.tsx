@@ -373,7 +373,7 @@ function getRecommendation(result: DetectionResultItem): { label: string; color:
   const activeCount = Object.values(result.signals).filter((s) => s.active).length
 
   if (rsi14 >= 70) {
-    return { label: '매도 주의', color: 'bg-[var(--loss-bg)] text-loss' }
+    return { label: '매수과열 주의', color: 'bg-[var(--loss-bg)] text-loss' }
   }
 
   if (score >= 0.8 && activeCount >= 4) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }

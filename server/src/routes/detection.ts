@@ -265,7 +265,17 @@ detectionRoutes.get('/scan/stream', async (c) => {
   return streamSSE(c, async (stream) => {
     const startTime = Date.now()
     try {
-      const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
+      let btcCandles: Candle[]
+      try {
+        btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
+      } catch (btcErr) {
+        console.error('[탐지 SSE] BTC 캔들 조회 실패:', btcErr)
+        await stream.writeSSE({
+          data: JSON.stringify({ type: 'error', message: 'BTC 캔들 조회 실패 (업비트 API 오류)' }),
+          event: 'scan-error',
+        })
+        return
+      }
       if (btcCandles.length < 21) {
         await stream.writeSSE({
           data: JSON.stringify({ type: 'error', message: `BTC 데이터 부족 (${btcCandles.length}/21)` }),
@@ -277,8 +287,19 @@ detectionRoutes.get('/scan/stream', async (c) => {
       const now = new Date()
       const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
 
-      const allKrwSymbols = await fetchUpbitKrwSymbols()
-      const koreanNames = await fetchUpbitKoreanNameMap()
+      let allKrwSymbols: string[]
+      let koreanNames: Map<string, string>
+      try {
+        allKrwSymbols = await fetchUpbitKrwSymbols()
+        koreanNames = await fetchUpbitKoreanNameMap()
+      } catch (symbolErr) {
+        console.error('[탐지 SSE] 심볼 목록 조회 실패:', symbolErr)
+        await stream.writeSSE({
+          data: JSON.stringify({ type: 'error', message: '업비트 마켓 목록 조회 실패' }),
+          event: 'scan-error',
+        })
+        return
+      }
       const total = allKrwSymbols.length
 
       await stream.writeSSE({
@@ -366,7 +387,7 @@ detectionRoutes.get('/scan/stream', async (c) => {
         event: 'complete',
       })
     } catch (err) {
-      console.error('SSE 탐지 스캔 오류:', err)
+      console.error('[탐지 SSE] 스캔 오류:', err)
       await stream.writeSSE({
         data: JSON.stringify({ type: 'error', message: '탐지 스캔 실패' }),
         event: 'scan-error',

@@ -246,15 +246,33 @@ export function runBacktest(
   // 기간 일수
   const periodDays = periodDaysCalc(equityCurve)
 
-  // Sharpe (연환산): mean/std * sqrt(연간 거래수)
+  // Sharpe (연환산): 에쿼티 커브 일별 수익률 기반
   let sharpeRatio = 0
-  if (trades.length > 1 && periodDays > 0) {
-    const returns = trades.map((t) => t.pnlPct / 100)
-    const mean = returns.reduce((a, b) => a + b, 0) / returns.length
-    const variance = returns.reduce((acc, r) => acc + (r - mean) ** 2, 0) / returns.length
-    const std = Math.sqrt(variance)
-    const annualizedTrades = trades.length * (365 / periodDays)
-    sharpeRatio = std > 0 ? (mean / std) * Math.sqrt(annualizedTrades) : 0
+  if (equityCurve.length > 2 && periodDays > 0) {
+    // 에쿼티 커브를 일별로 샘플링하여 수익률 계산
+    const dailyReturns: number[] = []
+    const msPerDay = 24 * 60 * 60 * 1000
+    let prevEquity = equityCurve[0].equity
+    let prevTime = new Date(equityCurve[0].t).getTime()
+
+    for (let j = 1; j < equityCurve.length; j++) {
+      const curTime = new Date(equityCurve[j].t).getTime()
+      // 하루 이상 경과한 시점에서 수익률 기록
+      if (curTime - prevTime >= msPerDay) {
+        const ret = (equityCurve[j].equity - prevEquity) / prevEquity
+        dailyReturns.push(ret)
+        prevEquity = equityCurve[j].equity
+        prevTime = curTime
+      }
+    }
+
+    if (dailyReturns.length > 1) {
+      const mean = dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length
+      const variance = dailyReturns.reduce((acc, r) => acc + (r - mean) ** 2, 0) / dailyReturns.length
+      const std = Math.sqrt(variance)
+      // 연환산: 일별 수익률 기준 sqrt(365)
+      sharpeRatio = std > 0 ? (mean / std) * Math.sqrt(365) : 0
+    }
   }
 
   // CAGR
