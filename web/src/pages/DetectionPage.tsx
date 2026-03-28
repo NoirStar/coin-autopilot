@@ -14,7 +14,7 @@ import {
   TrendingDown,
   BarChart3,
 } from 'lucide-react'
-import { api, API_BASE } from '../services/api'
+import { API_BASE } from '../services/api'
 
 interface DetectionSignal {
   active: boolean
