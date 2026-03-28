@@ -83,7 +83,7 @@ export function DetectionPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">코인 분석</h1>
         <p className="text-[13px] text-text-muted">
-          업비트 KRW 마켓 · <span className="font-mono-trading">1</span>시간봉 기준 · ��수 점수 산출
+          업비트 KRW 마켓 · <span className="font-mono-trading">1</span>시간봉 기준 · 매수 점수 산출
         </p>
       </div>
 
@@ -202,7 +202,7 @@ export function DetectionPage() {
           <IndicatorInfo name="RSI(14)" description="과매수/과매도 지표 (0~100). 30 이하 과매도, 70 이상 과매수." />
           <IndicatorInfo name="거래량 Z-Score" weight="25%" description="20일 평균 대비 거래량 이상치. Z > 2.5이면 활성." />
           <IndicatorInfo name="BTC 보정 급등" weight="25%" description="BTC 연동분 제거 후 독립 상승률. > 2%이면 활성." />
-          <IndicatorInfo name="호가 불��형" weight="20%" description="매수/매도 호가 비율. Bid/Ask > 2.0이면 활성." />
+          <IndicatorInfo name="호가 불균형" weight="20%" description="매수/매도 호가 비율. Bid/Ask > 2.0이면 활성." />
           <IndicatorInfo name="OBV 다이버전스" weight="15%" description="가격 하락 + 거래량 상승 = 숨겨진 축적." />
           <IndicatorInfo name="9시 리셋" weight="15%" description="업비트 09:00 리셋 직후 상승 모멘텀. > 1%이면 활성." />
         </div>
