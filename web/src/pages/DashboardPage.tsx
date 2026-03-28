@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   TrendingDown,
@@ -12,6 +13,9 @@ import {
 import { BtcCandleChart } from '../components/charts/BtcCandleChart'
 import { supabase } from '../lib/supabase'
 import { TermTooltip } from '../components/ui/term-tooltip'
+import { useAuth } from '../hooks/useAuth'
+import { WelcomeModal } from '../components/onboarding/WelcomeModal'
+import { OnboardingChecklist } from '../components/onboarding/OnboardingChecklist'
 
 interface RegimeState {
   regime: 'risk_on' | 'risk_off'
@@ -111,13 +115,54 @@ function useActiveSignalCount() {
 }
 
 export function DashboardPage() {
+  const { user } = useAuth()
   const { data: regime } = useRegime()
   const { data: perf } = useBacktestPerformance()
   const { data: activeCount } = useActiveSignalCount()
   const { data: recentSignals } = useRecentSignals()
 
+  // 온보딩 상태
+  const [showWelcome, setShowWelcome] = useState(false)
+  const [checklistDismissed, setChecklistDismissed] = useState(false)
+
+  useEffect(() => {
+    if (user && !localStorage.getItem('onboarding_complete')) {
+      setShowWelcome(true)
+    }
+  }, [user])
+
+  const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true'
+  const profileSelected = localStorage.getItem('profile_selected') === 'true'
+  const backtestRun = (perf?.total_trades ?? 0) > 0
+  const paperStarted = false // TODO: paper session count 조회
+
   return (
     <div className="space-y-5">
+      {/* 온보딩 */}
+      <WelcomeModal
+        open={showWelcome}
+        onClose={() => {
+          setShowWelcome(false)
+          localStorage.setItem('onboarding_complete', 'true')
+        }}
+        onComplete={() => {
+          setShowWelcome(false)
+          localStorage.setItem('onboarding_complete', 'true')
+        }}
+      />
+
+      {user && !onboardingComplete && !checklistDismissed && (
+        <OnboardingChecklist
+          profileSelected={profileSelected}
+          backtestRun={backtestRun}
+          paperStarted={paperStarted}
+          onDismiss={() => {
+            setChecklistDismissed(true)
+            localStorage.setItem('onboarding_complete', 'true')
+          }}
+        />
+      )}
+
       {/* 헤더 */}
       <div className="flex items-end justify-between">
         <div>

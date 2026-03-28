@@ -1,6 +1,7 @@
 import cron from 'node-cron'
 import { generateSignals } from '../services/signal-generator.js'
 import { runPaperTradingCycle } from '../services/paper-trading-engine.js'
+import { runExecutionCycle } from '../services/execution-engine.js'
 import { supabase } from '../services/database.js'
 
 /**
@@ -20,6 +21,15 @@ export function startCronJobs(): void {
       await runPaperTradingCycle()
     } catch (err) {
       console.error('[크론] 가상매매 사이클 오류:', err)
+    }
+
+    // 실전매매 사이클 (LIVE_TRADING=true 환경변수로 활성화)
+    if (process.env.LIVE_TRADING === 'true') {
+      try {
+        await runExecutionCycle({ enabled: true })
+      } catch (err) {
+        console.error('[크론] 실전매매 사이클 오류:', err)
+      }
     }
   })
 

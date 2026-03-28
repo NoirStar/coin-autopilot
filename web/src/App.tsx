@@ -8,6 +8,7 @@ import { PaperTradingPage } from '@/pages/PaperTradingPage'
 import { PortfolioPage } from '@/pages/PortfolioPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SignalsPage } from '@/pages/SignalsPage'
+import { DetectionPage } from '@/pages/DetectionPage'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         {/* public */}
         <Route path="/" element={<DashboardPage />} />
         <Route path="/signals" element={<SignalsPage />} />
+        <Route path="/detection" element={<DetectionPage />} />
 
         {/* private – auth required */}
         <Route path="/strategy" element={<AuthGuard><StrategyPage /></AuthGuard>} />

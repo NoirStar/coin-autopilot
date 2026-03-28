@@ -8,21 +8,23 @@ import {
   Settings,
   Signal,
   Orbit,
+  Radar,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '대시보드' },
-  { to: '/signals', icon: Signal, label: '시그널' },
-  { to: '/strategy', icon: Brain, label: '전략 관리' },
+  { to: '/signals', icon: Signal, label: '시���널' },
+  { to: '/detection', icon: Radar, label: '알트 탐지' },
+  { to: '/strategy', icon: Brain, label: '전략 관��' },
   { to: '/backtest', icon: FlaskConical, label: '백테스팅' },
   { to: '/paper-trading', icon: PlayCircle, label: '가상매매' },
-  { to: '/portfolio', icon: Wallet, label: '포트폴리오' },
+  { to: '/portfolio', icon: Wallet, label: '포��폴리��' },
   { to: '/settings', icon: Settings, label: '설정' },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <aside className="flex w-60 flex-col border-r border-border-subtle">
+    <aside className="flex h-full w-60 flex-col border-r border-border-subtle bg-background">
       {/* 로고 */}
       <div className="flex items-center gap-3 px-5 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--accent-bg)' }}>
@@ -34,7 +36,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* 구분선 */}
       <div className="mx-4 h-px bg-border-subtle" />
 
       {/* 네비게이션 */}
@@ -44,10 +45,11 @@ export function Sidebar() {
             key={item.to}
             to={item.to}
             end={item.to === '/'}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
                 isActive
-                  ? 'text-primary' + ' bg-[var(--accent-bg)]'
+                  ? 'text-primary bg-[var(--accent-bg)]'
                   : 'text-text-muted hover:bg-surface-hover hover:text-foreground'
               }`
             }
@@ -63,9 +65,9 @@ export function Sidebar() {
         <div className="card-surface rounded-md px-3 py-2.5">
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-profit status-active" />
-            <span className="text-[11px] font-medium text-text-primary">에이전트 연결됨</span>
+            <span className="text-[11px] font-medium text-text-primary">서버 연결됨</span>
           </div>
-          <p className="mt-0.5 pl-3.5 text-[10px] text-text-muted">Paper Trading</p>
+          <p className="mt-0.5 pl-3.5 text-[10px] text-text-muted">4H 주기 자동 실행</p>
         </div>
       </div>
     </aside>

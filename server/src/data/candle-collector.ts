@@ -6,6 +6,8 @@ const OKX_API = 'https://www.okx.com/api/v5'
 
 /** 타임프레임 → 업비트 분봉 단위 */
 const TIMEFRAME_MINUTES: Partial<Record<Timeframe, number>> = {
+  '5m': 5,
+  '15m': 15,
   '1h': 60,
   '4h': 240,
   '1d': 1440,
@@ -13,6 +15,8 @@ const TIMEFRAME_MINUTES: Partial<Record<Timeframe, number>> = {
 
 /** 타임프레임 → OKX bar 파라미터 */
 const OKX_BAR: Partial<Record<Timeframe, string>> = {
+  '5m': '5m',
+  '15m': '15m',
   '1h': '1H',
   '4h': '4H',
   '1d': '1D',

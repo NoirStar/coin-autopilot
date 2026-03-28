@@ -18,11 +18,15 @@
     "hono": "^4.7.10",
     "node-cron": "^3.0.3",
     "technicalindicators": "^3.1.0",
+    "uuid": "^13.0.0",
+    "ws": "^8.20.0",
     "zod": "^3.25.20"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",
     "@types/node-cron": "^3.0.11",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "tsup": "^8.5.0",
     "tsx": "^4.19.4",
     "typescript": "~5.9.3",
