@@ -328,12 +328,12 @@ function MarketDashboard() {
       {/* BTC 가격 */}
       <div className="card-surface rounded-md px-4 py-3">
         <div className="text-[12px] font-semibold text-text-muted">BTC 가격</div>
-        <div className="mt-1.5">
-          <span className="font-mono-trading text-[14px] font-semibold text-text-primary">
+        <div className="mt-1.5 flex items-baseline gap-1.5 overflow-hidden">
+          <span className="whitespace-nowrap font-mono-trading text-[14px] font-semibold text-text-primary">
             {btcPrice?.price ? formatKrw(btcPrice.price) : '—'}
           </span>
           {btcPrice?.changeRate !== undefined && (
-            <span className={`ml-1.5 font-mono-trading text-[12px] ${btcPrice.changeRate >= 0 ? 'text-profit' : 'text-loss'}`}>
+            <span className={`whitespace-nowrap font-mono-trading text-[12px] ${btcPrice.changeRate >= 0 ? 'text-profit' : 'text-loss'}`}>
               {btcPrice.changeRate >= 0 ? '+' : ''}{(btcPrice.changeRate * 100).toFixed(2)}%
             </span>
           )}
@@ -344,7 +344,7 @@ function MarketDashboard() {
       <div className="card-surface rounded-md px-4 py-3">
         <div className="text-[12px] font-semibold text-text-muted">활성 시그널</div>
         <div className="mt-1.5">
-          <span className={`font-mono-trading text-[14px] font-semibold ${signalCount > 0 ? 'text-profit' : 'text-text-primary'}`}>
+          <span className={`whitespace-nowrap font-mono-trading text-[14px] font-semibold ${signalCount > 0 ? 'text-profit' : 'text-text-primary'}`}>
             {signalCount}개
           </span>
         </div>
@@ -403,7 +403,7 @@ function RegimeHero() {
             </p>
           </div>
         </div>
-        <span className="text-[12px] text-text-muted">{timeAgo}</span>
+        <span className="shrink-0 whitespace-nowrap text-[12px] text-text-muted">{timeAgo}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
