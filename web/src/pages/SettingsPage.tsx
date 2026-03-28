@@ -8,13 +8,10 @@ import {
   RotateCcw,
   Loader2,
   Check,
-  AlertTriangle,
   Trash2,
   Bell,
   Shield,
   Server,
-  Clock,
-  X,
 } from 'lucide-react'
 import { api } from '../services/api'
 import { useSettingsStore } from '../stores/settings-store'
@@ -60,7 +57,7 @@ const DEFAULT_RISK = {
 }
 
 export function SettingsPage() {
-  const queryClient = useQueryClient()
+  const _queryClient = useQueryClient()
   const { setUpbitConfigured, setOkxConfigured } = useSettingsStore()
 
   const { data: settingsResponse, isLoading } = useQuery<SettingsResponse>({

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Shield,
@@ -9,7 +9,6 @@ import {
   RotateCcw,
   Loader2,
   AlertTriangle,
-  RefreshCw,
   Settings2,
   Lock,
 } from 'lucide-react'

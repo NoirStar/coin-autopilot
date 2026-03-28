@@ -3,14 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Key,
   FileText,
-  AlertTriangle,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
-  ArrowUpRight,
   Settings,
-  TrendingUp,
-  TrendingDown,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
@@ -58,7 +53,7 @@ export function PortfolioPage() {
   const [exchangeFilter, setExchangeFilter] = useState('')
   const pageSize = 20
 
-  const { data: balance, isLoading: balanceLoading, error: balanceError } = useQuery<BalanceResponse>({
+  const { data: balance, isLoading: balanceLoading } = useQuery<BalanceResponse>({
     queryKey: ['portfolio-balance'],
     queryFn: () => api.getBalance() as Promise<BalanceResponse>,
   })
@@ -251,7 +246,7 @@ export function PortfolioPage() {
   )
 }
 
-function ExchangeCard({ name, type, currency, configured, balance, positions, isLoading, onGoToSettings, formatBalance }: {
+function ExchangeCard({ name, type, currency: _currency, configured, balance, positions, isLoading, onGoToSettings, formatBalance }: {
   name: string
   type: string
   currency: string
