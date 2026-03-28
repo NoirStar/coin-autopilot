@@ -2,6 +2,41 @@ import { supabase } from '../lib/supabase'
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+export interface DetectionResultItem {
+  symbol: string
+  koreanName: string
+  score: number
+  rsi14: number
+  atrPct: number
+  changePct: number
+  price: number
+  signals: {
+    volumeZScore: { active: boolean; value: number; weight: number }
+    btcAdjustedPump: { active: boolean; value: number; weight: number }
+    orderbookImbalance: { active: boolean; value: number; weight: number }
+    obvDivergence: { active: boolean; value: string; weight: number }
+    morningReset: { active: boolean; value: number; weight: number }
+  }
+  reasoning: Record<string, unknown>
+}
+
+export interface DetectionCacheResponse {
+  cached: boolean
+  message?: string
+  scannedAt?: string
+  totalScanned?: number
+  detected?: number
+  results?: DetectionResultItem[]
+  scanDurationMs?: number
+}
+
+export interface DetectionScanResult {
+  scannedAt: string
+  totalScanned: number
+  detected: number
+  results: DetectionResultItem[]
+}
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()
   if (session?.access_token) {
@@ -66,6 +101,8 @@ export const api = {
   // Detection (알트코인 탐지)
   scanDetection: (strategy?: string) => request(`/api/detection/scan${strategy ? `?strategy=${strategy}` : ''}`),
   getDetectionScore: (symbol: string) => request(`/api/detection/score/${symbol}`),
+  getDetectionCached: () => request<DetectionCacheResponse>('/api/detection/cached'),
+  refreshDetection: () => request<DetectionScanResult>('/api/detection/refresh', { method: 'POST' }),
 
   // Settings
   getSettings: () => request('/api/settings'),

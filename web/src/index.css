@@ -184,7 +184,7 @@
 }
 
 body {
-  font-family: 'Geist', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Geist', 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.6; /* 한글 텍스트 line-height 상향 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

@@ -144,6 +144,7 @@ create table if not exists paper_sessions (
   id bigint generated always as identity primary key,
   user_id uuid references auth.users not null,
   strategy_id bigint references strategies,
+  strategy_type text,
   name text not null,
   initial_capital numeric not null default 10000000,
   current_equity numeric not null default 10000000,

@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   TrendingUp,
   TrendingDown,
-  ShieldCheck,
   ShieldAlert,
   ChevronDown,
   ChevronUp,
@@ -13,9 +12,12 @@ import {
   Activity,
   BarChart3,
   Clock,
+  Thermometer,
+  Loader2,
+  ArrowRight,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { api } from '../services/api'
+import { api, type DetectionCacheResponse, type DetectionResultItem } from '../services/api'
 import { TermTooltip } from '../components/ui/term-tooltip'
 
 // --- 타입 ---
@@ -118,6 +120,15 @@ function usePerformance() {
   })
 }
 
+function useDetectionCache() {
+  return useQuery({
+    queryKey: ['detection-cache'],
+    queryFn: () => api.getDetectionCached(),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+  })
+}
+
 // --- Fear & Greed ---
 
 interface FearGreedResponse {
@@ -140,29 +151,68 @@ function useFearGreed() {
   })
 }
 
-// --- 매수 환경 라벨 ---
+// --- BTC 도미넌스 ---
 
-type BuyEnvironment = { label: string; color: string }
-
-function getBuyEnvironment(regime: RegimeState | undefined, signalCount: number): BuyEnvironment {
-  if (!regime || regime.regime === 'risk_off') {
-    return { label: '매수 비추천', color: 'var(--loss)' }
-  }
-  if (signalCount > 0) {
-    return { label: '매수 추천', color: 'var(--profit)' }
-  }
-  return { label: '보통', color: 'var(--warning)' }
+function useBtcDominance() {
+  return useQuery({
+    queryKey: ['btc-dominance'],
+    queryFn: async () => {
+      const res = await fetch('https://api.coingecko.com/api/v3/global')
+      if (!res.ok) throw new Error('CoinGecko API 실패')
+      const json = await res.json() as { data: { market_cap_percentage: { btc: number } } }
+      return json.data.market_cap_percentage.btc
+    },
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  })
 }
 
-// --- 시장 상황 요약 ---
+// --- 시장 온도계 ---
 
-function MarketSummary() {
+function getMarketTemperature(
+  regime: RegimeState | undefined,
+  fearGreedValue: number | undefined,
+  btcDominance: number | undefined,
+  signalCount: number
+): { score: number; label: string; color: string } {
+  let score = 0
+
+  // BTC 레짐 (최대 40점)
+  if (regime?.regime === 'risk_on') score += 40
+
+  // Fear & Greed (최대 20점) — 공포가 높을수록 매수 기회
+  if (fearGreedValue !== undefined) {
+    if (fearGreedValue <= 25) score += 20
+    else if (fearGreedValue <= 45) score += 10
+  }
+
+  // BTC 도미넌스 (최대 20점) — 낮을수록 알트 시즌
+  if (btcDominance !== undefined) {
+    if (btcDominance < 55) score += 20
+    else if (btcDominance <= 60) score += 10
+  }
+
+  // 활성 시그널 (최대 20점)
+  if (signalCount > 0) score += 20
+
+  if (score <= 20) return { score, label: '극도 위험', color: 'var(--loss)' }
+  if (score <= 40) return { score, label: '위험', color: 'var(--warning)' }
+  if (score <= 60) return { score, label: '보통', color: 'var(--text-secondary)' }
+  if (score <= 80) return { score, label: '안전', color: 'var(--profit)' }
+  return { score, label: '적극 매수', color: 'var(--profit)' }
+}
+
+// --- 시장 요약 (2행 그리드) ---
+
+function MarketDashboard() {
   const { data: regime } = useRegime()
   const { data: signals } = useSignals()
   const { data: fearGreed, isLoading: fgLoading, isError: fgError, refetch: refetchFg } = useFearGreed()
+  const { data: btcDominance, isLoading: domLoading } = useBtcDominance()
+  const { data: btcPrice } = useBtcPrice()
 
   const signalCount = signals?.length ?? 0
-  const env = getBuyEnvironment(regime, signalCount)
+  const temp = getMarketTemperature(regime, fearGreed?.value, btcDominance, signalCount)
 
   const fgInfo = (v: number): { label: string; color: string } => {
     if (v <= 25) return { label: '극도의 공포', color: 'var(--loss)' }
@@ -173,15 +223,18 @@ function MarketSummary() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      {/* 매수 환경 */}
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* 시장 온도계 */}
       <div className="card-surface rounded-md px-4 py-3">
         <div className="text-[12px] font-semibold text-text-muted">
-          <TermTooltip term="buy_environment">매수 환경</TermTooltip>
+          <TermTooltip term="market_temperature">시장 온도</TermTooltip>
         </div>
         <div className="mt-1.5 flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ background: env.color }} />
-          <span className="text-[14px] font-semibold" style={{ color: env.color }}>{env.label}</span>
+          <Thermometer className="h-3.5 w-3.5" style={{ color: temp.color }} />
+          <span className="font-mono-trading text-[16px] font-bold" style={{ color: temp.color }}>
+            {temp.score}
+          </span>
+          <span className="text-[12px] font-semibold" style={{ color: temp.color }}>{temp.label}</span>
         </div>
       </div>
 
@@ -236,30 +289,49 @@ function MarketSummary() {
           })() : null}
         </div>
       </div>
-    </div>
-  )
-}
 
-// --- 메인 ---
-
-export function SignalsPage() {
-  return (
-    <div className="mx-auto max-w-4xl space-y-5 py-2">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">알트코인 매매 시그널</h1>
-        <p className="text-[13px] text-text-muted">
-          BTC 시장 상태를 기반으로 알트코인 매수 시점을 추천합니다. 4시간마다 갱신.
-        </p>
+      {/* BTC 도미넌스 */}
+      <div className="card-surface rounded-md px-4 py-3">
+        <div className="text-[12px] font-semibold text-text-muted">
+          <TermTooltip term="btc_dominance">BTC 도미넌스</TermTooltip>
+        </div>
+        <div className="mt-1.5">
+          {domLoading ? (
+            <span className="skeleton-shimmer h-4 w-16 rounded" />
+          ) : btcDominance !== undefined ? (
+            <span className="font-mono-trading text-[14px] font-semibold text-text-primary">
+              {btcDominance.toFixed(1)}%
+            </span>
+          ) : (
+            <span className="text-[12px] text-text-muted">—</span>
+          )}
+        </div>
       </div>
 
-      <MarketSummary />
-      <RegimeHero />
-      <PerformanceSummary />
-      <SignalList />
+      {/* BTC 가격 */}
+      <div className="card-surface rounded-md px-4 py-3">
+        <div className="text-[12px] font-semibold text-text-muted">BTC 가격</div>
+        <div className="mt-1.5">
+          <span className="font-mono-trading text-[14px] font-semibold text-text-primary">
+            {btcPrice?.price ? formatKrw(btcPrice.price) : '—'}
+          </span>
+          {btcPrice?.changeRate !== undefined && (
+            <span className={`ml-1.5 font-mono-trading text-[12px] ${btcPrice.changeRate >= 0 ? 'text-profit' : 'text-loss'}`}>
+              {btcPrice.changeRate >= 0 ? '+' : ''}{(btcPrice.changeRate * 100).toFixed(2)}%
+            </span>
+          )}
+        </div>
+      </div>
 
-      <p className="text-center text-[12px] text-text-muted">
-        이 시그널은 학습 및 참고 목적이며, 투자 조언이 아닙니다. 투자 판단은 본인 책임입니다.
-      </p>
+      {/* 활성 시그널 수 */}
+      <div className="card-surface rounded-md px-4 py-3">
+        <div className="text-[12px] font-semibold text-text-muted">활성 시그널</div>
+        <div className="mt-1.5">
+          <span className={`font-mono-trading text-[14px] font-semibold ${signalCount > 0 ? 'text-profit' : 'text-text-primary'}`}>
+            {signalCount}개
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -310,7 +382,7 @@ function RegimeHero() {
             <p className="text-[12px] text-text-muted">
               {isRiskOn
                 ? '시장이 안정적입니다. 매수 시그널이 활성화됩니다.'
-                : '시장 불확실성이 높습니다. 매수 시그널을 억제하고 있습니다.'}
+                : '시장 불확실성이 높습니다. 매수 시그널이 비활성 상태입니다.'}
             </p>
           </div>
         </div>
@@ -405,6 +477,75 @@ function RegimeHeroSkeleton() {
   )
 }
 
+// --- 추천 코인 Top3 ---
+
+function TopCoins() {
+  const { data: cache, isLoading } = useDetectionCache()
+
+  if (isLoading) {
+    return (
+      <div className="card-surface rounded-md p-4">
+        <div className="mb-3 h-3.5 w-24 skeleton-shimmer rounded" />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => <div key={i} className="h-16 skeleton-shimmer rounded-md" />)}
+        </div>
+      </div>
+    )
+  }
+
+  if (!cache?.cached || !cache.results || cache.results.length === 0) {
+    return (
+      <div className="card-surface rounded-md p-4 text-center">
+        <p className="text-[12px] text-text-muted">아직 스캔 결과가 없습니다. 코인 분석 페이지에서 스캔을 실행하세요.</p>
+      </div>
+    )
+  }
+
+  const top3 = [...cache.results]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+
+  return (
+    <div className="card-surface rounded-md p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[12px] font-semibold text-text-faint">
+          <TermTooltip term="top_coins">매수 추천 Top3</TermTooltip>
+        </h2>
+        <span className="text-[12px] text-text-muted">
+          {cache.scannedAt ? getTimeAgo(cache.scannedAt) : ''}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {top3.map((coin) => (
+          <a
+            key={coin.symbol}
+            href="/detection"
+            className="flex items-center justify-between rounded-md bg-secondary p-3 transition-colors hover:bg-surface-hover"
+          >
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-text-primary">{coin.koreanName}</span>
+                <span className={`rounded-full px-1.5 py-0.5 font-mono-trading text-[12px] font-semibold ${
+                  coin.score >= 0.8 ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--warning-bg)] text-warning'
+                }`}>
+                  {Math.round(coin.score * 100)}점
+                </span>
+              </div>
+              <div className="mt-0.5 flex items-center gap-2 text-[12px] text-text-muted">
+                <span className="font-mono-trading">{coin.price.toLocaleString('ko-KR')}원</span>
+                <span className={`font-mono-trading ${coin.changePct >= 0 ? 'text-profit' : 'text-loss'}`}>
+                  {coin.changePct >= 0 ? '+' : ''}{coin.changePct.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="h-3.5 w-3.5 text-text-faint" />
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // --- 성과 요약 ---
 
 function PerformanceSummary() {
@@ -447,11 +588,10 @@ function PerformanceSummary() {
   )
 }
 
-// --- 시그널 ---
+// --- 시그널 리스트 ---
 
 function SignalList() {
   const { data: signals, isLoading, error } = useSignals()
-  const { data: regime } = useRegime()
 
   if (isLoading) return <SignalListSkeleton />
   if (error) {
@@ -459,18 +599,6 @@ function SignalList() {
       <div className="card-surface flex items-center justify-center rounded-md p-8 text-[12px] text-text-muted">
         <RefreshCw className="mr-2 h-3.5 w-3.5" />
         시그널을 불러올 수 없습니다.
-      </div>
-    )
-  }
-
-  if ((!signals || signals.length === 0) && regime?.regime === 'risk_off') {
-    return (
-      <div className="card-surface rounded-md p-8 text-center">
-        <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-loss" />
-        <p className="text-[13px] font-medium text-text-secondary">매수 시그널을 억제하고 있습니다</p>
-        <p className="mt-1 text-[12px] text-text-muted">
-          BTC 레짐이 Risk-Off 상태입니다. 레짐이 전환되면 시그널이 활성화됩니다.
-        </p>
       </div>
     )
   }
@@ -634,6 +762,64 @@ function SignalListSkeleton() {
       {[1, 2, 3].map((i) => (
         <div key={i} className="mb-1.5 h-10 skeleton-shimmer rounded-lg" />
       ))}
+    </div>
+  )
+}
+
+// --- 수동 갱신 버튼 ---
+
+function RefreshButton() {
+  const queryClient = useQueryClient()
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await api.refreshDetection()
+      await queryClient.invalidateQueries({ queryKey: ['detection-cache'] })
+    } catch {
+      // 에러는 무시 (다음 자동 갱신으로 해결)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleRefresh}
+      disabled={refreshing}
+      className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[12px] text-text-muted hover:bg-secondary disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+    >
+      {refreshing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+      {refreshing ? '갱신 중...' : '갱신'}
+    </button>
+  )
+}
+
+// --- 메인 ---
+
+export function SignalsPage() {
+  return (
+    <div className="mx-auto max-w-4xl space-y-5 py-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">알트코인 매매 시그널</h1>
+          <p className="text-[13px] text-text-muted">
+            BTC 시장 상태를 기반으로 알트코인 매수 시점을 추천합니다. 4시간마다 갱신.
+          </p>
+        </div>
+        <RefreshButton />
+      </div>
+
+      <MarketDashboard />
+      <RegimeHero />
+      <TopCoins />
+      <PerformanceSummary />
+      <SignalList />
+
+      <p className="text-center text-[12px] text-text-muted">
+        이 시그널은 학습 및 참고 목적이며, 투자 조언이 아닙니다. 투자 판단은 본인 책임입니다.
+      </p>
     </div>
   )
 }

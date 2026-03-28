@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { scoreMultipleCoins, computeDetectionScore, type DetectionStrategy } from '../detector/composite-scorer.js'
+import { scoreMultipleCoins, computeDetectionScore } from '../detector/composite-scorer.js'
 import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap } from '../data/candle-collector.js'
+import { supabase } from '../services/database.js'
 import type { Candle } from '../strategy/strategy-base.js'
 
 export const detectionRoutes = new Hono()
@@ -18,9 +19,7 @@ async function fetchUpbitCandlesDirect(
   count: number = 50
 ): Promise<Candle[]> {
   const url = `${UPBIT_API}/candles/minutes/60?market=${market}&count=${count}`
-  console.log(`[탐지] 업비트 요청: ${url}`)
   const res = await fetch(url)
-  console.log(`[탐지] 업비트 응답: ${res.status} (${market})`)
   if (res.status === 429) {
     await sleep(1000)
     return fetchUpbitCandlesDirect(market, count)
@@ -50,15 +49,181 @@ async function fetchUpbitCandlesDirect(
   })).reverse()
 }
 
-/** 스캔 대상 — 업비트 KRW 마켓에서 동적으로 가져옴 */
+/** 스캔 결과를 Supabase에 캐시 저장 */
+async function saveScanToCache(
+  totalScanned: number,
+  detected: number,
+  results: unknown[],
+  durationMs: number
+): Promise<void> {
+  try {
+    const { error } = await supabase.from('detection_cache').insert({
+      total_scanned: totalScanned,
+      detected,
+      results,
+      scan_duration_ms: durationMs,
+      created_by: 'system',
+    })
+    if (error) {
+      console.error('[캐시] detection_cache 저장 실패:', error.message)
+    } else {
+      console.log(`[캐시] detection_cache 저장 완료 (${totalScanned}개 스캔, ${detected}개 감지)`)
+    }
+  } catch (err) {
+    console.error('[캐시] detection_cache 저장 오류:', err)
+  }
+}
+
+/** 30일 이전 캐시 삭제 */
+export async function cleanOldCache(): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('detection_cache')
+      .delete()
+      .lt('scanned_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    if (error) console.error('[캐시] 오래된 캐시 삭제 실패:', error.message)
+    else console.log('[캐시] 30일 이전 캐시 정리 완료')
+  } catch (err) {
+    console.error('[캐시] 캐시 정리 오류:', err)
+  }
+}
+
+/** 전체 알트코인 스캔 실행 (캐시 저장 포함) */
+export async function runFullScan(): Promise<{
+  scannedAt: string
+  totalScanned: number
+  detected: number
+  results: Array<{
+    symbol: string
+    koreanName: string
+    score: number
+    rsi14: number
+    atrPct: number
+    changePct: number
+    price: number
+    signals: unknown
+    reasoning: unknown
+  }>
+}> {
+  const startTime = Date.now()
+
+  const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
+  if (btcCandles.length < 21) {
+    throw new Error(`BTC 데이터 부족 (${btcCandles.length}/21)`)
+  }
+  const btcPrices = btcCandles.map((cl) => cl.close)
+  const now = new Date()
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+
+  const allKrwSymbols = await fetchUpbitKrwSymbols()
+  const koreanNames = await fetchUpbitKoreanNameMap()
+
+  const inputs: Array<{
+    symbol: string
+    candles: Candle[]
+    btcPrices: number[]
+    currentPrice: number
+    openPriceAt9: number
+    currentTimeKST: Date
+  }> = []
+
+  for (const symbol of allKrwSymbols) {
+    try {
+      await sleep(130)
+      const altCandles = await fetchUpbitCandlesDirect(`KRW-${symbol}`, 50)
+      if (altCandles.length < 21) continue
+
+      const currentPrice = altCandles[altCandles.length - 1].close
+      const openPriceAt9 = altCandles.length > 9
+        ? altCandles[altCandles.length - 9].open
+        : altCandles[0].open
+
+      inputs.push({
+        symbol,
+        candles: altCandles,
+        btcPrices: btcPrices.slice(-altCandles.length),
+        currentPrice,
+        openPriceAt9,
+        currentTimeKST: kstNow,
+      })
+    } catch {
+      // 개별 코인 실패 시 스킵
+    }
+  }
+
+  const scored = scoreMultipleCoins(inputs, 20, 'composite')
+  const durationMs = Date.now() - startTime
+
+  const mappedResults = scored.map((r) => ({
+    symbol: r.symbol,
+    koreanName: koreanNames.get(r.symbol) ?? r.symbol,
+    score: r.score,
+    rsi14: r.rsi14,
+    atrPct: r.atrPct,
+    changePct: r.changePct,
+    price: r.price,
+    signals: r.signals,
+    reasoning: r.reasoning,
+  }))
+
+  // 캐시 저장
+  await saveScanToCache(inputs.length, scored.length, mappedResults, durationMs)
+
+  return {
+    scannedAt: now.toISOString(),
+    totalScanned: inputs.length,
+    detected: scored.length,
+    results: mappedResults,
+  }
+}
+
+/** GET /api/detection/cached — 최신 캐시 결과 반환 */
+detectionRoutes.get('/cached', async (c) => {
+  try {
+    const { data, error } = await supabase
+      .from('detection_cache')
+      .select('*')
+      .order('scanned_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      return c.json({ error: '캐시 조회 실패' }, 500)
+    }
+
+    if (!data) {
+      return c.json({ cached: false, message: '아직 스캔 결과가 없습니다' }, 200)
+    }
+
+    return c.json({
+      cached: true,
+      scannedAt: data.scanned_at,
+      totalScanned: data.total_scanned,
+      detected: data.detected,
+      results: data.results,
+      scanDurationMs: data.scan_duration_ms,
+    })
+  } catch (err) {
+    console.error('[캐시] 조회 오류:', err)
+    return c.json({ error: '캐시 조회 실패' }, 500)
+  }
+})
+
+/** POST /api/detection/refresh — 수동 갱신 (전체 스캔 + 캐시 저장) */
+detectionRoutes.post('/refresh', async (c) => {
+  try {
+    const result = await runFullScan()
+    return c.json(result)
+  } catch (err) {
+    console.error('[갱신] 스캔 오류:', err)
+    return c.json({ error: '스캔 실패' }, 500)
+  }
+})
 
 /** GET /api/detection/scan/stream — SSE 스트리밍 전체 알트코인 스캔 */
 detectionRoutes.get('/scan/stream', async (c) => {
-  const strategyParam = c.req.query('strategy') ?? 'composite'
-  const validStrategies = ['composite', 'oversold', 'momentum', 'volume']
-  const strategy = (validStrategies.includes(strategyParam) ? strategyParam : 'composite') as DetectionStrategy
-
   return streamSSE(c, async (stream) => {
+    const startTime = Date.now()
     try {
       const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
       if (btcCandles.length < 21) {
@@ -129,26 +294,31 @@ detectionRoutes.get('/scan/stream', async (c) => {
         }
       }
 
-      const results = scoreMultipleCoins(inputs, 20, strategy)
+      const results = scoreMultipleCoins(inputs, 20, 'composite')
+      const durationMs = Date.now() - startTime
+
+      const mappedResults = results.map((r) => ({
+        symbol: r.symbol,
+        koreanName: koreanNames.get(r.symbol) ?? r.symbol,
+        score: r.score,
+        rsi14: r.rsi14,
+        atrPct: r.atrPct,
+        changePct: r.changePct,
+        price: r.price,
+        signals: r.signals,
+        reasoning: r.reasoning,
+      }))
+
+      // 캐시 저장
+      await saveScanToCache(inputs.length, results.length, mappedResults, durationMs)
 
       await stream.writeSSE({
         data: JSON.stringify({
           type: 'complete',
-          strategy,
           scannedAt: now.toISOString(),
           totalScanned: inputs.length,
           detected: results.length,
-          results: results.map((r) => ({
-            symbol: r.symbol,
-            koreanName: koreanNames.get(r.symbol) ?? r.symbol,
-            score: r.score,
-            rsi14: r.rsi14,
-            atrPct: r.atrPct,
-            changePct: r.changePct,
-            price: r.price,
-            signals: r.signals,
-            reasoning: r.reasoning,
-          })),
+          results: mappedResults,
         }),
         event: 'complete',
       })
@@ -165,72 +335,8 @@ detectionRoutes.get('/scan/stream', async (c) => {
 /** GET /api/detection/scan — 전체 알트코인 스캔 (공개, 폴백) */
 detectionRoutes.get('/scan', async (c) => {
   try {
-    const strategyParam = c.req.query('strategy') ?? 'composite'
-    const validStrategies = ['composite', 'oversold', 'momentum', 'volume']
-    const strategy = (validStrategies.includes(strategyParam) ? strategyParam : 'composite') as DetectionStrategy
-
-    // BTC 캔들 직접 로드
-    console.log('[탐지] 스캔 시작 — BTC 캔들 요청')
-    const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
-    console.log(`[탐지] BTC 캔들 수신: ${btcCandles.length}개`)
-    if (btcCandles.length < 21) {
-      return c.json({ error: `BTC 데이터 부족 (${btcCandles.length}/21)` }, 422)
-    }
-    const btcPrices = btcCandles.map((cl) => cl.close)
-
-    const now = new Date()
-    const kstOffset = 9 * 60 * 60 * 1000
-    const kstNow = new Date(now.getTime() + kstOffset)
-
-    // 업비트 KRW 마켓 동적 조회 (상위 50개만 스캔 — 속도)
-    const allKrwSymbols = await fetchUpbitKrwSymbols()
-    const ALT_UNIVERSE = allKrwSymbols.slice(0, 50)
-    console.log(`[탐지] 알트 유니버스: ${ALT_UNIVERSE.length}개 (전체 ${allKrwSymbols.length}개)`)
-
-    // 각 알트코인 스코어링
-    const inputs = []
-    for (const symbol of ALT_UNIVERSE) {
-      try {
-        await sleep(130) // 업비트 레이트 리밋 (초당 ~8회)
-        const altCandles = await fetchUpbitCandlesDirect(`KRW-${symbol}`, 50)
-        if (altCandles.length < 21) continue
-
-        const currentPrice = altCandles[altCandles.length - 1].close
-        const openPriceAt9 = altCandles.length > 9
-          ? altCandles[altCandles.length - 9].open
-          : altCandles[0].open
-
-        inputs.push({
-          symbol,
-          candles: altCandles,
-          btcPrices: btcPrices.slice(-altCandles.length),
-          currentPrice,
-          openPriceAt9,
-          currentTimeKST: kstNow,
-        })
-      } catch {
-        // 개별 코인 실패 시 스킵
-      }
-    }
-
-    const results = scoreMultipleCoins(inputs, 20, strategy)
-
-    return c.json({
-      strategy,
-      scannedAt: now.toISOString(),
-      totalScanned: inputs.length,
-      detected: results.length,
-      results: results.map((r) => ({
-        symbol: r.symbol,
-        score: r.score,
-        rsi14: r.rsi14,
-        atrPct: r.atrPct,
-        changePct: r.changePct,
-        price: r.price,
-        signals: r.signals,
-        reasoning: r.reasoning,
-      })),
-    })
+    const result = await runFullScan()
+    return c.json(result)
   } catch (err) {
     console.error('탐지 스캔 오류:', err)
     return c.json({ error: '탐지 스캔 실패' }, 500)

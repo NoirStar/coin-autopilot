@@ -3,6 +3,7 @@ import { generateSignals } from '../services/signal-generator.js'
 import { runPaperTradingCycle } from '../services/paper-trading-engine.js'
 import { runExecutionCycle } from '../services/execution-engine.js'
 import { supabase } from '../services/database.js'
+import { runFullScan, cleanOldCache } from '../routes/detection.js'
 
 /**
  * 크론 작업 시작
@@ -55,5 +56,21 @@ export function startCronJobs(): void {
     }
   })
 
-  console.log('[크론] 스케줄 등록 완료 (4시간 주기)')
+  // 1시간마다 알트코인 탐지 스캔 + 캐시 저장
+  cron.schedule('5 * * * *', async () => {
+    console.log(`[크론] 알트코인 탐지 스캔 시작: ${new Date().toISOString()}`)
+    try {
+      const result = await runFullScan()
+      console.log(`[크론] 탐지 스캔 완료: ${result.totalScanned}개 스캔, ${result.detected}개 감지`)
+    } catch (err) {
+      console.error('[크론] 탐지 스캔 실패:', err)
+    }
+  })
+
+  // 매일 0시에 30일 이전 캐시 정리
+  cron.schedule('0 0 * * *', async () => {
+    await cleanOldCache()
+  })
+
+  console.log('[크론] 스케줄 등록 완료 (4시간 시그널 + 1시간 탐지 + 일일 캐시 정리)')
 }
