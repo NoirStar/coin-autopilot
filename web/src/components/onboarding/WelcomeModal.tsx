@@ -10,8 +10,6 @@ interface WelcomeModalProps {
 
 export function WelcomeModal({ open, onClose, onComplete }: WelcomeModalProps) {
   const navigate = useNavigate()
-  const [step, setStep] = useState(0)
-
   if (!open) return null
 
   const steps = [
@@ -49,11 +47,11 @@ export function WelcomeModal({ open, onClose, onComplete }: WelcomeModalProps) {
           </button>
         </div>
 
-        <h2 className="mt-4 text-[16px] font-semibold">{steps[0].title}</h2>
-        <p className="mt-1 text-[12px] text-text-muted">{steps[0].description}</p>
+        <h2 className="mt-4 text-[16px] font-semibold">{steps[0]?.title}</h2>
+        <p className="mt-1 text-[12px] text-text-muted">{steps[0]?.description}</p>
 
         <div className="mt-5 space-y-3">
-          {steps[0].items.map((item, i) => (
+          {steps[0]?.items?.map((item, i) => (
             <div key={i} className="flex items-center gap-3 rounded-md bg-secondary p-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--accent-bg)]">
                 <item.icon className="h-4 w-4 text-primary" />

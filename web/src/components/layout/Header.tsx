@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Bell, LogIn, LogOut, User, Menu } from 'lucide-react'
+import { LogIn, LogOut, User, Menu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { LoginModal } from '@/components/auth/LoginModal'
 import { supabase } from '@/lib/supabase'
