@@ -57,7 +57,6 @@ const DEFAULT_RISK = {
 }
 
 export function SettingsPage() {
-  const _queryClient = useQueryClient()
   const { setUpbitConfigured, setOkxConfigured } = useSettingsStore()
 
   const { data: settingsResponse, isLoading } = useQuery<SettingsResponse>({
