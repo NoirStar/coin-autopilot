@@ -1,4 +1,4 @@
-import { EMA, RSI, ATR, BollingerBands, ADX, MACD } from 'technicalindicators'
+import { EMA, RSI, ATR, BollingerBands, ADX, MACD, StochasticRSI, MFI } from 'technicalindicators'
 
 /**
  * EMA 계산
@@ -165,6 +165,82 @@ export function calcDonchianChannel(
     result.push({ upper, lower, middle })
   }
   return result
+}
+
+/**
+ * Stochastic RSI 계산 — RSI에 스토캐스틱 공식 적용
+ * @returns { k, d } 배열 (0~100). 20 이하 과매도, 80 이상 과매수
+ */
+export function calcStochRSI(
+  closes: number[],
+  rsiPeriod: number = 14,
+  stochPeriod: number = 14,
+  kPeriod: number = 3,
+  dPeriod: number = 3
+): Array<{ k: number; d: number }> {
+  if (closes.length < rsiPeriod + stochPeriod) return []
+
+  const results = StochasticRSI.calculate({
+    values: closes,
+    rsiPeriod,
+    stochasticPeriod: stochPeriod,
+    kPeriod,
+    dPeriod,
+  })
+
+  return results
+    .filter((r) => r.k != null && r.d != null)
+    .map((r) => ({ k: r.k as number, d: r.d as number }))
+}
+
+/**
+ * MFI (Money Flow Index) 계산 — 거래량 가중 RSI
+ * @returns MFI 배열 (0~100). 20 이하 과매도, 80 이상 과매수
+ */
+export function calcMFI(
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  volumes: number[],
+  period: number = 14
+): number[] {
+  const len = Math.min(highs.length, lows.length, closes.length, volumes.length)
+  if (len < period + 1) return []
+
+  return MFI.calculate({
+    high: highs.slice(0, len),
+    low: lows.slice(0, len),
+    close: closes.slice(0, len),
+    volume: volumes.slice(0, len),
+    period,
+  })
+}
+
+/**
+ * ADX + DMI 계산 — ADX, +DI, -DI 모두 반환
+ * @returns { adx, pdi, mdi } 배열
+ */
+export function calcADXWithDMI(
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period: number
+): Array<{ adx: number; pdi: number; mdi: number }> {
+  const len = Math.min(highs.length, lows.length, closes.length)
+  if (len < period * 2) return []
+
+  const result = ADX.calculate({
+    period,
+    high: highs.slice(0, len),
+    low: lows.slice(0, len),
+    close: closes.slice(0, len),
+  })
+
+  return result.map((r) => ({
+    adx: r.adx,
+    pdi: r.pdi,
+    mdi: r.mdi,
+  }))
 }
 
 /**

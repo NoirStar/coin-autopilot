@@ -3,6 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import { scoreMultipleCoins, computeDetectionScore } from '../detector/composite-scorer.js'
 import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap } from '../data/candle-collector.js'
 import { supabase } from '../services/database.js'
+import { notifyStrongBuySignals } from '../services/telegram-notifier.js'
 import type { Candle } from '../strategy/strategy-base.js'
 
 export const detectionRoutes = new Hono()
@@ -168,6 +169,15 @@ export async function runFullScan(): Promise<{
 
   // 캐시 저장
   await saveScanToCache(inputs.length, scored.length, mappedResults, durationMs)
+
+  // 강력 매수 알림 (score >= 0.8)
+  await notifyStrongBuySignals(mappedResults.map((r) => ({
+    symbol: r.symbol,
+    koreanName: r.koreanName,
+    score: r.score,
+    price: r.price,
+    changePct: r.changePct,
+  })))
 
   return {
     scannedAt: now.toISOString(),

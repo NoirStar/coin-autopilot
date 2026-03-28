@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Radar,
   Activity,
@@ -12,271 +12,249 @@ import {
   Search,
   TrendingUp,
   TrendingDown,
-  BarChart3,
 } from 'lucide-react'
-import { API_BASE } from '../services/api'
+import { api, API_BASE, type DetectionResultItem, type DetectionCacheResponse } from '../services/api'
+import { TermTooltip } from '../components/ui/term-tooltip'
 
-interface DetectionSignal {
-  active: boolean
-  value: number | string
-  weight: number
+// --- 캐시된 결과 조회 ---
+
+function useDetectionCache() {
+  return useQuery<DetectionCacheResponse>({
+    queryKey: ['detection-cache'],
+    queryFn: () => api.getDetectionCached(),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+  })
 }
-
-interface DetectionResult {
-  symbol: string
-  koreanName?: string
-  score: number
-  detected?: boolean
-  rsi14: number
-  atrPct: number
-  changePct: number
-  price: number
-  signals: {
-    volumeZScore: DetectionSignal
-    btcAdjustedPump: DetectionSignal
-    orderbookImbalance: DetectionSignal
-    obvDivergence: DetectionSignal
-    morningReset: DetectionSignal
-  }
-  reasoning: Record<string, unknown>
-}
-
-interface ScanResponse {
-  strategy: string
-  scannedAt: string
-  totalScanned: number
-  detected: number
-  results: DetectionResult[]
-}
-
-type StrategyType = 'composite' | 'oversold' | 'momentum' | 'volume'
-
-const STRATEGY_TABS: { id: StrategyType; label: string; icon: React.ReactNode; desc: string }[] = [
-  { id: 'composite', label: '복합 탐지', icon: <Radar className="h-3.5 w-3.5" />, desc: '5개 지표 가중합산 (0.6 이상)' },
-  { id: 'oversold', label: '과매도', icon: <TrendingDown className="h-3.5 w-3.5" />, desc: 'RSI ≤ 30 과매도 반등 대상' },
-  { id: 'momentum', label: '모멘텀', icon: <TrendingUp className="h-3.5 w-3.5" />, desc: '건강한 상승세 (RSI 50~70)' },
-  { id: 'volume', label: '거래량 폭발', icon: <BarChart3 className="h-3.5 w-3.5" />, desc: '거래량 Z-Score > 1.5' },
-]
 
 export function DetectionPage() {
-  const [strategy, setStrategy] = useState<StrategyType>('composite')
+  const queryClient = useQueryClient()
+  const { data: cache, isLoading: cacheLoading } = useDetectionCache()
+  const [scanning, setScanning] = useState(false)
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number; symbol: string } | null>(null)
+  const [scanError, setScanError] = useState<string | null>(null)
 
-  const { data, error, refetch, isFetching } = useQuery<ScanResponse>({
-    queryKey: ['detection-scan', strategy],
-    queryFn: () =>
-      new Promise<ScanResponse>((resolve, reject) => {
-        let done = false
-        const es = new EventSource(`${API_BASE}/api/detection/scan/stream?strategy=${strategy}`)
+  // SSE 스트리밍 스캔
+  const startScan = () => {
+    setScanning(true)
+    setScanError(null)
+    setScanProgress(null)
 
-        es.addEventListener('progress', (e) => {
-          const d = JSON.parse(e.data)
-          if (d.type === 'start') {
-            setScanProgress({ current: 0, total: d.total, symbol: '' })
-          } else if (d.current !== undefined) {
-            setScanProgress({ current: d.current, total: d.total, symbol: d.symbol ?? '' })
-          }
-        })
+    const es = new EventSource(`${API_BASE}/api/detection/scan/stream`)
 
-        es.addEventListener('complete', (e) => {
-          done = true
-          setScanProgress(null)
-          es.close()
-          resolve(JSON.parse(e.data))
-        })
+    es.addEventListener('progress', (e) => {
+      const d = JSON.parse(e.data)
+      if (d.type === 'start') {
+        setScanProgress({ current: 0, total: d.total, symbol: '' })
+      } else if (d.current !== undefined) {
+        setScanProgress({ current: d.current, total: d.total, symbol: d.symbol ?? '' })
+      }
+    })
 
-        es.addEventListener('scan-error', (e) => {
-          done = true
-          setScanProgress(null)
-          es.close()
-          reject(new Error(JSON.parse(e.data).message ?? '스캔 실패'))
-        })
+    es.addEventListener('complete', () => {
+      setScanProgress(null)
+      setScanning(false)
+      es.close()
+      queryClient.invalidateQueries({ queryKey: ['detection-cache'] })
+    })
 
-        es.onerror = () => {
-          if (!done) {
-            setScanProgress(null)
-            es.close()
-            reject(new Error('스캔 연결 실패'))
-          }
-        }
-      }),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    enabled: false,
-  })
+    es.addEventListener('scan-error', (e) => {
+      const d = JSON.parse(e.data)
+      setScanProgress(null)
+      setScanning(false)
+      setScanError(d.message ?? '스캔 실패')
+      es.close()
+    })
+
+    es.onerror = () => {
+      setScanProgress(null)
+      setScanning(false)
+      setScanError('스캔 연결 실패')
+      es.close()
+    }
+  }
+
+  // 결과 데이터: 캐시에서 가져옴
+  const results = cache?.cached ? (cache.results ?? []) : []
+  const sortedResults = [...results].sort((a, b) => b.score - a.score)
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 py-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">코인 분석</h1>
-          <p className="text-[13px] text-text-muted">
-            업비트 KRW 마켓 · <span className="font-mono-trading">1</span>시간봉 기준 · 수동 스캔
-          </p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12px] text-text-muted hover:bg-secondary disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
-        >
-          {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          스캔
-        </button>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">코인 분석</h1>
+        <p className="text-[13px] text-text-muted">
+          업비트 KRW 마켓 · <span className="font-mono-trading">1</span>시간봉 기준 · ��수 점수 산출
+        </p>
       </div>
 
-      {/* 전략 탭 */}
-      <div className="flex gap-2 overflow-x-auto">
-        {STRATEGY_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setStrategy(tab.id)}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-md border px-3 py-2 text-[12px] transition-colors ${
-              strategy === tab.id
-                ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
-                : 'border-border text-text-muted hover:bg-secondary'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-      <p className="text-[12px] text-text-muted">
-        {STRATEGY_TABS.find((t) => t.id === strategy)?.desc}
-      </p>
-
-      {/* 스캔 요약 */}
-      {data && (
-        <div className="card-surface flex items-center gap-5 rounded-md px-4 py-2.5">
-          <div className="flex items-center gap-1.5 text-[12px]">
-            <Radar className="h-3 w-3 text-text-faint" />
-            <span className="text-text-muted">스캔:</span>
-            <span className="font-mono-trading text-text-primary">{data.totalScanned}개</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[12px]">
-            <Activity className="h-3 w-3 text-text-faint" />
-            <span className="text-text-muted">감지:</span>
-            <span className={`font-mono-trading ${data.detected > 0 ? 'text-profit' : 'text-text-primary'}`}>
-              {data.detected}개
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
-            <Clock className="h-3 w-3" />
-            {getTimeAgo(data.scannedAt)}
-          </div>
-        </div>
-      )}
+      {/* 스캔 버튼 (눈에 띄는 위치) */}
+      <button
+        onClick={startScan}
+        disabled={scanning}
+        className="flex w-full items-center justify-center gap-2 rounded-md border border-[var(--accent)] bg-[var(--accent-bg)] px-4 py-2.5 text-[13px] font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10 disabled:cursor-not-allowed disabled:border-border disabled:bg-secondary disabled:text-text-faint"
+      >
+        {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        {scanning ? '스캔 중...' : cache?.cached ? `재스캔 (최근: ${getTimeAgo(cache.scannedAt!)})` : '코인 스캔 시작'}
+      </button>
 
       {/* 스캔 프로그레스 */}
-      {isFetching && (
+      {scanning && scanProgress && (
         <div className="card-surface rounded-md px-4 py-4">
           <div className="flex items-center justify-between text-[12px]">
             <div className="flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
               <span className="text-text-muted">
-                <span className="font-medium text-text-secondary">{scanProgress?.symbol || '마켓 목록 로딩'}</span> 스캔 중
+                <span className="font-medium text-text-secondary">{scanProgress.symbol || '마켓 목록 로딩'}</span> 스캔 중
               </span>
             </div>
-            <span className="text-text-muted">
-              {scanProgress ? <span className="font-mono-trading">{scanProgress.current}/{scanProgress.total}</span> : '준비 중...'}
+            <span className="font-mono-trading text-text-muted">
+              {scanProgress.current}/{scanProgress.total}
             </span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full bg-[var(--accent)] transition-all duration-150"
-              style={{ width: scanProgress && scanProgress.total > 0 ? `${(scanProgress.current / scanProgress.total) * 100}%` : '0%' }}
+              style={{ width: scanProgress.total > 0 ? `${(scanProgress.current / scanProgress.total) * 100}%` : '0%' }}
             />
           </div>
         </div>
       )}
 
       {/* 에러 */}
-      {error && (
+      {scanError && (
         <div className="card-surface flex flex-col items-center justify-center gap-2 rounded-md py-8">
           <AlertTriangle className="h-5 w-5 text-loss" />
-          <p className="text-[13px] font-medium text-text-secondary">탐지 스캔에 실패했습니다</p>
-          <p className="text-[12px] text-text-muted">
-            {error.message.includes('fetch') || error.message.includes('network')
-              ? '서버에 연결할 수 없습니다. 백엔드 서버(localhost:3001)가 실행 중인지 확인하세요.'
-              : error.message}
-          </p>
-          <button onClick={() => refetch()} className="mt-2 rounded-md border border-border px-3 py-1.5 text-[12px] text-text-secondary hover:bg-surface-hover">
+          <p className="text-[13px] font-medium text-text-secondary">스캔에 실패했습니다</p>
+          <p className="text-[12px] text-text-muted">{scanError}</p>
+          <button onClick={startScan} className="mt-2 rounded-md border border-border px-3 py-1.5 text-[12px] text-text-secondary hover:bg-surface-hover">
             다시 시도
           </button>
         </div>
       )}
 
+      {/* 스캔 요약 */}
+      {cache?.cached && (
+        <div className="card-surface flex items-center gap-5 rounded-md px-4 py-2.5">
+          <div className="flex items-center gap-1.5 text-[12px]">
+            <Radar className="h-3 w-3 text-text-faint" />
+            <span className="text-text-muted">스캔:</span>
+            <span className="font-mono-trading text-text-primary">{cache.totalScanned}개</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[12px]">
+            <Activity className="h-3 w-3 text-text-faint" />
+            <span className="text-text-muted">감지:</span>
+            <span className={`font-mono-trading ${(cache.detected ?? 0) > 0 ? 'text-profit' : 'text-text-primary'}`}>
+              {cache.detected}개
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
+            <Clock className="h-3 w-3" />
+            {cache.scannedAt ? getTimeAgo(cache.scannedAt) : ''}
+          </div>
+          {cache.scanDurationMs && (
+            <div className="text-[12px] text-text-faint">
+              {(cache.scanDurationMs / 1000).toFixed(0)}초
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 초기 로딩 */}
+      {cacheLoading && (
+        <div className="card-surface flex items-center justify-center gap-2 rounded-md py-12">
+          <Loader2 className="h-4 w-4 animate-spin text-text-muted" />
+          <span className="text-[13px] text-text-muted">캐시 로딩 중...</span>
+        </div>
+      )}
+
       {/* 결과 없음 */}
-      {data && data.results.length === 0 && (
+      {!cacheLoading && sortedResults.length === 0 && !scanning && (
         <div className="card-surface rounded-md py-12 text-center" style={{ border: '1px dashed var(--border)' }}>
           <Search className="mx-auto mb-3 h-8 w-8 text-text-faint" />
-          <p className="text-[13px] font-medium text-text-secondary">현재 탐지된 코인이 없습니다</p>
+          <p className="text-[13px] font-medium text-text-secondary">
+            {cache?.cached ? '현재 탐지된 코인이 없습니다' : '스캔을 실행하면 매수 추천 코인이 표시됩니다'}
+          </p>
           <p className="mt-1 text-[12px] text-text-muted">
-            {strategy === 'composite' && '5개 지표 중 3개 이상 합의해야 시그널이 발생합니다'}
-            {strategy === 'oversold' && 'RSI(14)가 30 이하인 과매도 코인이 없습니다'}
-            {strategy === 'momentum' && 'RSI 50~70 구간의 건강한 상승 종목이 없습니다'}
-            {strategy === 'volume' && '거래량 Z-Score > 1.5인 코인이 없습니다'}
+            위의 스캔 버튼을 눌러 업비트 전체 코인을 분석하세요.
           </p>
         </div>
       )}
 
       {/* 탐지 결과 */}
-      {data && data.results.length > 0 && (
-        <div className="space-y-3">
+      {sortedResults.length > 0 && (
+        <div className="space-y-2">
           <h2 className="text-[12px] font-semibold text-text-muted">
-            탐지 결과 ({data.results.length}개)
+            분석 결과 ({sortedResults.length}개)
           </h2>
-          {data.results.map((result) => (
-            <DetectionCard key={result.symbol} result={result} strategy={strategy} />
+          {sortedResults.map((result) => (
+            <DetectionCard key={result.symbol} result={result} />
           ))}
         </div>
       )}
 
       {/* 지표 설명 */}
       <div className="card-surface rounded-md p-4">
-        <h3 className="data-table-header mb-3">탐지 지표</h3>
+        <h3 className="data-table-header mb-3">
+          <TermTooltip term="detection_indicators">분석 지표 안내</TermTooltip>
+        </h3>
         <div className="grid grid-cols-1 gap-2 text-[12px] md:grid-cols-2">
-          <IndicatorInfo name="RSI(14)" description="과매수/과매도 지표 (0~100). 30↓ 과매도, 70↑ 과매수" />
-          <IndicatorInfo name="ATR%" description="가격 대비 평균 변동폭의 비율(%). 4%↓ 조용, 6%↑ 격변" />
-          <IndicatorInfo name="거래량 Z-Score" weight="25%" description="20일 평균 대비 거래량 이상치 (Z > 2.5)" />
-          <IndicatorInfo name="BTC 보정 급등" weight="25%" description="BTC 연동분 제거 후 독립 상승률 (> 2%)" />
-          <IndicatorInfo name="호가 불균형" weight="20%" description="매수/매도 호가 비율 (Bid/Ask > 2.0)" />
-          <IndicatorInfo name="OBV 다이버전스" weight="15%" description="가격 하락 + 거래량 상승 = 숨겨진 축적" />
-          <IndicatorInfo name="9시 리셋" weight="15%" description="업비트 09:00 리셋 직후 상승 모멘텀 (> 1%)" />
+          <IndicatorInfo name="매수 점수" description="5개 지표의 가중 합산. 60점 이상이면 매수 시그널." />
+          <IndicatorInfo name="RSI(14)" description="과매수/과매도 지표 (0~100). 30 이하 과매도, 70 이상 과매수." />
+          <IndicatorInfo name="거래량 Z-Score" weight="25%" description="20일 평균 대비 거래량 이상치. Z > 2.5이면 활성." />
+          <IndicatorInfo name="BTC 보정 급등" weight="25%" description="BTC 연동분 제거 후 독립 상승률. > 2%이면 활성." />
+          <IndicatorInfo name="호가 불��형" weight="20%" description="매수/매도 호가 비율. Bid/Ask > 2.0이면 활성." />
+          <IndicatorInfo name="OBV 다이버전스" weight="15%" description="가격 하락 + 거래량 상승 = 숨겨진 축적." />
+          <IndicatorInfo name="9시 리셋" weight="15%" description="업비트 09:00 리셋 직후 상승 모멘텀. > 1%이면 활성." />
         </div>
       </div>
     </div>
   )
 }
 
-function DetectionCard({ result, strategy }: { result: DetectionResult; strategy: StrategyType }) {
+// --- 탐지 카드 (간소화 + detail 숨김) ---
+
+function DetectionCard({ result }: { result: DetectionResultItem }) {
   const [expanded, setExpanded] = useState(false)
-  const activeCount = Object.values(result.signals).filter((s) => s.active).length
+  const scorePercent = Math.round(result.score * 100)
+  const rec = getRecommendation(result)
 
   return (
-    <div className="card-surface rounded-md p-4">
+    <div className="card-surface rounded-md">
+      {/* 기본: 코인명 + 매수 점수 + 추천 뱃지 + 가격 + 24h 변동 */}
       <div
-        className="flex cursor-pointer items-center justify-between"
+        className="flex cursor-pointer items-center justify-between px-4 py-3"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
-            <span className="text-[15px] font-semibold text-text-primary">{result.koreanName || result.symbol}</span>
+            <span className="text-[14px] font-semibold text-text-primary">{result.koreanName}</span>
             <span className="text-[12px] text-text-muted">{result.symbol}</span>
           </div>
-          <ScoreBadge score={result.score} strategy={strategy} />
-          <RecommendBadge result={result} strategy={strategy} />
-          {result.changePct !== 0 && (
-            <span className={`flex items-center gap-0.5 font-mono-trading text-[12px] ${result.changePct > 0 ? 'text-profit' : 'text-loss'}`}>
-              {result.changePct > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {result.changePct > 0 ? '+' : ''}{result.changePct.toFixed(2)}%
+          <span className={`rounded-full px-2 py-0.5 font-mono-trading text-[12px] font-semibold ${
+            scorePercent >= 80 ? 'bg-[var(--profit-bg)] text-profit' :
+            scorePercent >= 60 ? 'bg-[var(--warning-bg)] text-warning' :
+            'bg-secondary text-text-muted'
+          }`}>
+            {scorePercent}점
+          </span>
+          {rec && (
+            <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${rec.color}`}>
+              {rec.label}
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="font-mono-trading text-[12px] text-text-muted">
-            {result.price ? `${result.price.toLocaleString('ko-KR')}원` : ''}
-          </span>
+          <div className="text-right">
+            <span className="font-mono-trading text-[13px] text-text-primary">
+              {result.price.toLocaleString('ko-KR')}원
+            </span>
+            {result.changePct !== 0 && (
+              <span className={`ml-2 flex items-center gap-0.5 font-mono-trading text-[12px] ${result.changePct > 0 ? 'text-profit' : 'text-loss'}`}>
+                {result.changePct > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {result.changePct > 0 ? '+' : ''}{result.changePct.toFixed(2)}%
+              </span>
+            )}
+          </div>
           {expanded
             ? <ChevronUp className="h-4 w-4 text-text-faint" />
             : <ChevronDown className="h-4 w-4 text-text-faint" />
@@ -284,137 +262,79 @@ function DetectionCard({ result, strategy }: { result: DetectionResult; strategy
         </div>
       </div>
 
-      {/* 핵심 지표 바 */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        <MetricPill label="RSI" value={result.rsi14.toFixed(1)} color={getRsiColor(result.rsi14)} />
-        <MetricPill label="ATR%" value={`${result.atrPct.toFixed(2)}%`} color={getAtrColor(result.atrPct)} />
-        <MetricPill
-          label="Vol Z"
-          value={(result.signals.volumeZScore.value as number).toFixed(1)}
-          color={(result.signals.volumeZScore.value as number) > 2.5 ? 'profit' : 'muted'}
-        />
-        <span className="mx-1 self-center text-[12px] text-text-faint">|</span>
-        <SignalDot label="거래량" active={result.signals.volumeZScore.active} />
-        <SignalDot label="BTC보정" active={result.signals.btcAdjustedPump.active} />
-        <SignalDot label="호가" active={result.signals.orderbookImbalance.active} />
-        <SignalDot label="OBV" active={result.signals.obvDivergence.active} />
-        <SignalDot label="9시" active={result.signals.morningReset.active} />
-        <span className="ml-auto text-[12px] text-text-muted">{activeCount}/5</span>
-      </div>
-
-      {/* 상세 */}
+      {/* 상세 (펼치면 보임) */}
       {expanded && (
-        <div className="mt-3 space-y-2 border-t border-border-subtle pt-3">
-          <div className="mb-2 grid grid-cols-3 gap-2">
+        <div className="border-t border-border-subtle px-4 py-3 space-y-3">
+          {/* 핵심 지표 */}
+          <div className="grid grid-cols-3 gap-2">
             <MetricBox label="RSI(14)" value={result.rsi14.toFixed(1)} desc={getRsiDesc(result.rsi14)} color={getRsiColor(result.rsi14)} />
             <MetricBox label="ATR%" value={`${result.atrPct.toFixed(2)}%`} desc={getAtrDesc(result.atrPct)} color={getAtrColor(result.atrPct)} />
             <MetricBox label="24h 변동" value={`${result.changePct > 0 ? '+' : ''}${result.changePct.toFixed(2)}%`} desc="" color={result.changePct > 0 ? 'profit' : result.changePct < 0 ? 'loss' : 'muted'} />
           </div>
-          <SignalDetail
-            label="거래량 Z-Score"
-            active={result.signals.volumeZScore.active}
-            value={`Z = ${(result.signals.volumeZScore.value as number).toFixed(2)}`}
-            threshold="Z > 2.5"
-          />
-          <SignalDetail
-            label="BTC 보정 급등"
-            active={result.signals.btcAdjustedPump.active}
-            value={`${(result.signals.btcAdjustedPump.value as number).toFixed(2)}%`}
-            threshold="> 2.0%"
-          />
-          <SignalDetail
-            label="호가 Bid/Ask"
-            active={result.signals.orderbookImbalance.active}
-            value={`${(result.signals.orderbookImbalance.value as number).toFixed(2)}`}
-            threshold="> 2.0"
-          />
-          <SignalDetail
-            label="OBV 다이버전스"
-            active={result.signals.obvDivergence.active}
-            value={String(result.signals.obvDivergence.value)}
-            threshold="bullish"
-          />
-          <SignalDetail
-            label="9시 리셋"
-            active={result.signals.morningReset.active}
-            value={`${(result.signals.morningReset.value as number).toFixed(2)}%`}
-            threshold="> 1.0%"
-          />
+
+          {/* 5개 시그널 상세 */}
+          <div className="space-y-1.5">
+            <p className="text-[12px] font-semibold text-text-muted">탐지 지표</p>
+            <SignalDetail
+              label="거래량 Z-Score"
+              active={result.signals.volumeZScore.active}
+              value={`Z = ${(result.signals.volumeZScore.value as number).toFixed(2)}`}
+              threshold="Z > 2.5"
+              weight="25%"
+            />
+            <SignalDetail
+              label="BTC 보정 급등"
+              active={result.signals.btcAdjustedPump.active}
+              value={`${(result.signals.btcAdjustedPump.value as number).toFixed(2)}%`}
+              threshold="> 2.0%"
+              weight="25%"
+            />
+            <SignalDetail
+              label="호가 Bid/Ask"
+              active={result.signals.orderbookImbalance.active}
+              value={`${(result.signals.orderbookImbalance.value as number).toFixed(2)}`}
+              threshold="> 2.0"
+              weight="20%"
+            />
+            <SignalDetail
+              label="OBV 다이버전스"
+              active={result.signals.obvDivergence.active}
+              value={String(result.signals.obvDivergence.value)}
+              threshold="bullish"
+              weight="15%"
+            />
+            <SignalDetail
+              label="9시 리셋"
+              active={result.signals.morningReset.active}
+              value={`${(result.signals.morningReset.value as number).toFixed(2)}%`}
+              threshold="> 1.0%"
+              weight="15%"
+            />
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function ScoreBadge({ score, strategy }: { score: number; strategy: StrategyType }) {
-  let color: string
-  let label: string
+// --- 추천 로직 ---
 
-  if (strategy === 'composite') {
-    color = score >= 0.8 ? 'bg-[var(--profit-bg)] text-profit' : score >= 0.6 ? 'bg-[var(--warning-bg)] text-warning' : 'bg-muted text-text-muted'
-    label = `${(score * 100).toFixed(0)}%`
-  } else if (strategy === 'oversold') {
-    color = score <= 20 ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--warning-bg)] text-warning'
-    label = `${(score * 100).toFixed(0)}%`
-  } else {
-    color = 'bg-[var(--accent-bg)] text-[var(--accent)]'
-    label = `${(score * 100).toFixed(0)}%`
-  }
+function getRecommendation(result: DetectionResultItem): { label: string; color: string } | null {
+  const { score, rsi14 } = result
+  const activeCount = Object.values(result.signals).filter((s) => s.active).length
 
-  return (
-    <span className={`rounded-full px-2 py-0.5 font-mono-trading text-[12px] font-semibold ${color}`}>
-      {label}
-    </span>
-  )
-}
-
-function getRecommendation(result: DetectionResult, strategy: StrategyType): { label: string; color: string } | null {
-  const { score, rsi14, signals } = result
-  const activeCount = Object.values(signals).filter((s) => s.active).length
-
-  // 매도 주의 (과매수)
   if (rsi14 >= 70) {
     return { label: '매도 주의', color: 'bg-[var(--loss-bg)] text-loss' }
   }
 
-  if (strategy === 'composite') {
-    if (score >= 0.8 && activeCount >= 4) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
-    if (score >= 0.8) return { label: '매수 추천', color: 'bg-[var(--profit-bg)] text-profit' }
-    if (score >= 0.6) return { label: '매수 관심', color: 'bg-[var(--warning-bg)] text-warning' }
-  } else if (strategy === 'oversold') {
-    if (rsi14 <= 25) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
-    if (rsi14 <= 30) return { label: '매수 추천', color: 'bg-[var(--profit-bg)] text-profit' }
-    return { label: '과매도 관심', color: 'bg-[var(--warning-bg)] text-warning' }
-  } else if (strategy === 'momentum') {
-    if (rsi14 >= 55 && rsi14 <= 65 && result.changePct > 0) return { label: '추세 매수', color: 'bg-[var(--profit-bg)] text-profit' }
-    return { label: '모멘텀 관심', color: 'bg-[var(--warning-bg)] text-warning' }
-  } else if (strategy === 'volume') {
-    const volZ = signals.volumeZScore.value as number
-    if (volZ > 3 && result.changePct > 0) return { label: '거래량 매수', color: 'bg-[var(--profit-bg)] text-profit' }
-    return { label: '거래량 관심', color: 'bg-[var(--warning-bg)] text-warning' }
-  }
+  if (score >= 0.8 && activeCount >= 4) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
+  if (score >= 0.8) return { label: '매수 추천', color: 'bg-[var(--profit-bg)] text-profit' }
+  if (score >= 0.6) return { label: '매수 관심', color: 'bg-[var(--warning-bg)] text-warning' }
 
   return null
 }
 
-function RecommendBadge({ result, strategy }: { result: DetectionResult; strategy: StrategyType }) {
-  const rec = getRecommendation(result, strategy)
-  if (!rec) return null
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${rec.color}`}>
-      {rec.label}
-    </span>
-  )
-}
-
-function MetricPill({ label, value, color }: { label: string; value: string; color: string }) {
-  const colorClass = color === 'profit' ? 'text-profit' : color === 'loss' ? 'text-loss' : color === 'warning' ? 'text-warning' : 'text-text-muted'
-  return (
-    <span className={`rounded-md bg-secondary px-2 py-0.5 text-[12px] ${colorClass}`}>
-      <span className="text-text-muted">{label}</span> <span className="font-mono-trading font-medium">{value}</span>
-    </span>
-  )
-}
+// --- 보조 컴포넌트 ---
 
 function MetricBox({ label, value, desc, color }: { label: string; value: string; desc: string; color: string }) {
   const colorClass = color === 'profit' ? 'text-profit' : color === 'loss' ? 'text-loss' : color === 'warning' ? 'text-warning' : 'text-text-secondary'
@@ -427,84 +347,73 @@ function MetricBox({ label, value, desc, color }: { label: string; value: string
   )
 }
 
-function SignalDot({ label, active }: { label: string; active: boolean }) {
-  return (
-    <div className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] ${
-      active ? 'bg-[var(--profit-bg)] text-profit' : 'bg-secondary text-text-faint'
-    }`}>
-      <span className={`inline-block h-1.5 w-1.5 rounded-full ${active ? 'bg-profit' : 'bg-text-faint'}`} />
-      {label}
-    </div>
-  )
-}
-
-function SignalDetail({ label, active, value, threshold }: {
+function SignalDetail({ label, active, value, threshold, weight }: {
   label: string
   active: boolean
   value: string
   threshold: string
+  weight: string
 }) {
   return (
     <div className="flex items-center justify-between text-[12px]">
       <div className="flex items-center gap-2">
         <span className={`inline-block h-2 w-2 rounded-full ${active ? 'bg-profit' : 'bg-text-faint'}`} />
         <span className="text-text-muted">{label}</span>
+        <span className="text-[11px] text-text-faint">({weight})</span>
       </div>
-      <div className="flex items-center gap-3">
-        <span className={`font-mono-trading ${active ? 'text-profit' : 'text-text-faint'}`}>{value}</span>
-        <span className="text-[12px] text-text-muted">기준: {threshold}</span>
+      <div className="flex items-center gap-2">
+        <span className={`font-mono-trading ${active ? 'text-profit' : 'text-text-secondary'}`}>
+          {value}
+        </span>
+        <span className="text-text-faint">{threshold}</span>
       </div>
     </div>
   )
 }
 
-function IndicatorInfo({ name, weight, description }: { name: string; weight?: string; description: string }) {
+function IndicatorInfo({ name, description, weight }: { name: string; description: string; weight?: string }) {
   return (
-    <div className="rounded-md bg-secondary p-2.5">
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-text-secondary">{name}</span>
-        {weight && <span className="font-mono-trading text-[12px] text-text-muted">{weight}</span>}
-      </div>
-      <p className="mt-0.5 text-[12px] text-text-muted">{description}</p>
+    <div className="flex gap-2">
+      <span className="font-medium text-text-secondary">{name}</span>
+      {weight && <span className="text-text-faint">({weight})</span>}
+      <span className="text-text-muted">{description}</span>
     </div>
   )
 }
+
+// --- 유틸 ---
 
 function getRsiColor(rsi: number): string {
-  if (rsi === 0) return 'muted'
-  if (rsi <= 30) return 'profit'  // 과매도 = 매수 기회
-  if (rsi >= 70) return 'loss'    // 과매수 = 주의
-  if (rsi >= 52 && rsi <= 70) return 'muted'
+  if (rsi <= 30) return 'profit'
+  if (rsi >= 70) return 'loss'
+  if (rsi >= 50 && rsi <= 65) return 'profit'
   return 'muted'
 }
 
 function getRsiDesc(rsi: number): string {
-  if (rsi === 0) return '데이터 부족'
   if (rsi <= 30) return '과매도'
   if (rsi >= 70) return '과매수'
-  if (rsi >= 52) return '안전 구간'
-  return '중립'
+  if (rsi >= 50 && rsi <= 65) return '건강'
+  return ''
 }
 
 function getAtrColor(atr: number): string {
-  if (atr === 0) return 'muted'
-  if (atr <= 4) return 'profit'
+  if (atr <= 3) return 'profit'
   if (atr >= 6) return 'loss'
-  return 'warning'
+  return 'muted'
 }
 
 function getAtrDesc(atr: number): string {
-  if (atr === 0) return '데이터 부족'
-  if (atr <= 4) return '조용'
+  if (atr <= 3) return '조용'
   if (atr >= 6) return '격변'
-  return '보통'
+  return ''
 }
 
 function getTimeAgo(timestamp: string): string {
   const diff = Date.now() - new Date(timestamp).getTime()
-  const seconds = Math.floor(diff / 1000)
-  if (seconds < 60) return `${seconds}초 전`
-  const minutes = Math.floor(seconds / 60)
+  const minutes = Math.floor(diff / 60_000)
   if (minutes < 60) return `${minutes}분 전`
-  return `${Math.floor(minutes / 60)}시간 전`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}시간 전`
+  return `${Math.floor(hours / 24)}일 전`
 }
