@@ -68,7 +68,7 @@ export function BacktestPage() {
     { id: 'btc_donchian_breakout', name: 'BTC 돈치안 브레이크아웃 (OKX 선물)', timeframe: '1H' },
   ]
 
-  const selectedOption = strategyOptions.find((s) => s.id === selectedStrategy) ?? strategyOptions[0]
+  const selectedOption = strategyOptions.find((s) => s.id === selectedStrategy) ?? strategyOptions[0]!
 
   const mutation = useMutation({
     mutationFn: async () => {
