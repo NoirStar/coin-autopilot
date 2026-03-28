@@ -49,7 +49,7 @@ export function OnboardingChecklist({
       </div>
 
       {/* 진행 바 */}
-      <div className="mt-2.5 h-1 rounded-full bg-secondary">
+      <div className="mt-2.5 h-1 rounded-full bg-[var(--surface-hover)]">
         <div
           className="h-full rounded-full bg-profit transition-all duration-300"
           style={{ width: `${(completedCount / items.length) * 100}%` }}

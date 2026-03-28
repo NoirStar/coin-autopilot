@@ -4,6 +4,7 @@ import { LogIn, LogOut, User, Menu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { LoginModal } from '@/components/auth/LoginModal'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/services/api'
 
 export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { user, loading, signOut } = useAuth()
@@ -25,7 +26,15 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
     staleTime: 30_000,
   })
 
-  const btcPrice = regime?.btc_close
+  // 실시간 BTC 가격 (업비트 ticker)
+  const { data: btcData } = useQuery({
+    queryKey: ['header-btc-price'],
+    queryFn: () => api.getBtcPrice(),
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+  })
+
+  const btcPrice = btcData?.price
   const regimeState = regime?.regime
 
   return (
@@ -135,7 +144,5 @@ function calcReset(): string {
 }
 
 function formatKrw(value: number): string {
-  if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(2)}억`
-  if (value >= 10_000) return `${(value / 10_000).toFixed(0)}만`
-  return value.toLocaleString('ko-KR')
+  return `${value.toLocaleString('ko-KR')}원`
 }

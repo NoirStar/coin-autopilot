@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Brain,
@@ -7,26 +8,65 @@ import {
   Wallet,
   Settings,
   Signal,
-  Radar,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Lock,
+  BarChart3,
 } from 'lucide-react'
+import { useAuth } from '../../hooks/useAuth'
 
-/** 운용자 모드 네비게이션 항목 */
-const navItems = [
-  { to: '/operator/dashboard', icon: LayoutDashboard, label: '대시보드' },
-  { to: '/operator/strategy', icon: Brain, label: '전략 관리' },
-  { to: '/operator/backtest', icon: FlaskConical, label: '백테스팅' },
-  { to: '/operator/paper-trading', icon: PlayCircle, label: '가상매매' },
-  { to: '/operator/portfolio', icon: Wallet, label: '포트폴리오' },
-  { to: '/operator/settings', icon: Settings, label: '설정' },
-]
+interface NavCategory {
+  label: string
+  icon: typeof BarChart3
+  items: { to: string; icon: typeof BarChart3; label: string }[]
+  requiresAuth?: boolean
+}
 
-/** 공개 페이지 바로가기 */
-const publicItems = [
-  { to: '/signals', icon: Signal, label: '시그널' },
-  { to: '/detection', icon: Radar, label: '알트 탐지' },
+const categories: NavCategory[] = [
+  {
+    label: '시장 분석',
+    icon: BarChart3,
+    items: [
+      { to: '/signals', icon: Signal, label: '매매 시그널' },
+      { to: '/detection', icon: Search, label: '코인 분석' },
+    ],
+  },
+  {
+    label: '자동매매',
+    icon: Brain,
+    requiresAuth: true,
+    items: [
+      { to: '/operator/dashboard', icon: LayoutDashboard, label: '대시보드' },
+      { to: '/operator/strategy', icon: Brain, label: '전략 관리' },
+      { to: '/operator/backtest', icon: FlaskConical, label: '백테스팅' },
+      { to: '/operator/paper-trading', icon: PlayCircle, label: '가상매매' },
+      { to: '/operator/portfolio', icon: Wallet, label: '포트폴리오' },
+      { to: '/operator/settings', icon: Settings, label: '설정' },
+    ],
+  },
 ]
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { user } = useAuth()
+  const location = useLocation()
+
+  // 현재 경로가 속한 카테고리는 기본 열림
+  const getDefaultOpen = () => {
+    const open: Record<string, boolean> = {}
+    for (const cat of categories) {
+      const hasActive = cat.items.some((item) => location.pathname.startsWith(item.to))
+      open[cat.label] = hasActive || !cat.requiresAuth
+    }
+    return open
+  }
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(getDefaultOpen)
+
+  const toggleSection = (label: string) => {
+    setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }))
+  }
+
   return (
     <aside className="flex h-full w-60 flex-col border-r border-border-subtle bg-background">
       {/* 로고 + 골드 닷 브랜드마크 */}
@@ -40,47 +80,54 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="mx-4 h-px bg-border-subtle" />
 
-      {/* 운용자 네비게이션 */}
-      <nav className="flex-1 space-y-0.5 px-3 py-3">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
-                isActive
-                  ? 'text-foreground bg-surface-hover'
-                  : 'text-text-muted hover:bg-surface-hover hover:text-foreground'
-              }`
-            }
-          >
-            <item.icon className="h-[15px] w-[15px]" />
-            {item.label}
-          </NavLink>
-        ))}
+      {/* 2단계 아코디언 네비게이션 */}
+      <nav className="flex-1 space-y-1 px-3 py-3">
+        {categories.map((cat) => {
+          const isOpen = openSections[cat.label] ?? false
+          const isLocked = cat.requiresAuth && !user
 
-        {/* 구분선 */}
-        <div className="mx-2 my-2 h-px bg-border-subtle" />
-        <p className="px-3 py-1 text-[12px] font-semibold text-text-faint">공개 페이지</p>
+          return (
+            <div key={cat.label}>
+              {/* 카테고리 헤더 */}
+              <button
+                type="button"
+                onClick={() => toggleSection(cat.label)}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-[12px] font-semibold text-text-muted transition-colors hover:text-text-secondary"
+              >
+                {isOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                )}
+                {cat.label}
+                {isLocked && <Lock className="ml-auto h-3 w-3 text-text-faint" />}
+              </button>
 
-        {publicItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
-                isActive
-                  ? 'text-foreground bg-surface-hover'
-                  : 'text-text-muted hover:bg-surface-hover hover:text-foreground'
-              }`
-            }
-          >
-            <item.icon className="h-[15px] w-[15px]" />
-            {item.label}
-          </NavLink>
-        ))}
+              {/* 하위 항목 */}
+              {isOpen && (
+                <div className="ml-2 space-y-0.5">
+                  {cat.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={onNavigate}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
+                          isActive
+                            ? 'bg-[var(--accent-bg)] text-text-primary'
+                            : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
+                        }`
+                      }
+                    >
+                      <item.icon className="h-[15px] w-[15px]" />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       {/* 에이전트 상태 */}

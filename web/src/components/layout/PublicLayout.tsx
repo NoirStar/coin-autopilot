@@ -44,7 +44,7 @@ export function PublicLayout() {
               }
             >
               <Radar className="h-3 w-3" />
-              알트 탐지
+              코인 분석
             </NavLink>
           </nav>
         </div>

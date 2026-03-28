@@ -1,3 +1,5 @@
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { HelpCircle } from 'lucide-react'
 
 const TERM_DICTIONARY: Record<string, string> = {
@@ -15,6 +17,8 @@ const TERM_DICTIONARY: Record<string, string> = {
   kimchi_premium: '한국 거래소와 해외 거래소의 가격 차이. 양수면 한국이 더 비쌈',
   mean_reversion: '가격이 평균으로 돌아오려는 성질. 많이 빠지면 반등할 가능성이 높다는 전략',
   risk_profile: '투자 위험 허용 수준. 안전/중립/공격으로 나뉘며, 레버리지·동시보유·MDD 한도가 달라짐',
+  buy_environment: '현재 시장이 매수하기 좋은 환경인지 판단. BTC 레짐(Risk-On/Off)과 활성 시그널 수를 기반으로 3단계(매수 비추천/보통/매수 추천)로 표시',
+  fear_greed: '시장의 공포와 탐욕 수준 (0~100). 0에 가까우면 극단 공포(역발상 매수 기회), 100에 가까우면 극단 탐욕(과열 주의)',
 }
 
 interface TermTooltipProps {
@@ -25,30 +29,72 @@ interface TermTooltipProps {
 
 export function TermTooltip({ term, children, className = '' }: TermTooltipProps) {
   const description = TERM_DICTIONARY[term]
+  const [visible, setVisible] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const triggerRef = useRef<HTMLSpanElement>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+
+  const show = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => {
+      if (!triggerRef.current) return
+      const rect = triggerRef.current.getBoundingClientRect()
+      const tooltipWidth = 256
+      let left = rect.left + rect.width / 2 - tooltipWidth / 2
+      // viewport 경계 체크
+      if (left < 8) left = 8
+      if (left + tooltipWidth > window.innerWidth - 8) left = window.innerWidth - tooltipWidth - 8
+      // 위쪽에 공간이 있으면 위, 없으면 아래
+      const spaceAbove = rect.top
+      const top = spaceAbove > 80
+        ? rect.top + window.scrollY - 8
+        : rect.bottom + window.scrollY + 8
+      setPos({ top, left })
+      setVisible(true)
+    }, 300)
+  }, [])
+
+  const hide = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    setVisible(false)
+    setPos(null)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [])
+
   if (!description) return <span className={className}>{children}</span>
 
   return (
-    <span className={`group relative inline-flex items-center gap-1 ${className}`}>
-      {children}
-      <HelpCircle className="h-3.5 w-3.5 min-w-[14px] text-text-muted transition-colors group-hover:text-text-secondary" />
+    <>
       <span
-        className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-md px-3 py-2.5 text-[12px] leading-relaxed opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100"
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          color: 'var(--text-primary)',
-        }}
+        ref={triggerRef}
+        className={`inline-flex items-center gap-1 ${className}`}
+        onMouseEnter={show}
+        onMouseLeave={hide}
       >
-        {description}
-        <span
-          className="absolute left-1/2 top-full -translate-x-1/2"
-          style={{
-            borderWidth: '5px',
-            borderStyle: 'solid',
-            borderColor: 'var(--surface) transparent transparent transparent',
-          }}
-        />
+        {children}
+        <HelpCircle className="h-3.5 w-3.5 min-w-[14px] text-text-muted transition-colors hover:text-text-secondary" />
       </span>
-    </span>
+      {visible && pos && createPortal(
+        <div
+          className="pointer-events-none fixed z-50 w-64 rounded-md px-3 py-2.5 text-[12px] leading-relaxed shadow-xl"
+          style={{
+            top: pos.top,
+            left: pos.left,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-primary)',
+            transform: 'translateY(-100%)',
+          }}
+        >
+          {description}
+        </div>,
+        document.body
+      )}
+    </>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   TrendingDown,
@@ -15,7 +15,6 @@ import { BtcCandleChart } from '../components/charts/BtcCandleChart'
 import { supabase } from '../lib/supabase'
 import { TermTooltip } from '../components/ui/term-tooltip'
 import { useAuth } from '../hooks/useAuth'
-import { WelcomeModal } from '../components/onboarding/WelcomeModal'
 import { OnboardingChecklist } from '../components/onboarding/OnboardingChecklist'
 
 interface RegimeState {
@@ -117,20 +116,13 @@ function useActiveSignalCount() {
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const { data: regime } = useRegime()
-  const { data: perf } = useBacktestPerformance()
-  const { data: activeCount } = useActiveSignalCount()
-  const { data: recentSignals } = useRecentSignals()
+  const { data: regime, isError: regimeError, refetch: refetchRegime } = useRegime()
+  const { data: perf, isError: perfError, refetch: refetchPerf } = useBacktestPerformance()
+  const { data: activeCount, isError: activeError, refetch: refetchActive } = useActiveSignalCount()
+  const { data: recentSignals, isError: signalsError, refetch: refetchSignals } = useRecentSignals()
 
   // 온보딩 상태
-  const [showWelcome, setShowWelcome] = useState(false)
   const [checklistDismissed, setChecklistDismissed] = useState(false)
-
-  useEffect(() => {
-    if (user && !localStorage.getItem('onboarding_complete')) {
-      setShowWelcome(true)
-    }
-  }, [user])
 
   const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true'
   const profileSelected = localStorage.getItem('profile_selected') === 'true'
@@ -139,19 +131,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      {/* 온보딩 */}
-      <WelcomeModal
-        open={showWelcome}
-        onClose={() => {
-          setShowWelcome(false)
-          localStorage.setItem('onboarding_complete', 'true')
-        }}
-        onComplete={() => {
-          setShowWelcome(false)
-          localStorage.setItem('onboarding_complete', 'true')
-        }}
-      />
-
+      {/* 온보딩 체크리스트 (WelcomeModal 제거됨) */}
       {user && !onboardingComplete && !checklistDismissed && (
         <OnboardingChecklist
           profileSelected={profileSelected}
@@ -170,7 +150,14 @@ export function DashboardPage() {
           <h2 className="text-xl font-semibold tracking-tight">대시보드</h2>
           <p className="text-[13px] text-text-muted">자산 현황과 매매 상태를 확인합니다</p>
         </div>
-        {regime && <RegimeBadge regime={regime} />}
+        {regimeError ? (
+          <button onClick={() => refetchRegime()} className="flex items-center gap-1.5 text-[12px] text-loss hover:underline">
+            <Activity className="h-3.5 w-3.5" />
+            레짐 로드 실패 · 재시도
+          </button>
+        ) : regime ? (
+          <RegimeBadge regime={regime} />
+        ) : null}
       </div>
 
       {/* KPI */}
@@ -202,7 +189,7 @@ export function DashboardPage() {
         />
       </div>
 
-      {/* 알트 탐지 현황 */}
+      {/* 코인 분석 현황 */}
       <ScanStatusWidget />
 
       {/* 차트 + 사이드 */}
@@ -407,7 +394,7 @@ function ScanStatusWidget() {
     <div className="card-surface flex flex-wrap items-center gap-4 rounded-md px-4 py-3">
       <div className="flex items-center gap-1.5 text-text-muted">
         <Radar className="h-3.5 w-3.5" />
-        <span className="text-[12px] font-semibold">알트 탐지</span>
+        <span className="text-[12px] font-semibold">코인 분석</span>
       </div>
       <div className="flex items-center gap-1.5 text-[12px]">
         <span className="text-text-muted">스캔:</span>

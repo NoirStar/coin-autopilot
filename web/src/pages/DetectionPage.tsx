@@ -109,7 +109,7 @@ export function DetectionPage() {
     <div className="mx-auto max-w-4xl space-y-5 py-2">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">알트코인 탐지</h1>
+          <h1 className="text-xl font-semibold tracking-tight">코인 분석</h1>
           <p className="text-[13px] text-text-muted">
             업비트 KRW 마켓 · <span className="font-mono-trading">1</span>시간봉 기준 · 수동 스캔
           </p>

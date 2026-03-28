@@ -118,6 +118,124 @@ function usePerformance() {
   })
 }
 
+// --- Fear & Greed ---
+
+interface FearGreedResponse {
+  data: { value: string; value_classification: string }[]
+}
+
+function useFearGreed() {
+  return useQuery({
+    queryKey: ['fear-greed'],
+    queryFn: async () => {
+      const res = await fetch('https://api.alternative.me/fng/?limit=1')
+      if (!res.ok) throw new Error('Fear & Greed API 실패')
+      const json = (await res.json()) as FearGreedResponse
+      const entry = json.data?.[0]
+      if (!entry) throw new Error('데이터 없음')
+      return { value: Number(entry.value), label: entry.value_classification }
+    },
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  })
+}
+
+// --- 매수 환경 라벨 ---
+
+type BuyEnvironment = { label: string; color: string }
+
+function getBuyEnvironment(regime: RegimeState | undefined, signalCount: number): BuyEnvironment {
+  if (!regime || regime.regime === 'risk_off') {
+    return { label: '매수 비추천', color: 'var(--loss)' }
+  }
+  if (signalCount > 0) {
+    return { label: '매수 추천', color: 'var(--profit)' }
+  }
+  return { label: '보통', color: 'var(--warning)' }
+}
+
+// --- 시장 상황 요약 ---
+
+function MarketSummary() {
+  const { data: regime } = useRegime()
+  const { data: signals } = useSignals()
+  const { data: fearGreed, isLoading: fgLoading, isError: fgError, refetch: refetchFg } = useFearGreed()
+
+  const signalCount = signals?.length ?? 0
+  const env = getBuyEnvironment(regime, signalCount)
+
+  const fgLabel = (v: number) => {
+    if (v <= 25) return '극단 공포'
+    if (v <= 45) return '공포'
+    if (v <= 55) return '중립'
+    if (v <= 75) return '탐욕'
+    return '극단 탐욕'
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* 매수 환경 */}
+      <div className="card-surface rounded-md px-4 py-3">
+        <div className="text-[12px] font-semibold text-text-muted">
+          <TermTooltip term="buy_environment">매수 환경</TermTooltip>
+        </div>
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full" style={{ background: env.color }} />
+          <span className="text-[14px] font-semibold" style={{ color: env.color }}>{env.label}</span>
+        </div>
+      </div>
+
+      {/* BTC 레짐 */}
+      <div className="card-surface rounded-md px-4 py-3">
+        <div className="text-[12px] font-semibold text-text-muted">
+          <TermTooltip term="regime">BTC 레짐</TermTooltip>
+        </div>
+        <div className="mt-1.5 flex items-center gap-2">
+          {regime ? (
+            <>
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: regime.regime === 'risk_on' ? 'var(--profit)' : 'var(--loss)' }}
+              />
+              <span
+                className="text-[14px] font-semibold"
+                style={{ color: regime.regime === 'risk_on' ? 'var(--profit)' : 'var(--loss)' }}
+              >
+                {regime.regime === 'risk_on' ? 'RISK-ON' : 'RISK-OFF'}
+              </span>
+            </>
+          ) : (
+            <span className="skeleton-shimmer h-4 w-20 rounded" />
+          )}
+        </div>
+      </div>
+
+      {/* 공포/탐욕 지수 */}
+      <div className="card-surface rounded-md px-4 py-3">
+        <div className="text-[12px] font-semibold text-text-muted">
+          <TermTooltip term="fear_greed">공포/탐욕 지수</TermTooltip>
+        </div>
+        <div className="mt-1.5">
+          {fgLoading ? (
+            <span className="skeleton-shimmer h-4 w-24 rounded" />
+          ) : fgError ? (
+            <button onClick={() => refetchFg()} className="text-[12px] text-text-muted hover:underline">
+              확인 불가 · 재시도
+            </button>
+          ) : fearGreed ? (
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono-trading text-[14px] font-semibold text-text-primary">
+                {fearGreed.value}
+              </span>
+              <span className="text-[12px] text-text-muted">{fgLabel(fearGreed.value)}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // --- 메인 ---
 
 export function SignalsPage() {
@@ -126,10 +244,11 @@ export function SignalsPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">알트코인 매매 시그널</h1>
         <p className="text-[13px] text-text-muted">
-          BTC 흐름 기반 알트코인 매수/매도 시그널. 4시간마다 갱신.
+          BTC 시장 상태를 기반으로 알트코인 매수 시점을 추천합니다. 4시간마다 갱신.
         </p>
       </div>
 
+      <MarketSummary />
       <RegimeHero />
       <PerformanceSummary />
       <SignalList />
