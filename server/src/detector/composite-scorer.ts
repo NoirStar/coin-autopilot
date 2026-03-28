@@ -18,6 +18,7 @@ import { detectBtcAdjustedPump } from './btc-adjusted-pump.js'
 import { detectOrderbookImbalance, type OrderbookSnapshot } from './orderbook-imbalance.js'
 import { detectOBVDivergence } from './obv-divergence.js'
 import { detectMorningResetMomentum } from './morning-reset.js'
+import { calcRSI, calcATRPercent, calcZScore } from '../indicator/indicator-engine.js'
 
 interface DetectionInput {
   symbol: string
@@ -33,6 +34,10 @@ interface DetectionResult {
   symbol: string
   score: number               // 0.0 ~ 1.0
   detected: boolean           // score > threshold
+  rsi14: number               // RSI(14) 0~100
+  atrPct: number              // ATR% (가격 대비 변동폭)
+  changePct: number           // 24시간 변동률 %
+  price: number               // 현재가
   signals: {
     volumeZScore: { active: boolean; value: number; weight: number }
     btcAdjustedPump: { active: boolean; value: number; weight: number }
@@ -56,6 +61,20 @@ const SCORE_THRESHOLD = 0.6
 export function computeDetectionScore(input: DetectionInput): DetectionResult {
   const volumes = input.candles.map((c) => c.volume)
   const closes = input.candles.map((c) => c.close)
+  const highs = input.candles.map((c) => c.high)
+  const lows = input.candles.map((c) => c.low)
+
+  // RSI(14) & ATR%(14) — 보조 지표
+  const rsiValues = calcRSI(closes, 14)
+  const atrPctValues = calcATRPercent(highs, lows, closes, 14)
+  const rsi14 = rsiValues.length > 0 ? rsiValues[rsiValues.length - 1] : 0
+  const atrPct = atrPctValues.length > 0 ? atrPctValues[atrPctValues.length - 1] : 0
+
+  // 24시간 변동률 (candles가 1h면 24개 전)
+  const lookback = Math.min(24, closes.length - 1)
+  const changePct = lookback > 0
+    ? ((closes[closes.length - 1] - closes[closes.length - 1 - lookback]) / closes[closes.length - 1 - lookback]) * 100
+    : 0
 
   // 1. 거래량 Z-Score
   const volumeResult = detectVolumeAnomaly(volumes)
@@ -92,6 +111,10 @@ export function computeDetectionScore(input: DetectionInput): DetectionResult {
     symbol: input.symbol,
     score: Math.round(score * 100) / 100,
     detected,
+    rsi14: Math.round(rsi14 * 10) / 10,
+    atrPct: Math.round(atrPct * 100) / 100,
+    changePct: Math.round(changePct * 100) / 100,
+    price: input.currentPrice,
     signals: {
       volumeZScore: {
         active: volumeResult.detected,
@@ -122,6 +145,9 @@ export function computeDetectionScore(input: DetectionInput): DetectionResult {
     reasoning: {
       composite_score: score,
       threshold: SCORE_THRESHOLD,
+      rsi_14: rsi14,
+      atr_pct: atrPct,
+      change_pct_24h: changePct,
       volume_zscore: volumeResult.zScore,
       btc_adjusted_change: btcAdjResult.adjustedChangePct,
       bid_ask_ratio: obResult.bidAskRatio,
@@ -131,15 +157,44 @@ export function computeDetectionScore(input: DetectionInput): DetectionResult {
   }
 }
 
-/** 여러 코인을 한번에 스코어링하고 상위 결과만 반환 */
+export type DetectionStrategy = 'composite' | 'oversold' | 'momentum' | 'volume'
+
+/** 여러 코인을 한번에 스코어링하고 전략별 필터 적용 */
 export function scoreMultipleCoins(
   inputs: DetectionInput[],
-  topN: number = 5
+  topN: number = 10,
+  strategy: DetectionStrategy = 'composite'
 ): DetectionResult[] {
   const results = inputs.map(computeDetectionScore)
 
-  return results
-    .filter((r) => r.detected)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topN)
+  switch (strategy) {
+    case 'oversold':
+      // 과매도 전략: RSI ≤ 30 && 스코어 있는 코인
+      return results
+        .filter((r) => r.rsi14 > 0 && r.rsi14 <= 30)
+        .sort((a, b) => a.rsi14 - b.rsi14)
+        .slice(0, topN)
+
+    case 'momentum':
+      // 모멘텀 전략: 24h 상승률 상위 + RSI 50~70 (건강한 상승)
+      return results
+        .filter((r) => r.changePct > 0 && r.rsi14 >= 50 && r.rsi14 <= 70)
+        .sort((a, b) => b.changePct - a.changePct)
+        .slice(0, topN)
+
+    case 'volume':
+      // 거래량 폭증: Z-Score 기준 상위
+      return results
+        .filter((r) => (r.signals.volumeZScore.value as number) > 1.5)
+        .sort((a, b) => (b.signals.volumeZScore.value as number) - (a.signals.volumeZScore.value as number))
+        .slice(0, topN)
+
+    case 'composite':
+    default:
+      // 기본 복합 스코어: detected + 스코어 순
+      return results
+        .filter((r) => r.detected)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, topN)
+  }
 }

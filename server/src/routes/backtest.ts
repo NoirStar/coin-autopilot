@@ -4,14 +4,104 @@ import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
 import { BtcEmaCrossoverStrategy } from '../strategy/btc-ema-crossover.js'
 import { BtcBollingerReversionStrategy } from '../strategy/btc-bollinger-reversion.js'
 import { AltDetectionStrategy } from '../strategy/alt-detection-strategy.js'
-import { loadCandles } from '../data/candle-collector.js'
 import { runBacktest } from '../services/backtest-engine.js'
+import { fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import { supabase } from '../services/database.js'
-import type { CandleMap } from '../strategy/strategy-base.js'
+import type { Candle, CandleMap, Timeframe } from '../strategy/strategy-base.js'
 
 export const backtestRoutes = new Hono()
 
-const TARGET_SYMBOLS = ['ETH', 'XRP', 'SOL', 'DOGE', 'ADA', 'AVAX', 'DOT', 'LINK', 'ATOM']
+const UPBIT_API = 'https://api.upbit.com/v1'
+const OKX_API = 'https://www.okx.com/api/v5'
+
+const UPBIT_TF_MINUTES: Partial<Record<Timeframe, number>> = {
+  '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440,
+}
+const OKX_BAR: Partial<Record<Timeframe, string>> = {
+  '5m': '5m', '15m': '15m', '1h': '1H', '4h': '4H', '1d': '1D',
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/** 업비트에서 직접 캔들 수집 (페이징으로 최대 count개) */
+async function fetchUpbitDirect(market: string, tf: Timeframe, count: number): Promise<Candle[]> {
+  const minutes = UPBIT_TF_MINUTES[tf] ?? 240
+  const all: Candle[] = []
+  let to: string | undefined
+
+  while (all.length < count) {
+    const batch = Math.min(200, count - all.length)
+    const url = new URL(`${UPBIT_API}/candles/minutes/${minutes}`)
+    url.searchParams.set('market', market)
+    url.searchParams.set('count', String(batch))
+    if (to) url.searchParams.set('to', to)
+
+    const res = await fetch(url.toString())
+    if (res.status === 429) { await sleep(1000); continue }
+    if (!res.ok) break
+
+    const data = await res.json() as Array<{
+      candle_date_time_utc: string
+      opening_price: number; high_price: number; low_price: number
+      trade_price: number; candle_acc_trade_volume: number
+    }>
+    if (data.length === 0) break
+
+    const candles = data.map((d) => ({
+      openTime: new Date(d.candle_date_time_utc + 'Z'),
+      open: d.opening_price, high: d.high_price, low: d.low_price,
+      close: d.trade_price, volume: d.candle_acc_trade_volume,
+    }))
+
+    all.unshift(...candles.reverse())
+    to = data[data.length - 1].candle_date_time_utc.replace(/\.\d{3}$/, '')
+    await sleep(130)
+    if (data.length < batch) break
+  }
+
+  return all
+}
+
+/** OKX에서 직접 캔들 수집 (페이징) */
+async function fetchOkxDirect(instId: string, tf: Timeframe, count: number): Promise<Candle[]> {
+  const bar = OKX_BAR[tf] ?? '4H'
+  const all: Candle[] = []
+  let after: string | undefined
+
+  while (all.length < count) {
+    const limit = Math.min(100, count - all.length)
+    const url = new URL(`${OKX_API}/market/candles`)
+    url.searchParams.set('instId', instId)
+    url.searchParams.set('bar', bar)
+    url.searchParams.set('limit', String(limit))
+    if (after) url.searchParams.set('after', after)
+
+    const res = await fetch(url.toString())
+    if (!res.ok) break
+
+    const json = await res.json() as { data: string[][] }
+    if (!json.data || json.data.length === 0) break
+
+    const candles = json.data.map((d) => ({
+      openTime: new Date(parseInt(d[0])),
+      open: parseFloat(d[1]), high: parseFloat(d[2]),
+      low: parseFloat(d[3]), close: parseFloat(d[4]),
+      volume: parseFloat(d[5]),
+    }))
+
+    all.unshift(...candles.reverse())
+    after = json.data[json.data.length - 1][0]
+    await sleep(100)
+    if (json.data.length < limit) break
+  }
+
+  return all
+}
+
+/** 업비트 전략용 심볼은 동적으로 조회, OKX는 ETH만 */
+const OKX_TARGET = ['ETH']
 
 const runBacktestSchema = z.object({
   strategyId: z.enum(['alt_mean_reversion', 'btc_ema_crossover', 'btc_bollinger_reversion', 'alt_detection']).default('alt_mean_reversion'),
@@ -51,22 +141,43 @@ backtestRoutes.post('/run', async (c) => {
       return c.json({ error: '지원하지 않는 전략입니다' }, 400)
     }
 
-    // DB에서 캔들 로드 (전략의 거래소에 맞�� 분기)
+    // 직접 API에서 캔들 로드 (전략의 거래소에 맞춰 분기)
     const candleMap: CandleMap = new Map()
     const exchange = strategy.config.exchange === 'okx' ? 'okx' : 'upbit'
     const timeframe = strategy.config.timeframe
 
-    const btcCandles = await loadCandles(exchange, 'BTC', timeframe, 2000)
+    let btcCandles: Candle[]
+    if (exchange === 'okx') {
+      btcCandles = await fetchOkxDirect('BTC-USDT', timeframe, 2000)
+    } else {
+      btcCandles = await fetchUpbitDirect('KRW-BTC', timeframe, 2000)
+    }
     if (btcCandles.length < 201) {
-      return c.json({ error: 'BTC 캔들 데이터가 부족합니다 (최소 201개 필요)' }, 422)
+      return c.json({ error: `BTC 캔들 데이터가 부족합니다 (${btcCandles.length}/201)` }, 422)
     }
     candleMap.set('BTC', btcCandles)
 
-    // OKX 선물 전략은 ETH만 추가, 업비트 전략은 알트코인 전체
-    const symbols = strategy.config.exchange === 'okx' ? ['ETH'] : TARGET_SYMBOLS
+    // OKX 선물 전략은 ETH만, 업비트 전략은 KRW 마켓 동적 조회
+    let symbols: string[]
+    if (exchange === 'okx') {
+      symbols = OKX_TARGET
+    } else {
+      const allKrw = await fetchUpbitKrwSymbols()
+      // 상위 20개만 사용 (백테스트 속도)
+      symbols = allKrw.slice(0, 20)
+    }
     for (const symbol of symbols) {
-      const candles = await loadCandles(exchange, symbol, timeframe, 2000)
-      if (candles.length > 0) candleMap.set(symbol, candles)
+      try {
+        let candles: Candle[]
+        if (exchange === 'okx') {
+          candles = await fetchOkxDirect(`${symbol}-USDT`, timeframe, 2000)
+        } else {
+          candles = await fetchUpbitDirect(`KRW-${symbol}`, timeframe, 2000)
+        }
+        if (candles.length > 0) candleMap.set(symbol, candles)
+      } catch {
+        // 개별 코인 실패 스킵
+      }
     }
 
     // 백테스트 실행

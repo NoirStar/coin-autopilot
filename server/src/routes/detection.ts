@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { scoreMultipleCoins } from '../detector/composite-scorer.js'
+import { scoreMultipleCoins, computeDetectionScore, type DetectionStrategy } from '../detector/composite-scorer.js'
+import { fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import type { Candle } from '../strategy/strategy-base.js'
 
 export const detectionRoutes = new Hono()
@@ -16,12 +17,18 @@ async function fetchUpbitCandlesDirect(
   count: number = 50
 ): Promise<Candle[]> {
   const url = `${UPBIT_API}/candles/minutes/60?market=${market}&count=${count}`
+  console.log(`[탐지] 업비트 요청: ${url}`)
   const res = await fetch(url)
+  console.log(`[탐지] 업비트 응답: ${res.status} (${market})`)
   if (res.status === 429) {
     await sleep(1000)
     return fetchUpbitCandlesDirect(market, count)
   }
-  if (!res.ok) throw new Error(`업비트 API: ${res.status}`)
+  if (!res.ok) {
+    const text = await res.text()
+    console.error(`[탐지] 업비트 에러: ${res.status} ${text}`)
+    throw new Error(`업비트 API: ${res.status}`)
+  }
 
   const data = await res.json() as Array<{
     candle_date_time_utc: string
@@ -42,26 +49,32 @@ async function fetchUpbitCandlesDirect(
   })).reverse()
 }
 
-/** 업비트 알트코인 유니버스 (시총/유동성 기반, 동적 관리 예정) */
-const ALT_UNIVERSE = [
-  'ETH', 'XRP', 'SOL', 'DOGE', 'ADA', 'AVAX', 'DOT', 'LINK', 'ATOM',
-  'MATIC', 'NEAR', 'APT', 'ARB', 'OP', 'SUI', 'SEI', 'TIA', 'STX',
-  'IMX', 'SAND', 'MANA', 'AXS', 'AAVE', 'UNI', 'CRV',
-]
+/** 스캔 대상 — 업비트 KRW 마켓에서 동적으로 가져옴 */
 
 /** GET /api/detection/scan — 전체 알트코인 스캔 (공개) */
 detectionRoutes.get('/scan', async (c) => {
   try {
+    const strategyParam = c.req.query('strategy') ?? 'composite'
+    const validStrategies = ['composite', 'oversold', 'momentum', 'volume']
+    const strategy = (validStrategies.includes(strategyParam) ? strategyParam : 'composite') as DetectionStrategy
+
     // BTC 캔들 직접 로드
+    console.log('[탐지] 스캔 시작 — BTC 캔들 요청')
     const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
+    console.log(`[탐지] BTC 캔들 수신: ${btcCandles.length}개`)
     if (btcCandles.length < 21) {
-      return c.json({ error: 'BTC 데이터 부족' }, 422)
+      return c.json({ error: `BTC 데이터 부족 (${btcCandles.length}/21)` }, 422)
     }
     const btcPrices = btcCandles.map((cl) => cl.close)
 
     const now = new Date()
     const kstOffset = 9 * 60 * 60 * 1000
     const kstNow = new Date(now.getTime() + kstOffset)
+
+    // 업비트 KRW 마켓 동적 조회 (상위 50개만 스캔 — 속도)
+    const allKrwSymbols = await fetchUpbitKrwSymbols()
+    const ALT_UNIVERSE = allKrwSymbols.slice(0, 50)
+    console.log(`[탐지] 알트 유니버스: ${ALT_UNIVERSE.length}개 (전체 ${allKrwSymbols.length}개)`)
 
     // 각 알트코인 스코어링
     const inputs = []
@@ -89,15 +102,20 @@ detectionRoutes.get('/scan', async (c) => {
       }
     }
 
-    const results = scoreMultipleCoins(inputs, 10)
+    const results = scoreMultipleCoins(inputs, 20, strategy)
 
     return c.json({
+      strategy,
       scannedAt: now.toISOString(),
       totalScanned: inputs.length,
       detected: results.length,
       results: results.map((r) => ({
         symbol: r.symbol,
         score: r.score,
+        rsi14: r.rsi14,
+        atrPct: r.atrPct,
+        changePct: r.changePct,
+        price: r.price,
         signals: r.signals,
         reasoning: r.reasoning,
       })),

@@ -61,7 +61,7 @@ export const api = {
   comparePaperSessions: () => request('/api/paper-trading/compare'),
 
   // Detection (알트코인 탐지)
-  scanDetection: () => request('/api/detection/scan'),
+  scanDetection: (strategy?: string) => request(`/api/detection/scan${strategy ? `?strategy=${strategy}` : ''}`),
   getDetectionScore: (symbol: string) => request(`/api/detection/score/${symbol}`),
 
   // Settings

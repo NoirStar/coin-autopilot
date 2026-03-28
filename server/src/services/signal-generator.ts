@@ -1,11 +1,57 @@
 import { supabase } from './database.js'
-import { collectLatestCandles, loadCandles } from '../data/candle-collector.js'
+import { fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import { evaluateRegime, type RegimeDetail } from '../strategy/btc-regime-filter.js'
 import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
-import type { CandleMap, RegimeState, Strategy } from '../strategy/strategy-base.js'
+import type { Candle, CandleMap, RegimeState, Strategy, Timeframe } from '../strategy/strategy-base.js'
 
-/** 시그널 대상 알트코인 (업비트 KRW 마켓, 거래대금 상위) */
-const TARGET_SYMBOLS = ['ETH', 'XRP', 'SOL', 'DOGE', 'ADA', 'AVAX', 'DOT', 'LINK', 'ATOM']
+const UPBIT_API = 'https://api.upbit.com/v1'
+
+const UPBIT_TF_MINUTES: Partial<Record<Timeframe, number>> = {
+  '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440,
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/** 업비트에서 직접 캔들 페이징 수집 */
+async function fetchUpbitDirect(market: string, tf: Timeframe, count: number): Promise<Candle[]> {
+  const minutes = UPBIT_TF_MINUTES[tf] ?? 240
+  const all: Candle[] = []
+  let to: string | undefined
+
+  while (all.length < count) {
+    const batch = Math.min(200, count - all.length)
+    const url = new URL(`${UPBIT_API}/candles/minutes/${minutes}`)
+    url.searchParams.set('market', market)
+    url.searchParams.set('count', String(batch))
+    if (to) url.searchParams.set('to', to)
+
+    const res = await fetch(url.toString())
+    if (res.status === 429) { await sleep(1000); continue }
+    if (!res.ok) break
+
+    const data = await res.json() as Array<{
+      candle_date_time_utc: string
+      opening_price: number; high_price: number; low_price: number
+      trade_price: number; candle_acc_trade_volume: number
+    }>
+    if (data.length === 0) break
+
+    const candles = data.map((d) => ({
+      openTime: new Date(d.candle_date_time_utc + 'Z'),
+      open: d.opening_price, high: d.high_price, low: d.low_price,
+      close: d.trade_price, volume: d.candle_acc_trade_volume,
+    }))
+
+    all.unshift(...candles.reverse())
+    to = data[data.length - 1].candle_date_time_utc.replace(/\.\d{3}$/, '')
+    await sleep(130)
+    if (data.length < batch) break
+  }
+
+  return all
+}
 
 /** 등록된 전략 목록 */
 const strategies: Strategy[] = [
@@ -22,19 +68,28 @@ export async function generateSignals(): Promise<void> {
   console.log('[시그널] 파이프라인 시작')
 
   try {
-    // 1. 최신 캔들 수집
-    await collectLatestCandles('upbit', ['BTC', ...TARGET_SYMBOLS], '4h')
-    console.log('[시그널] 캔들 수집 완료')
+    // 1. 업비트에서 직접 BTC 4h 캔들 수집 (EMA200에 최소 201개 필요)
+    console.log('[시그널] BTC 4h 캔들 직접 수집 중...')
+    const btcCandles = await fetchUpbitDirect('KRW-BTC', '4h', 500)
+    console.log(`[시그널] BTC 캔들: ${btcCandles.length}개`)
 
-    // 2. DB에서 캔들 로드
     const candleMap: CandleMap = new Map()
-    const btcCandles = await loadCandles('upbit', 'BTC', '4h', 500)
     candleMap.set('BTC', btcCandles)
 
-    for (const symbol of TARGET_SYMBOLS) {
-      const candles = await loadCandles('upbit', symbol, '4h', 500)
-      if (candles.length > 0) candleMap.set(symbol, candles)
+    // 2. 알트코인 캔들 수집 (동적 KRW 마켓, 상위 20개)
+    const allKrwSymbols = await fetchUpbitKrwSymbols()
+    const targetSymbols = allKrwSymbols.slice(0, 20)
+    console.log(`[시그널] 알트코인 ${targetSymbols.length}개 수집 중...`)
+
+    for (const symbol of targetSymbols) {
+      try {
+        const candles = await fetchUpbitDirect(`KRW-${symbol}`, '4h', 500)
+        if (candles.length > 0) candleMap.set(symbol, candles)
+      } catch {
+        // 개별 코인 실패 스킵
+      }
     }
+    console.log(`[시그널] 캔들 수집 완료 (${candleMap.size}개 심볼)`)
 
     // 3. BTC 레짐 판단
     const regimeDetail = evaluateRegime(btcCandles, previousRegime)
