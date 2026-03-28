@@ -167,34 +167,24 @@ export function DetectionPage() {
       )}
 
       {/* 스캔 프로그레스 */}
-      {isFetching && scanProgress && (
+      {isFetching && (
         <div className="card-surface rounded-md px-4 py-4">
           <div className="flex items-center justify-between text-[12px]">
             <div className="flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
               <span className="text-text-muted">
-                <span className="font-medium text-text-secondary">{scanProgress.symbol || '준비 중'}</span> 스캔 중
+                <span className="font-medium text-text-secondary">{scanProgress?.symbol || '마켓 목록 로딩'}</span> 스캔 중
               </span>
             </div>
             <span className="font-mono-trading text-text-muted">
-              {scanProgress.current}/{scanProgress.total}
+              {scanProgress ? `${scanProgress.current}/${scanProgress.total}` : '0/?'}
             </span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full bg-[var(--accent)] transition-all duration-150"
-              style={{ width: `${scanProgress.total > 0 ? (scanProgress.current / scanProgress.total) * 100 : 0}%` }}
+              style={{ width: scanProgress && scanProgress.total > 0 ? `${(scanProgress.current / scanProgress.total) * 100}%` : '0%' }}
             />
-          </div>
-        </div>
-      )}
-
-      {/* 초기 로딩 (프로그레스 전) */}
-      {isLoading && !scanProgress && (
-        <div className="card-surface flex items-center justify-center rounded-md py-16">
-          <div className="text-center">
-            <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-text-faint" />
-            <p className="text-[12px] text-text-muted">업비트 KRW 마켓 스캔 준비 중...</p>
           </div>
         </div>
       )}

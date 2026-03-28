@@ -7,7 +7,6 @@ import {
   Wallet,
   Settings,
   Signal,
-  Orbit,
   Radar,
 } from 'lucide-react'
 
@@ -25,14 +24,12 @@ const navItems = [
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className="flex h-full w-60 flex-col border-r border-border-subtle bg-background">
-      {/* 로고 */}
+      {/* 로고 + 골드 닷 브랜드마크 */}
       <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--accent-bg)' }}>
-          <Orbit className="h-4 w-4 text-primary" />
-        </div>
+        <span className="h-2 w-2 rounded-full bg-accent" />
         <div>
           <h1 className="text-[13px] font-semibold tracking-tight">Coin Autopilot</h1>
-          <p className="text-[11px] text-text-muted">BTC 기반 자동매매</p>
+          <p className="text-[12px] text-text-muted">BTC 기반 자동매매</p>
         </div>
       </div>
 
