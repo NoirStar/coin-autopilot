@@ -32,7 +32,7 @@ export function TermTooltip({ term, children, className = '' }: TermTooltipProps
   const [visible, setVisible] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const triggerRef = useRef<HTMLSpanElement>(null)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const show = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)

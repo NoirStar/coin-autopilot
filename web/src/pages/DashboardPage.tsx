@@ -117,9 +117,9 @@ function useActiveSignalCount() {
 export function DashboardPage() {
   const { user } = useAuth()
   const { data: regime, isError: regimeError, refetch: refetchRegime } = useRegime()
-  const { data: perf, isError: perfError, refetch: refetchPerf } = useBacktestPerformance()
-  const { data: activeCount, isError: activeError, refetch: refetchActive } = useActiveSignalCount()
-  const { data: recentSignals, isError: signalsError, refetch: refetchSignals } = useRecentSignals()
+  const { data: perf } = useBacktestPerformance()
+  const { data: activeCount } = useActiveSignalCount()
+  const { data: recentSignals } = useRecentSignals()
 
   // 온보딩 상태
   const [checklistDismissed, setChecklistDismissed] = useState(false)
