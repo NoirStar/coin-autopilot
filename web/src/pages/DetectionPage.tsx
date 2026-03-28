@@ -61,7 +61,7 @@ export function DetectionPage() {
   const [strategy, setStrategy] = useState<StrategyType>('composite')
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number; symbol: string } | null>(null)
 
-  const { data, isLoading, error, refetch, isFetching } = useQuery<ScanResponse>({
+  const { data, error, refetch, isFetching } = useQuery<ScanResponse>({
     queryKey: ['detection-scan', strategy],
     queryFn: () =>
       new Promise<ScanResponse>((resolve, reject) => {

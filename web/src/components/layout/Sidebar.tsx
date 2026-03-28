@@ -46,7 +46,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             className={({ isActive }) =>
               `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
                 isActive
-                  ? 'text-primary bg-[var(--accent-bg)]'
+                  ? 'text-foreground bg-surface-hover'
                   : 'text-text-muted hover:bg-surface-hover hover:text-foreground'
               }`
             }
@@ -62,7 +62,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="card-surface rounded-md px-3 py-2.5">
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-profit status-active" />
-            <span className="text-[11px] font-medium text-text-primary">서버 연결됨</span>
+            <span className="text-[12px] font-medium text-text-primary">서버 연결됨</span>
           </div>
           <p className="mt-0.5 pl-3.5 text-[11px] text-text-muted">4H 주기 자동 실행</p>
         </div>

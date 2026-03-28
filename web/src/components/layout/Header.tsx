@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LogIn, LogOut, User, Menu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -54,18 +54,21 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
                 ? 'bg-[var(--profit-bg)] text-profit'
                 : regimeState === 'risk_off'
                   ? 'bg-[var(--loss-bg)] text-loss'
-                  : 'bg-[var(--accent-bg)] text-primary'
+                  : 'bg-[var(--warning-bg)] text-warning'
             }`}>
               {regimeState === 'risk_on' ? 'RISK-ON' : regimeState === 'risk_off' ? 'RISK-OFF' : '--'}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* 9시 리셋 카운트다운 */}
+          <ResetCountdown />
+
           {!loading && (
             user ? (
               <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-hover text-[11px] font-medium text-text-secondary">
                   {user.email?.charAt(0).toUpperCase() ?? <User className="h-3 w-3" />}
                 </div>
                 <button
@@ -79,7 +82,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
             ) : (
               <button
                 onClick={() => setLoginOpen(true)}
-                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:brightness-110"
+                className="flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:brightness-110"
               >
                 <LogIn className="h-3 w-3" />
                 로그인
@@ -92,6 +95,43 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
     </>
   )
+}
+
+/** 업비트 9시 리셋 카운트다운 */
+function ResetCountdown() {
+  const [timeStr, setTimeStr] = useState(() => calcReset())
+
+  useEffect(() => {
+    const id = setInterval(() => setTimeStr(calcReset()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <div className="hidden items-center gap-1.5 rounded border border-border-subtle px-2 py-1 sm:flex">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">RESET</span>
+      <span className="font-mono-trading text-[12px] font-semibold text-warning">{timeStr}</span>
+    </div>
+  )
+}
+
+function calcReset(): string {
+  const now = new Date()
+  // KST = UTC+9
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  const kstHour = kst.getUTCHours()
+  const kstMin = kst.getUTCMinutes()
+  const kstSec = kst.getUTCSeconds()
+
+  const currentSeconds = kstHour * 3600 + kstMin * 60 + kstSec
+  const targetSeconds = 9 * 3600 // 09:00:00 KST
+  let diff = targetSeconds - currentSeconds
+  if (diff <= 0) diff += 86400
+
+  const h = Math.floor(diff / 3600)
+  const m = Math.floor((diff % 3600) / 60)
+  const s = diff % 60
+
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 function formatKrw(value: number): string {
