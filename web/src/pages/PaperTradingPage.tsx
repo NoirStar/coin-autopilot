@@ -67,7 +67,7 @@ export function PaperTradingPage() {
           </span>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-background hover:opacity-90"
+            className="flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-background hover:brightness-110"
           >
             <Plus className="h-3.5 w-3.5" />
             새 세션
@@ -109,7 +109,7 @@ export function PaperTradingPage() {
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="mt-4 rounded-md bg-[var(--accent)] px-4 py-2 text-[12px] font-medium text-background hover:opacity-90"
+            className="mt-4 rounded-md bg-[var(--accent)] px-4 py-2 text-[12px] font-medium text-background hover:brightness-110"
           >
             새 세션 만들기
           </button>
@@ -439,7 +439,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={() => createMutation.mutate()}
             disabled={!name.trim() || createMutation.isPending}
-            className="flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-4 py-2 text-[12px] font-medium text-background hover:opacity-90 disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-4 py-2 text-[12px] font-medium text-background hover:brightness-110 disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
           >
             {createMutation.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
             세션 시작

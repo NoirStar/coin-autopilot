@@ -44,7 +44,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
       {/* backdrop */}
       <div
-        className="absolute inset-0 bg-background/80"
+        className="absolute inset-0 bg-[#0a0a0ccc]"
         onClick={onClose}
       />
 
@@ -81,7 +81,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
             <button
               onClick={handleGithubLogin}
               disabled={loading}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface px-4 py-2.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-surface-hover disabled:opacity-50"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface px-4 py-2.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
             >
               <Github className="h-4 w-4" />
               GitHub로 계속하기
@@ -108,7 +108,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
               <button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
               >
                 {loading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

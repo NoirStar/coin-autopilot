@@ -255,7 +255,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
 
   return (
     <div className={`rounded-md border p-4 ${
-      !isImplemented ? 'border-border-subtle opacity-60' : 'border-border'
+      !isImplemented ? 'border-border-subtle text-[var(--text-faint)]' : 'border-border'
     }`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -343,7 +343,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
                 <button
                   onClick={handleSave}
                   disabled={!editingParams || saveMutation.isPending}
-                  className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background transition-colors hover:opacity-90 disabled:opacity-40"
+                  className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
                 >
                   {saveMutation.isPending ? (
                     <Loader2 className="h-3 w-3 animate-spin" />

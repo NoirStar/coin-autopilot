@@ -69,7 +69,7 @@ export function WelcomeModal({ open, onClose, onComplete }: WelcomeModalProps) {
         <div className="mt-6 flex gap-2">
           <button
             onClick={handleStart}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:brightness-110"
           >
             시작하기
             <ArrowRight className="h-3.5 w-3.5" />

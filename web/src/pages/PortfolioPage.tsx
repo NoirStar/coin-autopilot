@@ -223,7 +223,7 @@ export function PortfolioPage() {
                 <button
                   onClick={() => setTradesPage(Math.max(0, tradesPage - 1))}
                   disabled={tradesPage === 0}
-                  className="rounded border border-border p-1.5 text-text-muted hover:bg-secondary disabled:opacity-30"
+                  className="rounded border border-border p-1.5 text-text-muted hover:bg-secondary disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
@@ -233,7 +233,7 @@ export function PortfolioPage() {
                 <button
                   onClick={() => setTradesPage(Math.min(totalPages - 1, tradesPage + 1))}
                   disabled={tradesPage >= totalPages - 1}
-                  className="rounded border border-border p-1.5 text-text-muted hover:bg-secondary disabled:opacity-30"
+                  className="rounded border border-border p-1.5 text-text-muted hover:bg-secondary disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>

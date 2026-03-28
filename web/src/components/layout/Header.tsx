@@ -79,7 +79,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
             ) : (
               <button
                 onClick={() => setLoginOpen(true)}
-                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground transition-colors hover:opacity-90"
+                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground transition-colors hover:brightness-110"
               >
                 <LogIn className="h-3 w-3" />
                 로그인

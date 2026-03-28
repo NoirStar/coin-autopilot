@@ -253,7 +253,7 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
           </div>
           <p className="text-[10px] text-text-faint">필요 권한: {permissions}</p>
           <div className="flex gap-2">
-            <button className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background hover:opacity-90">
+            <button className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background hover:brightness-110">
               <Save className="h-3 w-3" />
               저장
             </button>
@@ -392,7 +392,7 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
             <button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
-              className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background hover:opacity-90"
+              className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background hover:brightness-110"
             >
               {saveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
               저장
