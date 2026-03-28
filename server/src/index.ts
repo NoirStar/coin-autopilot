@@ -17,7 +17,14 @@ import { authMiddleware } from './core/auth.js'
 const app = new Hono()
 
 // Middleware
-app.use('*', cors())
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173', 'http://localhost:3000']
+
+app.use('*', cors({
+  origin: allowedOrigins,
+  credentials: true,
+}))
 app.use('*', logger())
 
 // Health check

@@ -10,11 +10,22 @@ import { supabase } from '../services/database.js'
  * 4시간마다 실행: 캔들 수집 → 지표 → 레짐 → 시그널 → 가상매매
  * UTC 기준: 0시, 4시, 8시, 12시, 16시, 20시
  */
+let signalFailCount = 0
+
 export function startCronJobs(): void {
   // 4시간마다 시그널 생성 + 가상매매
   cron.schedule('0 0,4,8,12,16,20 * * *', async () => {
     console.log(`[크론] 시그널 생성 시작: ${new Date().toISOString()}`)
-    await generateSignals()
+    try {
+      await generateSignals()
+      signalFailCount = 0
+    } catch (err) {
+      signalFailCount++
+      console.error(`[크론] 시그널 생성 실패 (연속 ${signalFailCount}회):`, err)
+      if (signalFailCount >= 2) {
+        console.error(`[크론] 경고: 시그널 생성 연속 ${signalFailCount}회 실패! 데이터 파이프라인 점검 필요`)
+      }
+    }
 
     // 시그널 생성 후 가상매매 사이클 실행
     try {

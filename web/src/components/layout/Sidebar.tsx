@@ -13,12 +13,12 @@ import {
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '대시보드' },
-  { to: '/signals', icon: Signal, label: '시���널' },
+  { to: '/signals', icon: Signal, label: '시그널' },
   { to: '/detection', icon: Radar, label: '알트 탐지' },
-  { to: '/strategy', icon: Brain, label: '전략 관��' },
+  { to: '/strategy', icon: Brain, label: '전략 관리' },
   { to: '/backtest', icon: FlaskConical, label: '백테스팅' },
   { to: '/paper-trading', icon: PlayCircle, label: '가상매매' },
-  { to: '/portfolio', icon: Wallet, label: '포��폴리��' },
+  { to: '/portfolio', icon: Wallet, label: '포트폴리오' },
   { to: '/settings', icon: Settings, label: '설정' },
 ]
 
@@ -32,7 +32,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </div>
         <div>
           <h1 className="text-[13px] font-semibold tracking-tight">Coin Autopilot</h1>
-          <p className="text-[10px] text-text-muted">BTC 기반 자동매매</p>
+          <p className="text-[11px] text-text-muted">BTC 기반 자동매매</p>
         </div>
       </div>
 
@@ -67,7 +67,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <span className="h-1.5 w-1.5 rounded-full bg-profit status-active" />
             <span className="text-[11px] font-medium text-text-primary">서버 연결됨</span>
           </div>
-          <p className="mt-0.5 pl-3.5 text-[10px] text-text-muted">4H 주기 자동 실행</p>
+          <p className="mt-0.5 pl-3.5 text-[11px] text-text-muted">4H 주기 자동 실행</p>
         </div>
       </div>
     </aside>

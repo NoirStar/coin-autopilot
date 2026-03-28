@@ -28,22 +28,22 @@ export function TermTooltip({ term, children, className = '' }: TermTooltipProps
   if (!description) return <span className={className}>{children}</span>
 
   return (
-    <span className={`group relative inline-flex items-center gap-0.5 ${className}`}>
+    <span className={`group relative inline-flex items-center gap-1 ${className}`}>
       {children}
-      <HelpCircle className="h-3 w-3 text-text-faint transition-colors group-hover:text-text-muted" />
+      <HelpCircle className="h-3.5 w-3.5 min-w-[14px] text-text-muted transition-colors group-hover:text-text-secondary" />
       <span
-        className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-60 -translate-x-1/2 rounded-md px-3 py-2 text-[11px] leading-relaxed opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100"
+        className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-md px-3 py-2.5 text-[12px] leading-relaxed opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100"
         style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          color: 'var(--text-secondary)',
+          color: 'var(--text-primary)',
         }}
       >
         {description}
         <span
           className="absolute left-1/2 top-full -translate-x-1/2"
           style={{
-            borderWidth: '4px',
+            borderWidth: '5px',
             borderStyle: 'solid',
             borderColor: 'var(--surface) transparent transparent transparent',
           }}

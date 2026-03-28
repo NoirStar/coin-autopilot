@@ -102,10 +102,15 @@ export function DetectionPage() {
 
       {/* 에러 */}
       {error && (
-        <div className="card-surface flex items-center justify-center gap-2 rounded-md py-8 text-[12px] text-text-muted">
-          <AlertTriangle className="h-4 w-4 text-loss" />
-          탐지 스캔에 실패했습니다
-          <button onClick={() => refetch()} className="ml-2 text-[var(--accent)] hover:underline">
+        <div className="card-surface flex flex-col items-center justify-center gap-2 rounded-md py-8">
+          <AlertTriangle className="h-5 w-5 text-loss" />
+          <p className="text-[13px] font-medium text-text-secondary">탐지 스캔에 실패했습니다</p>
+          <p className="text-[12px] text-text-muted">
+            {error.message.includes('fetch') || error.message.includes('network')
+              ? '서버에 연결할 수 없습니다. VPS 서버가 실행 중인지 확인하세요.'
+              : error.message}
+          </p>
+          <button onClick={() => refetch()} className="mt-2 rounded-md border border-border px-3 py-1.5 text-[12px] text-text-secondary hover:bg-surface-hover">
             다시 시도
           </button>
         </div>

@@ -11,6 +11,7 @@ interface AuthState {
 export function useAuth(): AuthState & {
   signInWithEmail: (email: string) => Promise<{ error: string | null }>
   signInWithGithub: () => Promise<{ error: string | null }>
+  signInWithGoogle: () => Promise<{ error: string | null }>
   signOut: () => Promise<void>
 } {
   const [state, setState] = useState<AuthState>({
@@ -49,9 +50,17 @@ export function useAuth(): AuthState & {
     return { error: error?.message ?? null }
   }
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
+    return { error: error?.message ?? null }
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
   }
 
-  return { ...state, signInWithEmail, signInWithGithub, signOut }
+  return { ...state, signInWithEmail, signInWithGithub, signInWithGoogle, signOut }
 }

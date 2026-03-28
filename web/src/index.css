@@ -23,7 +23,7 @@
   --secondary: #18181b;
   --secondary-foreground: #a1a1aa;
   --muted: #18181b;
-  --muted-foreground: #71717a;
+  --muted-foreground: #8b8b96;
   --accent: #a78bfa;
   --accent-foreground: #0a0a0c;
   --destructive: #f87171;
@@ -41,8 +41,8 @@
   /* Text hierarchy — NO opacity tricks */
   --text-primary: #e4e4e7;
   --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --text-faint: #52525b;
+  --text-muted: #8b8b96;
+  --text-faint: #62626b;
 
   /* Semantic */
   --profit: #2dd4a8;

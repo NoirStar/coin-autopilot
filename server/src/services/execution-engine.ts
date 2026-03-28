@@ -151,11 +151,24 @@ async function executeStrategy(
     const side = pos.side === 'long' ? 'sell' : 'buy'
 
     try {
+      // DB에서 해당 포지션 id 조회
+      const { data: dbPos } = await supabase
+        .from('positions')
+        .select('id')
+        .eq('symbol', exit.symbol)
+        .eq('session_type', 'live')
+        .eq('status', 'open')
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .single()
+
       const result = await createMarketOrder(pos.symbol, side, pos.size, true)
       console.log(`[실전매매] ${pos.symbol} 청산 (${exit.reason}): ${result.status}`)
 
-      // DB에 거래 기록
-      await logTrade(pos.symbol, side, pos.entryPrice, result.price ?? 0, pos.size, exit.reason)
+      // DB에 거래 기록 (position id로 정확한 행 지정)
+      if (dbPos?.id) {
+        await logTrade(dbPos.id, side, pos.entryPrice, result.price ?? 0, pos.size, exit.reason)
+      }
     } catch (err) {
       console.error(`[실전매매] ${pos.symbol} 청산 실패:`, err)
       // 실패 시 재시도 없이 다음 사이클에서 처리
@@ -208,15 +221,15 @@ async function executeStrategy(
   }
 }
 
-/** 진입 기록 → DB */
+/** 진입 기록 → DB, 생성된 position id 반환 */
 async function logEntry(
   symbol: string,
   direction: string,
   price: number,
   quantity: number,
   strategyId: string
-): Promise<void> {
-  await supabase.from('positions').insert({
+): Promise<string | null> {
+  const { data } = await supabase.from('positions').insert({
     session_type: 'live',
     exchange: 'okx',
     strategy: strategyId,
@@ -226,12 +239,13 @@ async function logEntry(
     quantity,
     status: 'open',
     opened_at: new Date().toISOString(),
-  })
+  }).select('id').single()
+  return data?.id ?? null
 }
 
-/** 거래 기록 → DB */
+/** 거래 기록 → DB (position id로 정확한 행 지정) */
 async function logTrade(
-  symbol: string,
+  positionId: string,
   side: string,
   entryPrice: number,
   exitPrice: number,
@@ -249,9 +263,8 @@ async function logTrade(
       exit_price: exitPrice,
       pnl_pct: Math.round(pnlPct * 100) / 100,
       pnl: Math.round(quantity * entryPrice * pnlPct / 100 * 100) / 100,
+      exit_reason: reason,
       closed_at: new Date().toISOString(),
     })
-    .eq('symbol', symbol)
-    .eq('session_type', 'live')
-    .eq('status', 'open')
+    .eq('id', positionId)
 }

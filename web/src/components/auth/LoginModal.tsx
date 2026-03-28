@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Mail, Github, Loader2, Check } from 'lucide-react'
+import { X, Mail, Github, Loader2, Check, Chrome } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
 interface LoginModalProps {
@@ -8,7 +8,7 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ open, onClose }: LoginModalProps) {
-  const { signInWithEmail, signInWithGithub } = useAuth()
+  const { signInWithEmail, signInWithGithub, signInWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -77,11 +77,27 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
           </div>
         ) : (
           <>
+            {/* Google */}
+            <button
+              onClick={async () => {
+                setLoading(true)
+                setError(null)
+                const result = await signInWithGoogle()
+                setLoading(false)
+                if (result.error) setError(result.error)
+              }}
+              disabled={loading}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface px-4 py-2.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+            >
+              <Chrome className="h-4 w-4" />
+              Google로 계속하기
+            </button>
+
             {/* GitHub */}
             <button
               onClick={handleGithubLogin}
               disabled={loading}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface px-4 py-2.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface px-4 py-2.5 text-[13px] font-medium text-text-primary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
             >
               <Github className="h-4 w-4" />
               GitHub로 계속하기
