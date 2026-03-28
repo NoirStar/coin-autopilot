@@ -34,15 +34,32 @@ export function DetectionPage() {
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number; symbol: string } | null>(null)
   const [scanError, setScanError] = useState<string | null>(null)
 
-  // SSE 스트리밍 스캔
+  // 폴백: SSE 실패 시 POST /refresh로 스캔
+  const fallbackScan = async () => {
+    try {
+      setScanProgress({ current: 0, total: 1, symbol: '전체 스캔 중...' })
+      await api.refreshDetection()
+      setScanProgress(null)
+      setScanning(false)
+      queryClient.invalidateQueries({ queryKey: ['detection-cache'] })
+    } catch {
+      setScanProgress(null)
+      setScanning(false)
+      setScanError('스캔에 실패했습니다. 서버 상태를 확인해주세요.')
+    }
+  }
+
+  // SSE 스트리밍 스캔 (실패 시 폴백)
   const startScan = () => {
     setScanning(true)
     setScanError(null)
     setScanProgress(null)
 
     const es = new EventSource(`${API_BASE}/api/detection/scan/stream`)
+    let connected = false
 
     es.addEventListener('progress', (e) => {
+      connected = true
       const d = JSON.parse(e.data)
       if (d.type === 'start') {
         setScanProgress({ current: 0, total: d.total, symbol: '' })
@@ -67,10 +84,15 @@ export function DetectionPage() {
     })
 
     es.onerror = () => {
-      setScanProgress(null)
-      setScanning(false)
-      setScanError('스캔 연결 실패')
       es.close()
+      if (!connected) {
+        // SSE 연결 자체가 안 됐으면 폴백
+        fallbackScan()
+      } else {
+        setScanProgress(null)
+        setScanning(false)
+        setScanError('스캔 연결이 끊어졌습니다')
+      }
     }
   }
 
