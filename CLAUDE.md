@@ -81,6 +81,9 @@ QA 모드에서 DESIGN.md와 불일치하는 코드는 플래그 처리.
 - glass-panel, cosmic-surface, backdrop-filter, cosmic-bg, noise-overlay 사용 금지
 - 장식적 그라데이션, 파티클, 글로우 효과 금지
 - 이모지 금지, Lucide 아이콘만 사용
+- 최소 폰트 사이즈 11px — 10px 이하 한글 텍스트 금지
+- uppercase + letter-spacing 확대는 영문 전용. 한글 레이블은 12px 600 weight 일반 spacing
+- 액센트(#E8D5B0 크림 골드)는 3곳만: 전략 인디케이터, 시그널 히어로, 브랜드마크
 
 ## 서브 가이드 참조
 

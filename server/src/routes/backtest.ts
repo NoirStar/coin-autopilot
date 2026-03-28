@@ -117,116 +117,6 @@ const runBacktestSchema = z.object({
   }).optional(),
 })
 
-/** POST /api/backtest/run — 백테스트 실행 (동기) */
-backtestRoutes.post('/run', async (c) => {
-  const body = await c.req.json().catch(() => ({}))
-  const parsed = runBacktestSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: '잘못된 요청 파라미터', details: parsed.error.flatten() }, 400)
-  }
-
-  const { strategyId, initialCapital, params } = parsed.data
-
-  try {
-    // 전략 인스턴스 생성
-    let strategy
-    if (strategyId === 'alt_mean_reversion') {
-      strategy = new AltMeanReversionStrategy(params)
-    } else if (strategyId === 'btc_ema_crossover') {
-      strategy = new BtcEmaCrossoverStrategy(params)
-    } else if (strategyId === 'btc_bollinger_reversion') {
-      strategy = new BtcBollingerReversionStrategy(params)
-    } else if (strategyId === 'alt_detection') {
-      strategy = new AltDetectionStrategy(params)
-    } else {
-      return c.json({ error: '지원하지 않는 전략입니다' }, 400)
-    }
-
-    // 직접 API에서 캔들 로드 (전략의 거래소에 맞춰 분기)
-    const candleMap: CandleMap = new Map()
-    const exchange = strategy.config.exchange === 'okx' ? 'okx' : 'upbit'
-    const timeframe = strategy.config.timeframe
-
-    let btcCandles: Candle[]
-    if (exchange === 'okx') {
-      btcCandles = await fetchOkxDirect('BTC-USDT', timeframe, 2000)
-    } else {
-      btcCandles = await fetchUpbitDirect('KRW-BTC', timeframe, 2000)
-    }
-    if (btcCandles.length < 201) {
-      return c.json({ error: `BTC 캔들 데이터가 부족합니다 (${btcCandles.length}/201)` }, 422)
-    }
-    candleMap.set('BTC', btcCandles)
-
-    // OKX 선물 전략은 ETH만, 업비트 전략은 KRW 마켓 동적 조회
-    let symbols: string[]
-    if (exchange === 'okx') {
-      symbols = OKX_TARGET
-    } else {
-      const allKrw = await fetchUpbitKrwSymbols()
-      // 상위 20개만 사용 (백테스트 속도)
-      symbols = allKrw.slice(0, 20)
-    }
-    for (const symbol of symbols) {
-      try {
-        let candles: Candle[]
-        if (exchange === 'okx') {
-          candles = await fetchOkxDirect(`${symbol}-USDT`, timeframe, 2000)
-        } else {
-          candles = await fetchUpbitDirect(`KRW-${symbol}`, timeframe, 2000)
-        }
-        if (candles.length > 0) candleMap.set(symbol, candles)
-      } catch {
-        // 개별 코인 실패 스킵
-      }
-    }
-
-    // 백테스트 실행
-    const result = runBacktest(strategy, candleMap, { initialCapital })
-
-    // DB에 결과 저장 (user_id=null → 시스템 레벨 공개 결과)
-    const { data: saved, error: saveError } = await supabase
-      .from('backtest_results')
-      .insert({
-        user_id: null,
-        strategy: result.strategyId,
-        params: result.params,
-        timeframe: result.timeframe,
-        period_start: result.periodStart instanceof Date ? result.periodStart.toISOString().slice(0, 10) : result.periodStart,
-        period_end: result.periodEnd instanceof Date ? result.periodEnd.toISOString().slice(0, 10) : result.periodEnd,
-        total_return: result.totalReturn,
-        cagr: result.cagr,
-        sharpe_ratio: result.sharpeRatio,
-        max_drawdown: result.maxDrawdown,
-        win_rate: result.winRate,
-        total_trades: result.totalTrades,
-        avg_hold_hours: result.avgHoldHours,
-        equity_curve: result.equityCurve,
-      })
-      .select('id')
-      .single()
-
-    if (saveError) {
-      console.error('백테스트 결과 저장 오류:', saveError.message)
-    }
-
-    return c.json({
-      id: saved?.id ?? null,
-      ...result,
-      periodStart: result.periodStart instanceof Date ? result.periodStart.toISOString() : result.periodStart,
-      periodEnd: result.periodEnd instanceof Date ? result.periodEnd.toISOString() : result.periodEnd,
-      trades: result.trades.map((t) => ({
-        ...t,
-        entryTime: t.entryTime instanceof Date ? t.entryTime.toISOString() : t.entryTime,
-        exitTime: t.exitTime instanceof Date ? t.exitTime.toISOString() : t.exitTime,
-      })),
-    })
-  } catch (err) {
-    console.error('백테스트 실행 오류:', err)
-    return c.json({ error: '백테스트 실행 중 오류가 발생했습니다' }, 500)
-  }
-})
-
 /** POST /api/backtest/run/stream — SSE 스트리밍 백테스트 */
 backtestRoutes.post('/run/stream', async (c) => {
   const body = await c.req.json().catch(() => ({}))
@@ -369,6 +259,116 @@ backtestRoutes.post('/run/stream', async (c) => {
       })
     }
   })
+})
+
+/** POST /api/backtest/run — 백테스트 실행 (동기, 폴백) */
+backtestRoutes.post('/run', async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = runBacktestSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: '잘못된 요청 파라미터', details: parsed.error.flatten() }, 400)
+  }
+
+  const { strategyId, initialCapital, params } = parsed.data
+
+  try {
+    // 전략 인스턴스 생성
+    let strategy
+    if (strategyId === 'alt_mean_reversion') {
+      strategy = new AltMeanReversionStrategy(params)
+    } else if (strategyId === 'btc_ema_crossover') {
+      strategy = new BtcEmaCrossoverStrategy(params)
+    } else if (strategyId === 'btc_bollinger_reversion') {
+      strategy = new BtcBollingerReversionStrategy(params)
+    } else if (strategyId === 'alt_detection') {
+      strategy = new AltDetectionStrategy(params)
+    } else {
+      return c.json({ error: '지원하지 않는 전략입니다' }, 400)
+    }
+
+    // 직접 API에서 캔들 로드 (전략의 거래소에 맞춰 분기)
+    const candleMap: CandleMap = new Map()
+    const exchange = strategy.config.exchange === 'okx' ? 'okx' : 'upbit'
+    const timeframe = strategy.config.timeframe
+
+    let btcCandles: Candle[]
+    if (exchange === 'okx') {
+      btcCandles = await fetchOkxDirect('BTC-USDT', timeframe, 2000)
+    } else {
+      btcCandles = await fetchUpbitDirect('KRW-BTC', timeframe, 2000)
+    }
+    if (btcCandles.length < 201) {
+      return c.json({ error: `BTC 캔들 데이터가 부족합니다 (${btcCandles.length}/201)` }, 422)
+    }
+    candleMap.set('BTC', btcCandles)
+
+    // OKX 선물 전략은 ETH만, 업비트 전략은 KRW 마켓 동적 조회
+    let symbols: string[]
+    if (exchange === 'okx') {
+      symbols = OKX_TARGET
+    } else {
+      const allKrw = await fetchUpbitKrwSymbols()
+      // 상위 20개만 사용 (백테스트 속도)
+      symbols = allKrw.slice(0, 20)
+    }
+    for (const symbol of symbols) {
+      try {
+        let candles: Candle[]
+        if (exchange === 'okx') {
+          candles = await fetchOkxDirect(`${symbol}-USDT`, timeframe, 2000)
+        } else {
+          candles = await fetchUpbitDirect(`KRW-${symbol}`, timeframe, 2000)
+        }
+        if (candles.length > 0) candleMap.set(symbol, candles)
+      } catch {
+        // 개별 코인 실패 스킵
+      }
+    }
+
+    // 백테스트 실행
+    const result = runBacktest(strategy, candleMap, { initialCapital })
+
+    // DB에 결과 저장 (user_id=null → 시스템 레벨 공개 결과)
+    const { data: saved, error: saveError } = await supabase
+      .from('backtest_results')
+      .insert({
+        user_id: null,
+        strategy: result.strategyId,
+        params: result.params,
+        timeframe: result.timeframe,
+        period_start: result.periodStart instanceof Date ? result.periodStart.toISOString().slice(0, 10) : result.periodStart,
+        period_end: result.periodEnd instanceof Date ? result.periodEnd.toISOString().slice(0, 10) : result.periodEnd,
+        total_return: result.totalReturn,
+        cagr: result.cagr,
+        sharpe_ratio: result.sharpeRatio,
+        max_drawdown: result.maxDrawdown,
+        win_rate: result.winRate,
+        total_trades: result.totalTrades,
+        avg_hold_hours: result.avgHoldHours,
+        equity_curve: result.equityCurve,
+      })
+      .select('id')
+      .single()
+
+    if (saveError) {
+      console.error('백테스트 결과 저장 오류:', saveError.message)
+    }
+
+    return c.json({
+      id: saved?.id ?? null,
+      ...result,
+      periodStart: result.periodStart instanceof Date ? result.periodStart.toISOString() : result.periodStart,
+      periodEnd: result.periodEnd instanceof Date ? result.periodEnd.toISOString() : result.periodEnd,
+      trades: result.trades.map((t) => ({
+        ...t,
+        entryTime: t.entryTime instanceof Date ? t.entryTime.toISOString() : t.entryTime,
+        exitTime: t.exitTime instanceof Date ? t.exitTime.toISOString() : t.exitTime,
+      })),
+    })
+  } catch (err) {
+    console.error('백테스트 실행 오류:', err)
+    return c.json({ error: '백테스트 실행 중 오류가 발생했습니다' }, 500)
+  }
 })
 
 /** GET /api/backtest/results — 저장된 백테스트 결과 목록 */

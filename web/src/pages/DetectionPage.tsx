@@ -194,7 +194,7 @@ export function DetectionPage() {
         <div className="card-surface flex items-center justify-center rounded-md py-16">
           <div className="text-center">
             <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-text-faint" />
-            <p className="text-[12px] text-text-muted">BTC 캔들 로딩 중...</p>
+            <p className="text-[12px] text-text-muted">업비트 KRW 마켓 스캔 준비 중...</p>
           </div>
         </div>
       )}

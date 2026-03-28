@@ -52,81 +52,6 @@ async function fetchUpbitCandlesDirect(
 
 /** 스캔 대상 — 업비트 KRW 마켓에서 동적으로 가져옴 */
 
-/** GET /api/detection/scan — 전체 알트코인 스캔 (공개) */
-detectionRoutes.get('/scan', async (c) => {
-  try {
-    const strategyParam = c.req.query('strategy') ?? 'composite'
-    const validStrategies = ['composite', 'oversold', 'momentum', 'volume']
-    const strategy = (validStrategies.includes(strategyParam) ? strategyParam : 'composite') as DetectionStrategy
-
-    // BTC 캔들 직접 로드
-    console.log('[탐지] 스캔 시작 — BTC 캔들 요청')
-    const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
-    console.log(`[탐지] BTC 캔들 수신: ${btcCandles.length}개`)
-    if (btcCandles.length < 21) {
-      return c.json({ error: `BTC 데이터 부족 (${btcCandles.length}/21)` }, 422)
-    }
-    const btcPrices = btcCandles.map((cl) => cl.close)
-
-    const now = new Date()
-    const kstOffset = 9 * 60 * 60 * 1000
-    const kstNow = new Date(now.getTime() + kstOffset)
-
-    // 업비트 KRW 마켓 동적 조회 (상위 50개만 스캔 — 속도)
-    const allKrwSymbols = await fetchUpbitKrwSymbols()
-    const ALT_UNIVERSE = allKrwSymbols.slice(0, 50)
-    console.log(`[탐지] 알트 유니버스: ${ALT_UNIVERSE.length}개 (전체 ${allKrwSymbols.length}개)`)
-
-    // 각 알트코인 스코어링
-    const inputs = []
-    for (const symbol of ALT_UNIVERSE) {
-      try {
-        await sleep(130) // 업비트 레이트 리밋 (초당 ~8회)
-        const altCandles = await fetchUpbitCandlesDirect(`KRW-${symbol}`, 50)
-        if (altCandles.length < 21) continue
-
-        const currentPrice = altCandles[altCandles.length - 1].close
-        const openPriceAt9 = altCandles.length > 9
-          ? altCandles[altCandles.length - 9].open
-          : altCandles[0].open
-
-        inputs.push({
-          symbol,
-          candles: altCandles,
-          btcPrices: btcPrices.slice(-altCandles.length),
-          currentPrice,
-          openPriceAt9,
-          currentTimeKST: kstNow,
-        })
-      } catch {
-        // 개별 코인 실패 시 스킵
-      }
-    }
-
-    const results = scoreMultipleCoins(inputs, 20, strategy)
-
-    return c.json({
-      strategy,
-      scannedAt: now.toISOString(),
-      totalScanned: inputs.length,
-      detected: results.length,
-      results: results.map((r) => ({
-        symbol: r.symbol,
-        score: r.score,
-        rsi14: r.rsi14,
-        atrPct: r.atrPct,
-        changePct: r.changePct,
-        price: r.price,
-        signals: r.signals,
-        reasoning: r.reasoning,
-      })),
-    })
-  } catch (err) {
-    console.error('탐지 스캔 오류:', err)
-    return c.json({ error: '탐지 스캔 실패' }, 500)
-  }
-})
-
 /** GET /api/detection/scan/stream — SSE 스트리밍 전체 알트코인 스캔 */
 detectionRoutes.get('/scan/stream', async (c) => {
   const strategyParam = c.req.query('strategy') ?? 'composite'
@@ -233,6 +158,81 @@ detectionRoutes.get('/scan/stream', async (c) => {
       })
     }
   })
+})
+
+/** GET /api/detection/scan — 전체 알트코인 스캔 (공개, 폴백) */
+detectionRoutes.get('/scan', async (c) => {
+  try {
+    const strategyParam = c.req.query('strategy') ?? 'composite'
+    const validStrategies = ['composite', 'oversold', 'momentum', 'volume']
+    const strategy = (validStrategies.includes(strategyParam) ? strategyParam : 'composite') as DetectionStrategy
+
+    // BTC 캔들 직접 로드
+    console.log('[탐지] 스캔 시작 — BTC 캔들 요청')
+    const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
+    console.log(`[탐지] BTC 캔들 수신: ${btcCandles.length}개`)
+    if (btcCandles.length < 21) {
+      return c.json({ error: `BTC 데이터 부족 (${btcCandles.length}/21)` }, 422)
+    }
+    const btcPrices = btcCandles.map((cl) => cl.close)
+
+    const now = new Date()
+    const kstOffset = 9 * 60 * 60 * 1000
+    const kstNow = new Date(now.getTime() + kstOffset)
+
+    // 업비트 KRW 마켓 동적 조회 (상위 50개만 스캔 — 속도)
+    const allKrwSymbols = await fetchUpbitKrwSymbols()
+    const ALT_UNIVERSE = allKrwSymbols.slice(0, 50)
+    console.log(`[탐지] 알트 유니버스: ${ALT_UNIVERSE.length}개 (전체 ${allKrwSymbols.length}개)`)
+
+    // 각 알트코인 스코어링
+    const inputs = []
+    for (const symbol of ALT_UNIVERSE) {
+      try {
+        await sleep(130) // 업비트 레이트 리밋 (초당 ~8회)
+        const altCandles = await fetchUpbitCandlesDirect(`KRW-${symbol}`, 50)
+        if (altCandles.length < 21) continue
+
+        const currentPrice = altCandles[altCandles.length - 1].close
+        const openPriceAt9 = altCandles.length > 9
+          ? altCandles[altCandles.length - 9].open
+          : altCandles[0].open
+
+        inputs.push({
+          symbol,
+          candles: altCandles,
+          btcPrices: btcPrices.slice(-altCandles.length),
+          currentPrice,
+          openPriceAt9,
+          currentTimeKST: kstNow,
+        })
+      } catch {
+        // 개별 코인 실패 시 스킵
+      }
+    }
+
+    const results = scoreMultipleCoins(inputs, 20, strategy)
+
+    return c.json({
+      strategy,
+      scannedAt: now.toISOString(),
+      totalScanned: inputs.length,
+      detected: results.length,
+      results: results.map((r) => ({
+        symbol: r.symbol,
+        score: r.score,
+        rsi14: r.rsi14,
+        atrPct: r.atrPct,
+        changePct: r.changePct,
+        price: r.price,
+        signals: r.signals,
+        reasoning: r.reasoning,
+      })),
+    })
+  } catch (err) {
+    console.error('탐지 스캔 오류:', err)
+    return c.json({ error: '탐지 스캔 실패' }, 500)
+  }
 })
 
 /** GET /api/detection/score/:symbol — 단일 코인 상세 스코어 */
