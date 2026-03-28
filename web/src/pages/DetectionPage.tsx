@@ -14,7 +14,7 @@ import {
   TrendingDown,
   BarChart3,
 } from 'lucide-react'
-import { api } from '../services/api'
+import { api, API_BASE } from '../services/api'
 
 interface DetectionSignal {
   active: boolean
@@ -59,12 +59,49 @@ const STRATEGY_TABS: { id: StrategyType; label: string; icon: React.ReactNode; d
 
 export function DetectionPage() {
   const [strategy, setStrategy] = useState<StrategyType>('composite')
+  const [scanProgress, setScanProgress] = useState<{ current: number; total: number; symbol: string } | null>(null)
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<ScanResponse>({
     queryKey: ['detection-scan', strategy],
-    queryFn: () => api.scanDetection(strategy) as Promise<ScanResponse>,
-    refetchInterval: 5 * 60 * 1000,
+    queryFn: () =>
+      new Promise<ScanResponse>((resolve, reject) => {
+        let done = false
+        const es = new EventSource(`${API_BASE}/api/detection/scan/stream?strategy=${strategy}`)
+
+        es.addEventListener('progress', (e) => {
+          const d = JSON.parse(e.data)
+          if (d.type === 'start') {
+            setScanProgress({ current: 0, total: d.total, symbol: '' })
+          } else if (d.current !== undefined) {
+            setScanProgress({ current: d.current, total: d.total, symbol: d.symbol ?? '' })
+          }
+        })
+
+        es.addEventListener('complete', (e) => {
+          done = true
+          setScanProgress(null)
+          es.close()
+          resolve(JSON.parse(e.data))
+        })
+
+        es.addEventListener('scan-error', (e) => {
+          done = true
+          setScanProgress(null)
+          es.close()
+          reject(new Error(JSON.parse(e.data).message ?? '스캔 실패'))
+        })
+
+        es.onerror = () => {
+          if (!done) {
+            setScanProgress(null)
+            es.close()
+            reject(new Error('스캔 연결 실패'))
+          }
+        }
+      }),
     staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   })
 
   return (
@@ -72,7 +109,7 @@ export function DetectionPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">알트코인 탐지</h1>
-          <p className="text-[12px] text-text-muted">
+          <p className="text-[13px] text-text-muted">
             실시간 업비트 KRW 마켓 스캔 — 전략별 필터링
           </p>
         </div>
@@ -103,7 +140,7 @@ export function DetectionPage() {
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-text-faint">
+      <p className="text-[11px] text-text-muted">
         {STRATEGY_TABS.find((t) => t.id === strategy)?.desc}
       </p>
 
@@ -122,20 +159,42 @@ export function DetectionPage() {
               {data.detected}개
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-text-faint">
+          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
             <Clock className="h-3 w-3" />
             {getTimeAgo(data.scannedAt)}
           </div>
         </div>
       )}
 
-      {/* 로딩 */}
-      {isLoading && (
+      {/* 스캔 프로그레스 */}
+      {isFetching && scanProgress && (
+        <div className="card-surface rounded-md px-4 py-4">
+          <div className="flex items-center justify-between text-[12px]">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
+              <span className="text-text-muted">
+                <span className="font-medium text-text-secondary">{scanProgress.symbol || '준비 중'}</span> 스캔 중
+              </span>
+            </div>
+            <span className="font-mono-trading text-text-muted">
+              {scanProgress.current}/{scanProgress.total}
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full bg-[var(--accent)] transition-all duration-150"
+              style={{ width: `${scanProgress.total > 0 ? (scanProgress.current / scanProgress.total) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 초기 로딩 (프로그레스 전) */}
+      {isLoading && !scanProgress && (
         <div className="card-surface flex items-center justify-center rounded-md py-16">
           <div className="text-center">
             <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-text-faint" />
-            <p className="text-[12px] text-text-muted">알트코인 스캔 중...</p>
-            <p className="text-[11px] text-text-faint">50개 코인 분석, 약 10-20초 소요</p>
+            <p className="text-[12px] text-text-muted">BTC 캔들 로딩 중...</p>
           </div>
         </div>
       )}
@@ -173,7 +232,7 @@ export function DetectionPage() {
       {/* 탐지 결과 */}
       {data && data.results.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-text-faint">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
             탐지 결과 ({data.results.length}개)
           </h2>
           {data.results.map((result) => (
@@ -239,13 +298,13 @@ function DetectionCard({ result, strategy }: { result: DetectionResult; strategy
           value={(result.signals.volumeZScore.value as number).toFixed(1)}
           color={(result.signals.volumeZScore.value as number) > 2.5 ? 'profit' : 'muted'}
         />
-        <span className="mx-1 self-center text-[10px] text-text-faint">|</span>
+        <span className="mx-1 self-center text-[11px] text-text-faint">|</span>
         <SignalDot label="거래량" active={result.signals.volumeZScore.active} />
         <SignalDot label="BTC보정" active={result.signals.btcAdjustedPump.active} />
         <SignalDot label="호가" active={result.signals.orderbookImbalance.active} />
         <SignalDot label="OBV" active={result.signals.obvDivergence.active} />
         <SignalDot label="9시" active={result.signals.morningReset.active} />
-        <span className="ml-auto text-[10px] text-text-faint">{activeCount}/5</span>
+        <span className="ml-auto text-[11px] text-text-muted">{activeCount}/5</span>
       </div>
 
       {/* 상세 */}
@@ -317,8 +376,8 @@ function ScoreBadge({ score, strategy }: { score: number; strategy: StrategyType
 function MetricPill({ label, value, color }: { label: string; value: string; color: string }) {
   const colorClass = color === 'profit' ? 'text-profit' : color === 'loss' ? 'text-loss' : color === 'warning' ? 'text-warning' : 'text-text-muted'
   return (
-    <span className={`rounded-md bg-secondary px-2 py-0.5 text-[10px] ${colorClass}`}>
-      <span className="text-text-faint">{label}</span> <span className="font-mono-trading font-medium">{value}</span>
+    <span className={`rounded-md bg-secondary px-2 py-0.5 text-[11px] ${colorClass}`}>
+      <span className="text-text-muted">{label}</span> <span className="font-mono-trading font-medium">{value}</span>
     </span>
   )
 }
@@ -327,16 +386,16 @@ function MetricBox({ label, value, desc, color }: { label: string; value: string
   const colorClass = color === 'profit' ? 'text-profit' : color === 'loss' ? 'text-loss' : color === 'warning' ? 'text-warning' : 'text-text-secondary'
   return (
     <div className="rounded-md bg-secondary p-2 text-center">
-      <div className="text-[10px] text-text-faint">{label}</div>
+      <div className="text-[11px] text-text-muted">{label}</div>
       <div className={`font-mono-trading text-[14px] font-semibold ${colorClass}`}>{value}</div>
-      {desc && <div className="text-[9px] text-text-faint">{desc}</div>}
+      {desc && <div className="text-[10px] text-text-muted">{desc}</div>}
     </div>
   )
 }
 
 function SignalDot({ label, active }: { label: string; active: boolean }) {
   return (
-    <div className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] ${
+    <div className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
       active ? 'bg-[var(--profit-bg)] text-profit' : 'bg-secondary text-text-faint'
     }`}>
       <span className={`inline-block h-1.5 w-1.5 rounded-full ${active ? 'bg-profit' : 'bg-text-faint'}`} />
@@ -359,7 +418,7 @@ function SignalDetail({ label, active, value, threshold }: {
       </div>
       <div className="flex items-center gap-3">
         <span className={`font-mono-trading ${active ? 'text-profit' : 'text-text-faint'}`}>{value}</span>
-        <span className="text-[10px] text-text-faint">기준: {threshold}</span>
+        <span className="text-[11px] text-text-muted">기준: {threshold}</span>
       </div>
     </div>
   )
@@ -370,9 +429,9 @@ function IndicatorInfo({ name, weight, description }: { name: string; weight?: s
     <div className="rounded-md bg-secondary p-2.5">
       <div className="flex items-center justify-between">
         <span className="font-medium text-text-secondary">{name}</span>
-        {weight && <span className="font-mono-trading text-[10px] text-text-faint">{weight}</span>}
+        {weight && <span className="font-mono-trading text-[11px] text-text-muted">{weight}</span>}
       </div>
-      <p className="mt-0.5 text-[10px] text-text-muted">{description}</p>
+      <p className="mt-0.5 text-[11px] text-text-muted">{description}</p>
     </div>
   )
 }

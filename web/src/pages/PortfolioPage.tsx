@@ -79,7 +79,7 @@ export function PortfolioPage() {
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">포트폴리오</h2>
-        <p className="text-[12px] text-text-muted">거래소별 잔고와 거래 내역을 확인합니다</p>
+        <p className="text-[13px] text-text-muted">거래소별 잔고와 거래 내역을 확인합니다</p>
       </div>
 
       {/* 거래소 잔고 */}
@@ -151,16 +151,16 @@ export function PortfolioPage() {
           <>
             {/* 데스크톱 테이블 */}
             <div className="mt-4 hidden overflow-x-auto md:block">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-border-subtle text-left">
-                    <th className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">시각</th>
-                    <th className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">거래소</th>
-                    <th className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">종목</th>
-                    <th className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">방향</th>
-                    <th className="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">진입가</th>
-                    <th className="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">청산가</th>
-                    <th className="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">PnL</th>
+                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">시각</th>
+                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">거래소</th>
+                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">종목</th>
+                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">방향</th>
+                    <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">진입가</th>
+                    <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">청산가</th>
+                    <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">PnL</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -170,7 +170,7 @@ export function PortfolioPage() {
                       <td className="px-3 py-2 text-text-secondary">{trade.exchange ?? '—'}</td>
                       <td className="px-3 py-2 font-medium text-text-primary">{trade.symbol}</td>
                       <td className="px-3 py-2">
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                        <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
                           trade.direction === 'long' ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--loss-bg)] text-loss'
                         }`}>
                           {trade.direction === 'long' ? '매수' : '매도'}
@@ -200,7 +200,7 @@ export function PortfolioPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] font-medium text-text-primary">{trade.symbol}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                      <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
                         trade.direction === 'long' ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--loss-bg)] text-loss'
                       }`}>
                         {trade.direction === 'long' ? '매수' : '매도'}
@@ -212,7 +212,7 @@ export function PortfolioPage() {
                       {trade.pnl_pct != null ? formatPercent(trade.pnl_pct) : '—'}
                     </span>
                   </div>
-                  <p className="mt-1 text-[10px] text-text-faint">{formatDate(trade.closed_at)}</p>
+                  <p className="mt-1 text-[11px] text-text-muted">{formatDate(trade.closed_at)}</p>
                 </div>
               ))}
             </div>
@@ -277,11 +277,11 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
           <div>
             <h3 className="data-table-header">{name} ({type})</h3>
           </div>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-text-faint">미설정</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-text-muted">미설정</span>
         </div>
         <div className="mt-4 text-center" style={{ border: '1px dashed var(--border)', borderRadius: '6px', padding: '20px' }}>
           <Key className="mx-auto mb-2 h-6 w-6 text-text-faint" />
-          <p className="text-[12px] text-text-secondary">API 키를 설정하면 잔고를 확인할 수 있습니다</p>
+          <p className="text-[13px] text-text-secondary">API 키를 설정하면 잔고를 확인할 수 있습니다</p>
           <button
             onClick={onGoToSettings}
             className="mt-3 flex items-center gap-1 mx-auto rounded-md border border-border px-3 py-1.5 text-[11px] text-text-muted hover:bg-secondary"
@@ -298,7 +298,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
     <div className="card-surface rounded-md p-4">
       <div className="flex items-center justify-between">
         <h3 className="data-table-header">{name} ({type})</h3>
-        <span className="flex items-center gap-1 text-[10px] text-profit">
+        <span className="flex items-center gap-1 text-[11px] text-profit">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />
           연결됨
         </span>
@@ -319,7 +319,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-[11px] text-text-faint">보유 코인: 없음</p>
+        <p className="mt-2 text-[11px] text-text-muted">보유 코인: 없음</p>
       )}
     </div>
   )

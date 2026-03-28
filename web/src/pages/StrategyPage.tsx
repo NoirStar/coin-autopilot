@@ -125,7 +125,7 @@ export function StrategyPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">전략 관리</h2>
-        <p className="text-[12px] text-text-muted">매매 전략과 투자 성향을 설정합니다</p>
+        <p className="text-[13px] text-text-muted">매매 전략과 투자 성향을 설정합니다</p>
       </div>
 
       {/* 투자 성향 선택 */}
@@ -151,13 +151,13 @@ export function StrategyPage() {
                   <Icon className={`h-4 w-4 ${isActive ? 'text-[var(--accent)]' : 'text-text-muted'}`} />
                   <h4 className="text-[13px] font-semibold">{profile.name}</h4>
                   {isActive && (
-                    <span className="rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+                    <span className="rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
                       선택됨
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-text-muted">{profile.description}</p>
-                <div className="mt-3 flex gap-4 text-[11px] text-text-secondary">
+                <p className="text-[12px] text-text-muted">{profile.description}</p>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-text-secondary">
                   <span>레버리지: <strong>{profile.leverage}</strong></span>
                   <span>최대 보유: <strong>{profile.maxPositions}</strong></span>
                   <span>
@@ -261,12 +261,12 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
         <div className="flex items-center gap-2">
           <h4 className="text-[13px] font-medium">{strategy.name}</h4>
           {strategy.is_active && isImplemented && (
-            <span className="rounded bg-[var(--profit-bg)] px-2 py-0.5 text-[10px] font-semibold text-profit">
+            <span className="rounded bg-[var(--profit-bg)] px-2 py-0.5 text-[11px] font-semibold text-profit">
               활성
             </span>
           )}
           {!isImplemented && (
-            <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[10px] text-text-faint">
+            <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[11px] text-text-muted">
               <Lock className="h-2.5 w-2.5" />
               개발 중
             </span>
@@ -295,7 +295,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
       <p className="mt-1.5 text-[11px] text-text-muted">
         {strategyDescriptions[strategy.type] ?? strategy.type}
       </p>
-      <p className="mt-0.5 font-mono-trading text-[10px] text-text-faint">{strategy.type}</p>
+      <p className="mt-0.5 font-mono-trading text-[11px] text-text-faint">{strategy.type}</p>
 
       {/* 파라미터 편집 (구현된 전략만) */}
       {isImplemented && (
@@ -332,7 +332,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
                         className="w-20 rounded border border-border bg-background px-2 py-1 font-mono-trading text-[12px] text-text-primary focus:border-[var(--accent)] focus:outline-none"
                       />
                       {param.unit && (
-                        <span className="text-[10px] text-text-faint">{param.unit}</span>
+                        <span className="text-[11px] text-text-muted">{param.unit}</span>
                       )}
                     </div>
                   </div>

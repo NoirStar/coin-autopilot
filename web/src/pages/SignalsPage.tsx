@@ -114,7 +114,7 @@ export function SignalsPage() {
     <div className="mx-auto max-w-4xl space-y-5 py-2">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">알트코인 매매 시그널</h1>
-        <p className="text-[12px] text-text-muted">
+        <p className="text-[13px] text-text-muted">
           BTC 흐름 기반 알트코인 매수/매도 시그널. 4시간마다 갱신.
         </p>
       </div>
@@ -123,7 +123,7 @@ export function SignalsPage() {
       <PerformanceSummary />
       <SignalList />
 
-      <p className="text-center text-[10px] text-text-faint">
+      <p className="text-center text-[11px] text-text-muted">
         이 시그널은 학습 및 참고 목적이며, 투자 조언이 아닙니다. 투자 판단은 본인 책임입니다.
       </p>
     </div>
@@ -167,7 +167,7 @@ function RegimeHero() {
               <span className="text-[15px] font-semibold">
                 BTC <TermTooltip term="regime">레짐</TermTooltip>
               </span>
-              <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+              <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
                 isRiskOn ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--loss-bg)] text-loss'
               }`}>
                 {isRiskOn ? 'RISK-ON' : 'RISK-OFF'}
@@ -180,7 +180,7 @@ function RegimeHero() {
             </p>
           </div>
         </div>
-        <span className="text-[10px] text-text-faint">{timeAgo}</span>
+        <span className="text-[11px] text-text-muted">{timeAgo}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
@@ -221,13 +221,13 @@ function IndicatorCard({ label, value, detail, positive }: {
 }) {
   return (
     <div className="rounded-md bg-secondary p-2.5">
-      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-text-faint">{label}</p>
+      <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-text-muted">{label}</p>
       <p className={`font-mono-trading text-[15px] font-bold ${
         positive === true ? 'text-profit' : positive === false ? 'text-loss' : 'text-text-primary'
       }`}>
         {value}
       </p>
-      {detail && <p className="text-[10px] text-text-faint">{detail}</p>}
+      {detail && <p className="text-[11px] text-text-muted">{detail}</p>}
     </div>
   )
 }
@@ -270,17 +270,17 @@ function PerformanceSummary() {
 
   return (
     <div className="card-surface flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-md px-4 py-2.5">
-      <div className="flex items-center gap-1.5 text-[12px]">
+      <div className="flex items-center gap-1.5 text-[13px]">
         <BarChart3 className="h-3 w-3 text-text-faint" />
         <TermTooltip term="sharpe">Sharpe</TermTooltip>
         <span className="font-mono-trading font-medium text-text-primary">{perf.sharpe_ratio.toFixed(2)}</span>
       </div>
-      <div className="flex items-center gap-1.5 text-[12px]">
+      <div className="flex items-center gap-1.5 text-[13px]">
         <Activity className="h-3 w-3 text-text-faint" />
         <TermTooltip term="win_rate">승률</TermTooltip>
         <span className="font-mono-trading font-medium text-text-primary">{perf.win_rate.toFixed(1)}%</span>
       </div>
-      <div className="flex items-center gap-1.5 text-[12px]">
+      <div className="flex items-center gap-1.5 text-[13px]">
         <TrendingDown className="h-3 w-3 text-text-faint" />
         <TermTooltip term="mdd">MDD</TermTooltip>
         <span className="font-mono-trading font-medium text-loss">-{perf.max_drawdown.toFixed(1)}%</span>
@@ -341,18 +341,18 @@ function SignalList() {
 
       {/* 데스크톱 */}
       <div className="hidden md:block">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-[13px]">
           <thead>
             <tr className="border-t border-border-subtle text-left">
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">종목</th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">방향</th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">종목</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">방향</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
                 <TermTooltip term="z_score">z-score</TermTooltip>
               </th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
                 <TermTooltip term="rsi">RSI</TermTooltip>
               </th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">시각</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">시각</th>
               <th className="px-4 py-2" />
             </tr>
           </thead>
@@ -385,7 +385,7 @@ function SignalRow({ signal }: { signal: Signal }) {
       >
         <td className="px-4 py-2.5 font-medium text-text-primary">{signal.symbol}</td>
         <td className="px-4 py-2.5">
-          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
             signal.direction === 'buy'
               ? 'bg-profit-bg text-profit'
               : 'bg-loss-bg text-loss'
@@ -425,7 +425,7 @@ function SignalCard({ signal }: { signal: Signal }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-medium text-text-primary">{signal.symbol}</span>
-          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
             signal.direction === 'buy'
               ? 'bg-profit-bg text-profit'
               : 'bg-loss-bg text-loss'
@@ -433,9 +433,9 @@ function SignalCard({ signal }: { signal: Signal }) {
             {signal.direction === 'buy' ? '매수' : '매도'}
           </span>
         </div>
-        <span className="text-[10px] text-text-faint">{getTimeAgo(signal.created_at)}</span>
+        <span className="text-[11px] text-text-muted">{getTimeAgo(signal.created_at)}</span>
       </div>
-      <div className="mt-1 flex gap-4 text-[10px] text-text-muted">
+      <div className="mt-1 flex gap-4 text-[11px] text-text-muted">
         <span>z: <span className="font-mono-trading text-text-secondary">{signal.z_score?.toFixed(2) ?? '-'}</span></span>
         <span>RSI: <span className="font-mono-trading text-text-secondary">{signal.rsi?.toFixed(1) ?? '-'}</span></span>
       </div>
@@ -457,9 +457,9 @@ function ReasoningPanel({ reasoning }: { reasoning: Record<string, unknown> }) {
 
   return (
     <div className="space-y-1.5">
-      <p className="text-[10px] font-medium text-text-muted">진입 근거</p>
+      <p className="text-[11px] font-medium text-text-muted">진입 근거</p>
       {checks.map((check) => (
-        <div key={check.key} className="flex items-center gap-2 text-[12px]">
+        <div key={check.key} className="flex items-center gap-2 text-[13px]">
           {check.pass ? (
             <Check className="h-3.5 w-3.5 text-profit" />
           ) : (

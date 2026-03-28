@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -12,13 +12,15 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const authHeaders = await getAuthHeaders()
+  // AbortSignal 제거 — 탭 이동 시 진행 중인 요청이 취소되지 않도록
+  const { signal: _signal, ...restOptions } = options ?? {}
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,
-      ...options?.headers,
+      ...restOptions?.headers,
     },
-    ...options,
+    ...restOptions,
   })
 
   if (!res.ok) {

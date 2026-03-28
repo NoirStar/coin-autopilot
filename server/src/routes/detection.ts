@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
 import { scoreMultipleCoins, computeDetectionScore, type DetectionStrategy } from '../detector/composite-scorer.js'
 import { fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import type { Candle } from '../strategy/strategy-base.js'
@@ -124,6 +125,114 @@ detectionRoutes.get('/scan', async (c) => {
     console.error('탐지 스캔 오류:', err)
     return c.json({ error: '탐지 스캔 실패' }, 500)
   }
+})
+
+/** GET /api/detection/scan/stream — SSE 스트리밍 전체 알트코인 스캔 */
+detectionRoutes.get('/scan/stream', async (c) => {
+  const strategyParam = c.req.query('strategy') ?? 'composite'
+  const validStrategies = ['composite', 'oversold', 'momentum', 'volume']
+  const strategy = (validStrategies.includes(strategyParam) ? strategyParam : 'composite') as DetectionStrategy
+
+  return streamSSE(c, async (stream) => {
+    try {
+      const btcCandles = await fetchUpbitCandlesDirect('KRW-BTC', 50)
+      if (btcCandles.length < 21) {
+        await stream.writeSSE({
+          data: JSON.stringify({ type: 'error', message: `BTC 데이터 부족 (${btcCandles.length}/21)` }),
+          event: 'scan-error',
+        })
+        return
+      }
+      const btcPrices = btcCandles.map((cl) => cl.close)
+      const now = new Date()
+      const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+
+      const allKrwSymbols = await fetchUpbitKrwSymbols()
+      const total = allKrwSymbols.length
+
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'start', total }),
+        event: 'progress',
+      })
+
+      const inputs: Array<{
+        symbol: string
+        candles: Candle[]
+        btcPrices: number[]
+        currentPrice: number
+        openPriceAt9: number
+        currentTimeKST: Date
+      }> = []
+
+      for (let i = 0; i < total; i++) {
+        const symbol = allKrwSymbols[i]
+        try {
+          await sleep(130)
+          const altCandles = await fetchUpbitCandlesDirect(`KRW-${symbol}`, 50)
+          if (altCandles.length < 21) {
+            await stream.writeSSE({
+              data: JSON.stringify({ type: 'scan', current: i + 1, total, symbol, status: 'skip' }),
+              event: 'progress',
+            })
+            continue
+          }
+
+          const currentPrice = altCandles[altCandles.length - 1].close
+          const openPriceAt9 = altCandles.length > 9
+            ? altCandles[altCandles.length - 9].open
+            : altCandles[0].open
+
+          inputs.push({
+            symbol,
+            candles: altCandles,
+            btcPrices: btcPrices.slice(-altCandles.length),
+            currentPrice,
+            openPriceAt9,
+            currentTimeKST: kstNow,
+          })
+
+          await stream.writeSSE({
+            data: JSON.stringify({ type: 'scan', current: i + 1, total, symbol, status: 'ok' }),
+            event: 'progress',
+          })
+        } catch {
+          await stream.writeSSE({
+            data: JSON.stringify({ type: 'scan', current: i + 1, total, symbol, status: 'error' }),
+            event: 'progress',
+          })
+        }
+      }
+
+      const results = scoreMultipleCoins(inputs, 20, strategy)
+
+      await stream.writeSSE({
+        data: JSON.stringify({
+          type: 'complete',
+          strategy,
+          scannedAt: now.toISOString(),
+          totalScanned: inputs.length,
+          detected: results.length,
+          results: results.map((r) => ({
+            symbol: r.symbol,
+            score: r.score,
+            rsi14: r.rsi14,
+            atrPct: r.atrPct,
+            changePct: r.changePct,
+            price: r.price,
+            signals: r.signals,
+            reasoning: r.reasoning,
+          })),
+        }),
+        event: 'complete',
+      })
+    } catch (err) {
+      console.error('SSE 탐지 스캔 오류:', err)
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'error', message: '탐지 스캔 실패' }),
+        event: 'scan-error',
+      })
+    }
+  })
 })
 
 /** GET /api/detection/score/:symbol — 단일 코인 상세 스코어 */

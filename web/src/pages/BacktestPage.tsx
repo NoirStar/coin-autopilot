@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { TermTooltip } from '@/components/ui/term-tooltip'
-import { api } from '@/services/api'
+import { API_BASE } from '@/services/api'
 
 interface BacktestTradeResult {
   symbol: string
@@ -52,14 +52,66 @@ export function BacktestPage() {
   const [rsiMax, setRsiMax] = useState(78)
   const [atrStopMult, setAtrStopMult] = useState(2.7)
   const [maxPositions, setMaxPositions] = useState(5)
+  const [btProgress, setBtProgress] = useState<{
+    phase: string
+    current: number
+    total: number
+    detail: string
+  } | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () =>
-      api.runBacktest({
-        strategyId: 'alt_mean_reversion',
-        initialCapital,
-        params: { zScoreEntry, rsiMax, atrStopMult, maxPositions },
-      }) as Promise<BacktestResultData>,
+    mutationFn: async () => {
+      setBtProgress(null)
+      const res = await fetch(`${API_BASE}/api/backtest/run/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategyId: 'alt_mean_reversion',
+          initialCapital,
+          params: { zScoreEntry, rsiMax, atrStopMult, maxPositions },
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(err.error ?? `API Error: ${res.status}`)
+      }
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let result: BacktestResultData | null = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop()!
+        for (const event of events) {
+          for (const line of event.split('\n')) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                if (data.type === 'progress') {
+                  setBtProgress(data)
+                } else if (data.type === 'complete') {
+                  result = data.result
+                } else if (data.type === 'error') {
+                  throw new Error(data.message)
+                }
+              } catch (e) {
+                if (e instanceof Error && !e.message.includes('JSON')) throw e
+              }
+            }
+          }
+        }
+      }
+
+      setBtProgress(null)
+      if (!result) throw new Error('백테스트 결과 없음')
+      return result
+    },
+    gcTime: 30 * 60 * 1000,
   })
 
   const result = mutation.data
@@ -68,12 +120,12 @@ export function BacktestPage() {
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">백테스팅</h2>
-        <p className="text-[12px] text-text-muted">과거 데이터로 전략을 검증합니다</p>
+        <p className="text-[13px] text-text-muted">과거 데이터로 전략을 검증합니다</p>
       </div>
 
       {/* 설정 패널 */}
       <div className="card-surface rounded-md p-5">
-        <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-text-faint">백테스트 설정</h3>
+        <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-text-muted">백테스트 설정</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <InputField label="전략" value="BTC 레짐 + 알트 평균회귀" disabled />
           <InputField label="타임프레임" value="4H" disabled />
@@ -131,10 +183,28 @@ export function BacktestPage() {
             )}
             {mutation.isPending ? '실행 중...' : '백테스트 실행'}
           </button>
-          {mutation.isPending && (
-            <span className="text-[11px] text-text-muted">데이터 로드 및 시뮬레이션 중...</span>
-          )}
         </div>
+        {mutation.isPending && (
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between text-[12px]">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
+                <span className="text-text-muted">{btProgress?.detail ?? '준비 중...'}</span>
+              </div>
+              {btProgress && (
+                <span className="font-mono-trading text-text-muted">
+                  {btProgress.current}/{btProgress.total}
+                </span>
+              )}
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+                style={{ width: btProgress ? `${(btProgress.current / btProgress.total) * 100}%` : '0%' }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 에러 */}
@@ -219,7 +289,7 @@ function BacktestResults({ result }: { result: BacktestResultData }) {
       {/* 에퀴티 커브 */}
       {result.equityCurve.length > 0 && (
         <div className="card-surface rounded-md p-4">
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-faint">
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
             에퀴티 커브
           </h3>
           <div className="h-[280px] sm:h-[320px]">
@@ -288,13 +358,13 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
   return (
     <div className="card-surface overflow-hidden rounded-md">
       <div className="flex items-center justify-between px-4 py-3">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-faint">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
           거래 내역 ({trades.length}건)
         </h3>
         <div className="flex gap-1">
           <button
             onClick={() => setSortBy('time')}
-            className={`rounded-md px-2 py-1 text-[10px] ${
+            className={`rounded-md px-2 py-1 text-[11px] ${
               sortBy === 'time' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-text-muted'
             }`}
           >
@@ -302,7 +372,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
           </button>
           <button
             onClick={() => setSortBy('pnl')}
-            className={`rounded-md px-2 py-1 text-[10px] ${
+            className={`rounded-md px-2 py-1 text-[11px] ${
               sortBy === 'pnl' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-text-muted'
             }`}
           >
@@ -313,15 +383,15 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
 
       {/* 데스크톱 테이블 */}
       <div className="hidden md:block">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-[13px]">
           <thead>
             <tr className="border-t border-border-subtle text-left">
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">시각</th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">종목</th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">진입가</th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">청산가</th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">PnL</th>
-              <th className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-text-faint">사유</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">시각</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">종목</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">진입가</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">청산가</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">PnL</th>
+              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">사유</th>
             </tr>
           </thead>
           <tbody>
@@ -350,7 +420,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
           </tbody>
         </table>
         {trades.length > 50 && (
-          <div className="border-t border-border-subtle px-4 py-2 text-center text-[11px] text-text-faint">
+          <div className="border-t border-border-subtle px-4 py-2 text-center text-[11px] text-text-muted">
             최근 50건 표시 (전체 {trades.length}건)
           </div>
         )}
@@ -363,7 +433,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-text-primary">{trade.symbol}</span>
-                <span className="text-[10px] text-text-muted">
+                <span className="text-[11px] text-text-muted">
                   {reasonLabels[trade.reason] ?? trade.reason}
                 </span>
               </div>
@@ -373,7 +443,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
                 {trade.pnlPct >= 0 ? '+' : ''}{trade.pnlPct.toFixed(2)}%
               </span>
             </div>
-            <div className="mt-1 flex gap-3 text-[10px] text-text-muted">
+            <div className="mt-1 flex gap-3 text-[11px] text-text-muted">
               <span>진입: {formatPrice(trade.entryPrice)}</span>
               <span>청산: {formatPrice(trade.exitPrice)}</span>
               <span>{new Date(trade.exitTime).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</span>
@@ -394,9 +464,9 @@ function KpiCard({ label, value, sub, icon, variant }: {
 }) {
   return (
     <div className="card-surface rounded-md p-3">
-      <div className="flex items-center gap-1 text-text-faint">
+      <div className="flex items-center gap-1 text-text-muted">
         {icon}
-        <span className="text-[10px] font-medium uppercase tracking-wider">{label}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider">{label}</span>
       </div>
       <div className={`mt-1.5 font-mono-trading text-lg font-bold ${
         variant === 'profit' ? 'text-profit' :
@@ -404,7 +474,7 @@ function KpiCard({ label, value, sub, icon, variant }: {
       }`}>
         {value}
       </div>
-      {sub && <div className="mt-0.5 text-[10px] text-text-faint">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[11px] text-text-muted">{sub}</div>}
     </div>
   )
 }

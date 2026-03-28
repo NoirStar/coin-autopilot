@@ -83,7 +83,7 @@ export function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">설정</h2>
-        <p className="text-[12px] text-text-muted">API 키, 리스크 파라미터, 알림을 관리합니다</p>
+        <p className="text-[13px] text-text-muted">API 키, 리스크 파라미터, 알림을 관리합니다</p>
       </div>
 
       {/* 서버 상태 */}
@@ -133,7 +133,7 @@ export function SettingsPage() {
 function StatusItem({ label, value, active }: { label: string; value: string; active?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] font-medium uppercase tracking-wider text-text-faint">{label}</p>
+      <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">{label}</p>
       <p className="mt-0.5 flex items-center gap-1.5 text-[13px] font-medium text-text-primary">
         {active && <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />}
         {value}
@@ -175,7 +175,7 @@ function ApiKeySection({ settings, isLoading }: { settings: UserSettings | undef
           permissions="읽기 + 거래 (출금 권한 금지)"
         />
       </div>
-      <p className="mt-4 text-[10px] text-text-faint">
+      <p className="mt-4 text-[11px] text-text-muted">
         API 키는 서버에 암호화되어 저장됩니다. 출금 권한은 절대 부여하지 마세요.
       </p>
     </div>
@@ -201,12 +201,12 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
           <p className="text-[11px] text-text-muted">{description}</p>
         </div>
         {configured ? (
-          <span className="flex items-center gap-1 rounded-full bg-[var(--profit-bg)] px-2.5 py-0.5 text-[10px] font-medium text-profit">
+          <span className="flex items-center gap-1 rounded-full bg-[var(--profit-bg)] px-2.5 py-0.5 text-[11px] font-medium text-profit">
             <Check className="h-2.5 w-2.5" />
             연결됨
           </span>
         ) : (
-          <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-text-faint">미설정</span>
+          <span className="rounded bg-muted px-2 py-0.5 text-[11px] text-text-muted">미설정</span>
         )}
       </div>
 
@@ -223,7 +223,7 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
       {showForm && (
         <div className="mt-3 space-y-2.5 border-t border-border-subtle pt-3">
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-text-muted">Access Key</label>
+            <label className="mb-1 block text-[11px] font-medium text-text-muted">Access Key</label>
             <input
               type="text"
               value={accessKey}
@@ -233,7 +233,7 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
             />
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-medium text-text-muted">Secret Key</label>
+            <label className="mb-1 block text-[11px] font-medium text-text-muted">Secret Key</label>
             <div className="relative">
               <input
                 type={showSecret ? 'text' : 'password'}
@@ -251,7 +251,7 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
               </button>
             </div>
           </div>
-          <p className="text-[10px] text-text-faint">필요 권한: {permissions}</p>
+          <p className="text-[11px] text-text-muted">필요 권한: {permissions}</p>
           <div className="flex gap-2">
             <button className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background hover:brightness-110">
               <Save className="h-3 w-3" />
@@ -476,7 +476,7 @@ function AlertSection({ settings, isLoading }: { settings: UserSettings | undefi
       </div>
 
       <div className="mt-4 border-t border-border-subtle pt-4">
-        <p className="mb-2.5 text-[10px] font-medium uppercase tracking-wider text-text-faint">알림 조건</p>
+        <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-muted">알림 조건</p>
         <div className="space-y-2">
           {alertConditions.map((condition) => (
             <label key={condition.key} className="flex items-center justify-between text-[12px]">
@@ -538,20 +538,20 @@ function DangerZone() {
           <div key={action.id} className="flex items-center justify-between">
             <div>
               <p className="text-[12px] text-text-secondary">{action.label}</p>
-              <p className="text-[10px] text-text-faint">{action.description}</p>
+              <p className="text-[11px] text-text-muted">{action.description}</p>
             </div>
             {showConfirm === action.id ? (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-loss">정말 삭제하시겠습니까?</span>
+                <span className="text-[11px] text-loss">정말 삭제하시겠습니까?</span>
                 <button
                   onClick={() => setShowConfirm(null)}
-                  className="rounded border border-loss px-2 py-1 text-[10px] font-medium text-loss hover:bg-[var(--loss-bg)]"
+                  className="rounded border border-loss px-2 py-1 text-[11px] font-medium text-loss hover:bg-[var(--loss-bg)]"
                 >
                   확인
                 </button>
                 <button
                   onClick={() => setShowConfirm(null)}
-                  className="rounded border border-border px-2 py-1 text-[10px] text-text-muted hover:bg-secondary"
+                  className="rounded border border-border px-2 py-1 text-[11px] text-text-muted hover:bg-secondary"
                 >
                   취소
                 </button>

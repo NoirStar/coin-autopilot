@@ -57,12 +57,12 @@ export function PaperTradingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">가상매매</h2>
-          <p className="text-[12px] text-text-muted">
+          <p className="text-[13px] text-text-muted">
             실시간 데이터로 전략을 검증합니다 (실제 주문 없음)
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-text-faint">
+          <span className="text-[11px] text-text-muted">
             활성 세션: {runningSessions.length}/10
           </span>
           <button
@@ -264,8 +264,8 @@ function SessionDetail({ session }: { session: PaperSessionRow }) {
         <div className="flex items-center justify-center py-6">
           <div className="text-center">
             <Inbox className="mx-auto mb-2 h-6 w-6 text-text-faint" />
-            <p className="text-[12px] text-text-muted">아직 진입 조건을 충족한 종목이 없습니다</p>
-            <p className="mt-0.5 text-[11px] text-text-faint">다음 4H 분석에서 시그널이 발생하면 자동 진입합니다</p>
+            <p className="text-[13px] text-text-muted">아직 진입 조건을 충족한 종목이 없습니다</p>
+            <p className="mt-0.5 text-[11px] text-text-muted">다음 4H 분석에서 시그널이 발생하면 자동 진입합니다</p>
           </div>
         </div>
       </div>
@@ -273,7 +273,7 @@ function SessionDetail({ session }: { session: PaperSessionRow }) {
       {/* 체결 내역 */}
       <div className="card-surface rounded-md p-4">
         <h4 className="data-table-header mb-3">최근 체결</h4>
-        <p className="py-4 text-center text-[12px] text-text-faint">
+        <p className="py-4 text-center text-[13px] text-text-muted">
           체결 기록이 쌓이면 여기에 표시됩니다
         </p>
       </div>
@@ -289,7 +289,7 @@ function KpiCard({ label, value, sub, positive }: {
 }) {
   return (
     <div className="rounded-md bg-secondary p-3">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-text-faint">{label}</p>
+      <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">{label}</p>
       <p className="mt-1 font-mono-trading text-[16px] font-bold text-text-primary">{value}</p>
       {sub && (
         <p className={`mt-0.5 font-mono-trading text-[11px] ${
@@ -314,22 +314,22 @@ function CompareTable({ sessions }: { sessions: PaperSessionRow[] }) {
 
   return (
     <div className="card-surface overflow-x-auto rounded-md">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-[13px]">
         <thead>
           <tr className="border-b border-border-subtle text-left">
-            <th className="px-4 py-2.5 text-[10px] font-medium uppercase tracking-wider text-text-faint">세션</th>
-            <th className="px-4 py-2.5 text-[10px] font-medium uppercase tracking-wider text-text-faint">상태</th>
-            <th className="px-4 py-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">수익률</th>
-            <th className="px-4 py-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">
+            <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-text-muted">세션</th>
+            <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-text-muted">상태</th>
+            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">수익률</th>
+            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">
               <TermTooltip term="sharpe">Sharpe</TermTooltip>
             </th>
-            <th className="px-4 py-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">
+            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">
               <TermTooltip term="win_rate">승률</TermTooltip>
             </th>
-            <th className="px-4 py-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">
+            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">
               <TermTooltip term="mdd">MDD</TermTooltip>
             </th>
-            <th className="px-4 py-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-text-faint">거래</th>
+            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">거래</th>
           </tr>
         </thead>
         <tbody>
@@ -423,7 +423,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
               step={1_000_000}
               className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono-trading text-[13px] text-text-primary focus:border-[var(--accent)] focus:outline-none"
             />
-            <p className="mt-1 text-[10px] text-text-faint">
+            <p className="mt-1 text-[11px] text-text-muted">
               {formatKrwShort(capital)}
             </p>
           </div>

@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'
 import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
 import { BtcEmaCrossoverStrategy } from '../strategy/btc-ema-crossover.js'
@@ -224,6 +225,150 @@ backtestRoutes.post('/run', async (c) => {
     console.error('백테스트 실행 오류:', err)
     return c.json({ error: '백테스트 실행 중 오류가 발생했습니다' }, 500)
   }
+})
+
+/** POST /api/backtest/run/stream — SSE 스트리밍 백테스트 */
+backtestRoutes.post('/run/stream', async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = runBacktestSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: '잘못된 요청 파라미터', details: parsed.error.flatten() }, 400)
+  }
+
+  const { strategyId, initialCapital, params } = parsed.data
+
+  return streamSSE(c, async (stream) => {
+    try {
+      let strategy
+      if (strategyId === 'alt_mean_reversion') {
+        strategy = new AltMeanReversionStrategy(params)
+      } else if (strategyId === 'btc_ema_crossover') {
+        strategy = new BtcEmaCrossoverStrategy(params)
+      } else if (strategyId === 'btc_bollinger_reversion') {
+        strategy = new BtcBollingerReversionStrategy(params)
+      } else if (strategyId === 'alt_detection') {
+        strategy = new AltDetectionStrategy(params)
+      } else {
+        await stream.writeSSE({ data: JSON.stringify({ type: 'error', message: '지원하지 않는 전략' }), event: 'bt-error' })
+        return
+      }
+
+      const candleMap: CandleMap = new Map()
+      const exchange = strategy.config.exchange === 'okx' ? 'okx' : 'upbit'
+      const timeframe = strategy.config.timeframe
+
+      let symbols: string[]
+      if (exchange === 'okx') {
+        symbols = OKX_TARGET
+      } else {
+        const allKrw = await fetchUpbitKrwSymbols()
+        symbols = allKrw.slice(0, 20)
+      }
+
+      const totalSteps = 1 + symbols.length
+
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'progress', phase: 'candles', current: 0, total: totalSteps, detail: 'BTC 캔들 로딩...' }),
+        event: 'progress',
+      })
+
+      let btcCandles: Candle[]
+      if (exchange === 'okx') {
+        btcCandles = await fetchOkxDirect('BTC-USDT', timeframe, 2000)
+      } else {
+        btcCandles = await fetchUpbitDirect('KRW-BTC', timeframe, 2000)
+      }
+      if (btcCandles.length < 201) {
+        await stream.writeSSE({ data: JSON.stringify({ type: 'error', message: `BTC 캔들 부족 (${btcCandles.length}/201)` }), event: 'bt-error' })
+        return
+      }
+      candleMap.set('BTC', btcCandles)
+
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'progress', phase: 'candles', current: 1, total: totalSteps, detail: `BTC ${btcCandles.length}개 완료` }),
+        event: 'progress',
+      })
+
+      for (let i = 0; i < symbols.length; i++) {
+        const symbol = symbols[i]
+        await stream.writeSSE({
+          data: JSON.stringify({ type: 'progress', phase: 'candles', current: i + 2, total: totalSteps, detail: `${symbol} 캔들 로딩...` }),
+          event: 'progress',
+        })
+
+        try {
+          let candles: Candle[]
+          if (exchange === 'okx') {
+            candles = await fetchOkxDirect(`${symbol}-USDT`, timeframe, 2000)
+          } else {
+            candles = await fetchUpbitDirect(`KRW-${symbol}`, timeframe, 2000)
+          }
+          if (candles.length > 0) candleMap.set(symbol, candles)
+        } catch {
+          // skip
+        }
+      }
+
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'progress', phase: 'backtest', current: totalSteps, total: totalSteps, detail: '백테스트 실행 중...' }),
+        event: 'progress',
+      })
+
+      const result = runBacktest(strategy, candleMap, { initialCapital })
+
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'progress', phase: 'saving', current: totalSteps, total: totalSteps, detail: '결과 저장 중...' }),
+        event: 'progress',
+      })
+
+      const { data: saved, error: saveError } = await supabase
+        .from('backtest_results')
+        .insert({
+          user_id: null,
+          strategy: result.strategyId,
+          params: result.params,
+          timeframe: result.timeframe,
+          period_start: result.periodStart instanceof Date ? result.periodStart.toISOString().slice(0, 10) : result.periodStart,
+          period_end: result.periodEnd instanceof Date ? result.periodEnd.toISOString().slice(0, 10) : result.periodEnd,
+          total_return: result.totalReturn,
+          cagr: result.cagr,
+          sharpe_ratio: result.sharpeRatio,
+          max_drawdown: result.maxDrawdown,
+          win_rate: result.winRate,
+          total_trades: result.totalTrades,
+          avg_hold_hours: result.avgHoldHours,
+          equity_curve: result.equityCurve,
+        })
+        .select('id')
+        .single()
+
+      if (saveError) console.error('백테스트 결과 저장 오류:', saveError.message)
+
+      await stream.writeSSE({
+        data: JSON.stringify({
+          type: 'complete',
+          result: {
+            id: saved?.id ?? null,
+            ...result,
+            periodStart: result.periodStart instanceof Date ? result.periodStart.toISOString() : result.periodStart,
+            periodEnd: result.periodEnd instanceof Date ? result.periodEnd.toISOString() : result.periodEnd,
+            trades: result.trades.map((t) => ({
+              ...t,
+              entryTime: t.entryTime instanceof Date ? t.entryTime.toISOString() : t.entryTime,
+              exitTime: t.exitTime instanceof Date ? t.exitTime.toISOString() : t.exitTime,
+            })),
+          },
+        }),
+        event: 'complete',
+      })
+    } catch (err) {
+      console.error('SSE 백테스트 오류:', err)
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'error', message: '백테스트 실행 실패' }),
+        event: 'bt-error',
+      })
+    }
+  })
 })
 
 /** GET /api/backtest/results — 저장된 백테스트 결과 목록 */

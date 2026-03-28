@@ -31,7 +31,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
   return (
     <>
       <header className="flex h-12 items-center justify-between border-b border-border-subtle px-4 md:px-6">
-        <div className="flex items-center gap-3 text-[12px]">
+        <div className="flex items-center gap-3 text-[13px]">
           {/* 모바일 햄버거 */}
           <button
             onClick={onMenuToggle}
@@ -49,7 +49,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
           <div className="hidden h-3 w-px bg-border-subtle sm:block" />
           <div className="hidden items-center gap-2 sm:flex">
             <span className="text-text-muted">레짐</span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
               regimeState === 'risk_on'
                 ? 'bg-[var(--profit-bg)] text-profit'
                 : regimeState === 'risk_off'
@@ -65,7 +65,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
           {!loading && (
             user ? (
               <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground">
                   {user.email?.charAt(0).toUpperCase() ?? <User className="h-3 w-3" />}
                 </div>
                 <button
@@ -79,7 +79,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
             ) : (
               <button
                 onClick={() => setLoginOpen(true)}
-                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground transition-colors hover:brightness-110"
+                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-colors hover:brightness-110"
               >
                 <LogIn className="h-3 w-3" />
                 로그인

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   TrendingDown,
   Target,
@@ -9,6 +9,7 @@ import {
   Layers,
   Radio,
   Clock,
+  Radar,
 } from 'lucide-react'
 import { BtcCandleChart } from '../components/charts/BtcCandleChart'
 import { supabase } from '../lib/supabase'
@@ -167,7 +168,7 @@ export function DashboardPage() {
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">대시보드</h2>
-          <p className="text-[12px] text-text-muted">자산 현황과 매매 상태를 확인합니다</p>
+          <p className="text-[13px] text-text-muted">자산 현황과 매매 상태를 확인합니다</p>
         </div>
         {regime && <RegimeBadge regime={regime} />}
       </div>
@@ -201,6 +202,9 @@ export function DashboardPage() {
         />
       </div>
 
+      {/* 알트 탐지 현황 */}
+      <ScanStatusWidget />
+
       {/* 차트 + 사이드 */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3" style={{ minHeight: '440px' }}>
         <BtcCandleChart />
@@ -224,7 +228,7 @@ function KpiCard({ title, value, unit, sub, change, icon, variant }: {
 }) {
   return (
     <div className="card-surface group rounded-md p-4 transition-colors duration-200 hover:border-border">
-      <div className="flex items-center gap-1.5 text-text-faint">
+      <div className="flex items-center gap-1.5 text-text-muted">
         {icon}
         <p className="text-[11px] font-medium uppercase tracking-wider">{title}</p>
       </div>
@@ -234,7 +238,7 @@ function KpiCard({ title, value, unit, sub, change, icon, variant }: {
         }`}>
           {value}
         </span>
-        {unit && <span className="text-[11px] text-text-faint">{unit}</span>}
+        {unit && <span className="text-[11px] text-text-muted">{unit}</span>}
       </div>
       {change !== undefined && change !== null && (
         <div className={`mt-1.5 flex items-center gap-1 text-[11px] font-medium ${
@@ -242,10 +246,10 @@ function KpiCard({ title, value, unit, sub, change, icon, variant }: {
         }`}>
           {change >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
           {change >= 0 ? '+' : ''}{change.toFixed(2)}%
-          <span className="ml-1 text-text-faint">vs 어제</span>
+          <span className="ml-1 text-text-muted">vs 어제</span>
         </div>
       )}
-      {sub && <div className="mt-0.5 text-[10px] text-text-faint">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[11px] text-text-muted">{sub}</div>}
     </div>
   )
 }
@@ -264,7 +268,7 @@ function RegimeBadge({ regime }: { regime: RegimeState }) {
       <TermTooltip term="regime">
         {isOn ? 'RISK-ON' : 'RISK-OFF'}
       </TermTooltip>
-      <span className="text-text-faint">{timeAgo}</span>
+      <span className="text-text-muted">{timeAgo}</span>
     </div>
   )
 }
@@ -274,7 +278,7 @@ function SidePanel({ regime }: { regime: RegimeState | undefined }) {
     <div className="flex flex-col gap-3">
       {/* 레짐 */}
       <div className="card-surface rounded-md p-4">
-        <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-faint">
+        <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
           <Layers className="h-3 w-3" />
           BTC <TermTooltip term="regime">레짐</TermTooltip>
         </h3>
@@ -307,11 +311,11 @@ function SidePanel({ regime }: { regime: RegimeState | undefined }) {
 
       {/* 자산 배분 */}
       <div className="card-surface flex-1 rounded-md p-4">
-        <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-faint">
+        <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
           <Target className="h-3 w-3" />
           자산 배분
         </h3>
-        <div className="flex h-28 items-center justify-center text-[11px] text-text-faint">
+        <div className="flex h-28 items-center justify-center text-[12px] text-text-muted">
           Auth 연동 후 활성화
         </div>
       </div>
@@ -326,9 +330,9 @@ function RegimeRow({ label, value, pass }: {
 }) {
   return (
     <div className="flex items-center justify-between rounded-md bg-secondary px-3 py-2">
-      <span className="text-[11px] text-text-muted">{label}</span>
+      <span className="text-[12px] text-text-muted">{label}</span>
       <div className="flex items-center gap-2">
-        <span className="font-mono-trading text-[12px] font-medium">{value}</span>
+        <span className="font-mono-trading text-[13px] font-medium">{value}</span>
         <span className={`h-1.5 w-1.5 rounded-full ${pass ? 'bg-profit' : 'bg-loss'}`} />
       </div>
     </div>
@@ -339,21 +343,21 @@ function SignalFeed({ signals }: { signals: Signal[] }) {
   return (
     <div className="card-surface rounded-md p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-faint">
+        <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
           <Radio className="h-3 w-3" />
           최근 시그널
         </h3>
-        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[9px] text-text-faint">
+        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] text-text-muted">
           {signals.length}건
         </span>
       </div>
       {signals.length > 0 ? (
         <div className="space-y-1.5">
           {signals.map((sig) => (
-            <div key={sig.id} className="flex items-center gap-3 rounded-md bg-surface px-3 py-2 text-[12px]">
-              <span className="text-text-faint">{getTimeAgo(sig.created_at)}</span>
+            <div key={sig.id} className="flex items-center gap-3 rounded-md bg-surface px-3 py-2 text-[13px]">
+              <span className="text-text-muted">{getTimeAgo(sig.created_at)}</span>
               <span className="font-medium text-text-primary">{sig.symbol}</span>
-              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+              <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
                 sig.direction === 'buy'
                   ? 'bg-[var(--profit-bg)] text-profit'
                   : 'bg-[var(--loss-bg)] text-loss'
@@ -375,11 +379,62 @@ function SignalFeed({ signals }: { signals: Signal[] }) {
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-secondary">
               <Clock className="h-3.5 w-3.5 text-text-faint" />
             </div>
-            <p className="text-[12px] text-text-muted">시그널 기록 없음</p>
-            <p className="mt-0.5 text-[10px] text-text-faint">4시간마다 시그널이 생성됩니다</p>
+            <p className="text-[13px] text-text-muted">시그널 기록 없음</p>
+            <p className="mt-0.5 text-[11px] text-text-muted">4시간마다 시그널이 생성됩니다</p>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function ScanStatusWidget() {
+  const queryClient = useQueryClient()
+  // 탐지 페이지 캐시에서 마지막 스캔 결과 읽기
+  const strategies = ['composite', 'oversold', 'momentum', 'volume'] as const
+  let scanData: { totalScanned: number; detected: number; scannedAt: string; results: Array<{ symbol: string; score: number }> } | undefined
+
+  for (const s of strategies) {
+    const cached = queryClient.getQueryData<typeof scanData>(['detection-scan', s])
+    if (cached && (!scanData || cached.scannedAt > scanData.scannedAt)) {
+      scanData = cached
+    }
+  }
+
+  if (!scanData) return null
+
+  return (
+    <div className="card-surface flex flex-wrap items-center gap-4 rounded-md px-4 py-3">
+      <div className="flex items-center gap-1.5 text-text-muted">
+        <Radar className="h-3.5 w-3.5" />
+        <span className="text-[11px] font-semibold uppercase tracking-wider">알트 탐지</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-[12px]">
+        <span className="text-text-muted">스캔:</span>
+        <span className="font-mono-trading text-text-primary">{scanData.totalScanned}개</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-[12px]">
+        <span className="text-text-muted">감지:</span>
+        <span className={`font-mono-trading ${scanData.detected > 0 ? 'text-profit' : 'text-text-primary'}`}>
+          {scanData.detected}개
+        </span>
+      </div>
+      {scanData.results.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          {scanData.results.slice(0, 3).map((r) => (
+            <span
+              key={r.symbol}
+              className="rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]"
+            >
+              {r.symbol}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="ml-auto flex items-center gap-1 text-[11px] text-text-muted">
+        <Clock className="h-3 w-3" />
+        {getTimeAgo(scanData.scannedAt)}
+      </div>
     </div>
   )
 }
