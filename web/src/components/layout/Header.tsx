@@ -108,7 +108,7 @@ function ResetCountdown() {
 
   return (
     <div className="hidden items-center gap-1.5 rounded border border-border-subtle px-2 py-1 sm:flex">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">RESET</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">RESET</span>
       <span className="font-mono-trading text-[12px] font-semibold text-warning">{timeStr}</span>
     </div>
   )

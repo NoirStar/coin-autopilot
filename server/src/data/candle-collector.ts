@@ -30,24 +30,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** 업비트 KRW 마켓 심볼 캐시 (1시간 TTL) */
-let _upbitKrwCache: { symbols: string[]; fetchedAt: number } | null = null
+let _upbitKrwCache: { symbols: string[]; koreanNames: Map<string, string>; fetchedAt: number } | null = null
 const CACHE_TTL = 60 * 60 * 1000 // 1시간
 
-/**
- * 업비트 KRW 마켓 심볼 목록 동적 조회 (BTC 제외)
- * - /v1/market/all API 사용
- * - 1시간 캐싱
- */
-export async function fetchUpbitKrwSymbols(): Promise<string[]> {
-  if (_upbitKrwCache && Date.now() - _upbitKrwCache.fetchedAt < CACHE_TTL) {
-    return _upbitKrwCache.symbols
-  }
-
+async function _refreshUpbitKrwCache(): Promise<void> {
   const res = await fetch(`${UPBIT_API}/market/all?is_details=false`)
   if (!res.ok) {
     console.error(`업비트 마켓 조회 실패: ${res.status}`)
-    // 캐시 남아있으면 만료돼도 반환
-    if (_upbitKrwCache) return _upbitKrwCache.symbols
+    if (_upbitKrwCache) return
     throw new Error(`업비트 마켓 API 오류: ${res.status}`)
   }
 
@@ -57,13 +47,39 @@ export async function fetchUpbitKrwSymbols(): Promise<string[]> {
     english_name: string
   }>
 
-  const symbols = data
-    .filter((m) => m.market.startsWith('KRW-') && m.market !== 'KRW-BTC')
-    .map((m) => m.market.replace('KRW-', ''))
+  const symbols: string[] = []
+  const koreanNames = new Map<string, string>()
 
-  _upbitKrwCache = { symbols, fetchedAt: Date.now() }
+  for (const m of data) {
+    if (m.market.startsWith('KRW-') && m.market !== 'KRW-BTC') {
+      const sym = m.market.replace('KRW-', '')
+      symbols.push(sym)
+      koreanNames.set(sym, m.korean_name)
+    }
+  }
+
+  _upbitKrwCache = { symbols, koreanNames, fetchedAt: Date.now() }
   console.log(`[업비트] KRW 마켓 ${symbols.length}개 로드 완료`)
-  return symbols
+}
+
+/**
+ * 업비트 KRW 마켓 심볼 목록 동적 조회 (BTC 제외)
+ * - /v1/market/all API 사용
+ * - 1시간 캐싱
+ */
+export async function fetchUpbitKrwSymbols(): Promise<string[]> {
+  if (!_upbitKrwCache || Date.now() - _upbitKrwCache.fetchedAt >= CACHE_TTL) {
+    await _refreshUpbitKrwCache()
+  }
+  return _upbitKrwCache!.symbols
+}
+
+/** 심볼 → 한글 이름 맵 반환 (캐시 갱신 포함) */
+export async function fetchUpbitKoreanNameMap(): Promise<Map<string, string>> {
+  if (!_upbitKrwCache || Date.now() - _upbitKrwCache.fetchedAt >= CACHE_TTL) {
+    await _refreshUpbitKrwCache()
+  }
+  return _upbitKrwCache!.koreanNames
 }
 
 /**

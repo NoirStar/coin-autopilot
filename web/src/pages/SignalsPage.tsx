@@ -221,7 +221,7 @@ function IndicatorCard({ label, value, detail, positive }: {
 }) {
   return (
     <div className="rounded-md bg-secondary p-2.5">
-      <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-text-muted">{label}</p>
+      <p className="mb-1 text-[12px] font-semibold text-text-muted">{label}</p>
       <p className={`font-mono-trading text-[15px] font-bold ${
         positive === true ? 'text-profit' : positive === false ? 'text-loss' : 'text-text-primary'
       }`}>
@@ -336,7 +336,7 @@ function SignalList() {
   return (
     <div className="card-surface overflow-hidden rounded-md">
       <div className="px-4 py-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-text-faint">활성 시그널</h2>
+        <h2 className="text-[12px] font-semibold text-text-faint">활성 시그널</h2>
       </div>
 
       {/* 데스크톱 */}
@@ -344,15 +344,15 @@ function SignalList() {
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-t border-border-subtle text-left">
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">종목</th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">방향</th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">종목</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">방향</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">
                 <TermTooltip term="z_score">z-score</TermTooltip>
               </th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">
                 <TermTooltip term="rsi">RSI</TermTooltip>
               </th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">시각</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">시각</th>
               <th className="px-4 py-2" />
             </tr>
           </thead>

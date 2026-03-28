@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { scoreMultipleCoins, computeDetectionScore, type DetectionStrategy } from '../detector/composite-scorer.js'
-import { fetchUpbitKrwSymbols } from '../data/candle-collector.js'
+import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap } from '../data/candle-collector.js'
 import type { Candle } from '../strategy/strategy-base.js'
 
 export const detectionRoutes = new Hono()
@@ -73,6 +73,7 @@ detectionRoutes.get('/scan/stream', async (c) => {
       const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
 
       const allKrwSymbols = await fetchUpbitKrwSymbols()
+      const koreanNames = await fetchUpbitKoreanNameMap()
       const total = allKrwSymbols.length
 
       await stream.writeSSE({
@@ -139,6 +140,7 @@ detectionRoutes.get('/scan/stream', async (c) => {
           detected: results.length,
           results: results.map((r) => ({
             symbol: r.symbol,
+            koreanName: koreanNames.get(r.symbol) ?? r.symbol,
             score: r.score,
             rsi14: r.rsi14,
             atrPct: r.atrPct,

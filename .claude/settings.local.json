@@ -17,7 +17,8 @@
       "Bash(wc:*)",
       "Bash(npx vite:*)",
       "Bash(npx vitest:*)",
-      "Bash(ls -la /mnt/c/Dev/coin-autopilot/web/*.*)"
+      "Bash(ls -la /mnt/c/Dev/coin-autopilot/web/*.*)",
+      "Bash(npm run:*)"
     ]
   }
 }

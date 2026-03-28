@@ -125,7 +125,7 @@ export function BacktestPage() {
 
       {/* 설정 패널 */}
       <div className="card-surface rounded-md p-5">
-        <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-text-muted">백테스트 설정</h3>
+        <h3 className="mb-4 text-[12px] font-semibold text-text-muted">백테스트 설정</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <InputField label="전략" value="BTC 레짐 + 알트 평균회귀" disabled />
           <InputField label="타임프레임" value="4H" disabled />
@@ -289,7 +289,7 @@ function BacktestResults({ result }: { result: BacktestResultData }) {
       {/* 에퀴티 커브 */}
       {result.equityCurve.length > 0 && (
         <div className="card-surface rounded-md p-4">
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+          <h3 className="mb-3 text-[12px] font-semibold text-text-muted">
             에퀴티 커브
           </h3>
           <div className="h-[280px] sm:h-[320px]">
@@ -358,7 +358,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
   return (
     <div className="card-surface overflow-hidden rounded-md">
       <div className="flex items-center justify-between px-4 py-3">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="text-[12px] font-semibold text-text-muted">
           거래 내역 ({trades.length}건)
         </h3>
         <div className="flex gap-1">
@@ -386,12 +386,12 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-t border-border-subtle text-left">
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">시각</th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">종목</th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">진입가</th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">청산가</th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">PnL</th>
-              <th className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">사유</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">시각</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">종목</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">진입가</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">청산가</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">PnL</th>
+              <th className="px-4 py-2 text-[12px] font-semibold text-text-muted">사유</th>
             </tr>
           </thead>
           <tbody>
@@ -466,7 +466,7 @@ function KpiCard({ label, value, sub, icon, variant }: {
     <div className="card-surface rounded-md p-3">
       <div className="flex items-center gap-1 text-text-muted">
         {icon}
-        <span className="text-[11px] font-medium uppercase tracking-wider">{label}</span>
+        <span className="text-[12px] font-semibold">{label}</span>
       </div>
       <div className={`mt-1.5 font-mono-trading text-lg font-bold ${
         variant === 'profit' ? 'text-profit' :

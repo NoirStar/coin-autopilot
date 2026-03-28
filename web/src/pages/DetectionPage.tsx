@@ -24,6 +24,7 @@ interface DetectionSignal {
 
 interface DetectionResult {
   symbol: string
+  koreanName?: string
   score: number
   detected?: boolean
   rsi14: number
@@ -101,7 +102,7 @@ export function DetectionPage() {
       }),
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    enabled: false,
   })
 
   return (
@@ -110,7 +111,7 @@ export function DetectionPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">알트코인 탐지</h1>
           <p className="text-[13px] text-text-muted">
-            실시간 업비트 KRW 마켓 스캔 — 전략별 필터링
+            업비트 KRW 마켓 · <span className="font-mono-trading">1시간봉</span> 기준 · 수동 스캔
           </p>
         </div>
         <button
@@ -177,7 +178,7 @@ export function DetectionPage() {
               </span>
             </div>
             <span className="font-mono-trading text-text-muted">
-              {scanProgress ? `${scanProgress.current}/${scanProgress.total}` : '0/?'}
+              {scanProgress ? `${scanProgress.current}/${scanProgress.total}` : '준비 중...'}
             </span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
@@ -222,7 +223,7 @@ export function DetectionPage() {
       {/* 탐지 결과 */}
       {data && data.results.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+          <h2 className="text-[12px] font-semibold text-text-muted">
             탐지 결과 ({data.results.length}개)
           </h2>
           {data.results.map((result) => (
@@ -259,8 +260,12 @@ function DetectionCard({ result, strategy }: { result: DetectionResult; strategy
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3">
-          <span className="text-[15px] font-semibold text-text-primary">{result.symbol}</span>
+          <div className="flex flex-col">
+            <span className="text-[15px] font-semibold text-text-primary">{result.koreanName || result.symbol}</span>
+            <span className="text-[11px] text-text-muted">{result.symbol}</span>
+          </div>
           <ScoreBadge score={result.score} strategy={strategy} />
+          <RecommendBadge result={result} strategy={strategy} />
           {result.changePct !== 0 && (
             <span className={`flex items-center gap-0.5 font-mono-trading text-[11px] ${result.changePct > 0 ? 'text-profit' : 'text-loss'}`}>
               {result.changePct > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -363,6 +368,45 @@ function ScoreBadge({ score, strategy }: { score: number; strategy: StrategyType
   )
 }
 
+function getRecommendation(result: DetectionResult, strategy: StrategyType): { label: string; color: string } | null {
+  const { score, rsi14, signals } = result
+  const activeCount = Object.values(signals).filter((s) => s.active).length
+
+  // 매도 주의 (과매수)
+  if (rsi14 >= 70) {
+    return { label: '매도 주의', color: 'bg-[var(--loss-bg)] text-loss' }
+  }
+
+  if (strategy === 'composite') {
+    if (score >= 0.8 && activeCount >= 4) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
+    if (score >= 0.8) return { label: '매수 추천', color: 'bg-[var(--profit-bg)] text-profit' }
+    if (score >= 0.6) return { label: '매수 관심', color: 'bg-[var(--warning-bg)] text-warning' }
+  } else if (strategy === 'oversold') {
+    if (rsi14 <= 25) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
+    if (rsi14 <= 30) return { label: '매수 추천', color: 'bg-[var(--profit-bg)] text-profit' }
+    return { label: '과매도 관심', color: 'bg-[var(--warning-bg)] text-warning' }
+  } else if (strategy === 'momentum') {
+    if (rsi14 >= 55 && rsi14 <= 65 && result.changePct > 0) return { label: '추세 매수', color: 'bg-[var(--profit-bg)] text-profit' }
+    return { label: '모멘텀 관심', color: 'bg-[var(--warning-bg)] text-warning' }
+  } else if (strategy === 'volume') {
+    const volZ = signals.volumeZScore.value as number
+    if (volZ > 3 && result.changePct > 0) return { label: '거래량 매수', color: 'bg-[var(--profit-bg)] text-profit' }
+    return { label: '거래량 관심', color: 'bg-[var(--warning-bg)] text-warning' }
+  }
+
+  return null
+}
+
+function RecommendBadge({ result, strategy }: { result: DetectionResult; strategy: StrategyType }) {
+  const rec = getRecommendation(result, strategy)
+  if (!rec) return null
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${rec.color}`}>
+      {rec.label}
+    </span>
+  )
+}
+
 function MetricPill({ label, value, color }: { label: string; value: string; color: string }) {
   const colorClass = color === 'profit' ? 'text-profit' : color === 'loss' ? 'text-loss' : color === 'warning' ? 'text-warning' : 'text-text-muted'
   return (
@@ -378,7 +422,7 @@ function MetricBox({ label, value, desc, color }: { label: string; value: string
     <div className="rounded-md bg-secondary p-2 text-center">
       <div className="text-[11px] text-text-muted">{label}</div>
       <div className={`font-mono-trading text-[14px] font-semibold ${colorClass}`}>{value}</div>
-      {desc && <div className="text-[10px] text-text-muted">{desc}</div>}
+      {desc && <div className="text-[11px] text-text-muted">{desc}</div>}
     </div>
   )
 }

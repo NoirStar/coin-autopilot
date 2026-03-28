@@ -230,7 +230,7 @@ function KpiCard({ title, value, unit, sub, change, icon, variant }: {
     <div className="card-surface group rounded-md p-4 transition-colors duration-200 hover:border-border">
       <div className="flex items-center gap-1.5 text-text-muted">
         {icon}
-        <p className="text-[11px] font-medium uppercase tracking-wider">{title}</p>
+        <p className="text-[12px] font-semibold">{title}</p>
       </div>
       <div className="mt-2.5 flex items-baseline gap-1.5">
         <span className={`font-mono-trading text-2xl font-bold tracking-tight ${
@@ -278,7 +278,7 @@ function SidePanel({ regime }: { regime: RegimeState | undefined }) {
     <div className="flex flex-col gap-3">
       {/* 레짐 */}
       <div className="card-surface rounded-md p-4">
-        <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-text-muted">
           <Layers className="h-3 w-3" />
           BTC <TermTooltip term="regime">레짐</TermTooltip>
         </h3>
@@ -311,7 +311,7 @@ function SidePanel({ regime }: { regime: RegimeState | undefined }) {
 
       {/* 자산 배분 */}
       <div className="card-surface flex-1 rounded-md p-4">
-        <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-text-muted">
           <Target className="h-3 w-3" />
           자산 배분
         </h3>
@@ -343,11 +343,11 @@ function SignalFeed({ signals }: { signals: Signal[] }) {
   return (
     <div className="card-surface rounded-md p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+        <h3 className="flex items-center gap-1.5 text-[12px] font-semibold text-text-muted">
           <Radio className="h-3 w-3" />
           최근 시그널
         </h3>
-        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] text-text-muted">
+        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[11px] text-text-muted">
           {signals.length}건
         </span>
       </div>
@@ -407,7 +407,7 @@ function ScanStatusWidget() {
     <div className="card-surface flex flex-wrap items-center gap-4 rounded-md px-4 py-3">
       <div className="flex items-center gap-1.5 text-text-muted">
         <Radar className="h-3.5 w-3.5" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider">알트 탐지</span>
+        <span className="text-[12px] font-semibold">알트 탐지</span>
       </div>
       <div className="flex items-center gap-1.5 text-[12px]">
         <span className="text-text-muted">스캔:</span>

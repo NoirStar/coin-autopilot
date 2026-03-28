@@ -154,13 +154,13 @@ export function PortfolioPage() {
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-border-subtle text-left">
-                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">시각</th>
-                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">거래소</th>
-                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">종목</th>
-                    <th className="px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">방향</th>
-                    <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">진입가</th>
-                    <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">청산가</th>
-                    <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">PnL</th>
+                    <th className="px-3 py-2 text-[12px] font-semibold text-text-muted">시각</th>
+                    <th className="px-3 py-2 text-[12px] font-semibold text-text-muted">거래소</th>
+                    <th className="px-3 py-2 text-[12px] font-semibold text-text-muted">종목</th>
+                    <th className="px-3 py-2 text-[12px] font-semibold text-text-muted">방향</th>
+                    <th className="px-3 py-2 text-right text-[12px] font-semibold text-text-muted">진입가</th>
+                    <th className="px-3 py-2 text-right text-[12px] font-semibold text-text-muted">청산가</th>
+                    <th className="px-3 py-2 text-right text-[12px] font-semibold text-text-muted">PnL</th>
                   </tr>
                 </thead>
                 <tbody>

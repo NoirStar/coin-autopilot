@@ -289,7 +289,7 @@ function KpiCard({ label, value, sub, positive }: {
 }) {
   return (
     <div className="rounded-md bg-secondary p-3">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">{label}</p>
+      <p className="text-[12px] font-semibold text-text-muted">{label}</p>
       <p className="mt-1 font-mono-trading text-[16px] font-bold text-text-primary">{value}</p>
       {sub && (
         <p className={`mt-0.5 font-mono-trading text-[11px] ${
@@ -317,19 +317,19 @@ function CompareTable({ sessions }: { sessions: PaperSessionRow[] }) {
       <table className="w-full text-[13px]">
         <thead>
           <tr className="border-b border-border-subtle text-left">
-            <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-text-muted">세션</th>
-            <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-text-muted">상태</th>
-            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">수익률</th>
-            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">
+            <th className="px-4 py-2.5 text-[12px] font-semibold text-text-muted">세션</th>
+            <th className="px-4 py-2.5 text-[12px] font-semibold text-text-muted">상태</th>
+            <th className="px-4 py-2.5 text-right text-[12px] font-semibold text-text-muted">수익률</th>
+            <th className="px-4 py-2.5 text-right text-[12px] font-semibold text-text-muted">
               <TermTooltip term="sharpe">Sharpe</TermTooltip>
             </th>
-            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">
+            <th className="px-4 py-2.5 text-right text-[12px] font-semibold text-text-muted">
               <TermTooltip term="win_rate">승률</TermTooltip>
             </th>
-            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">
+            <th className="px-4 py-2.5 text-right text-[12px] font-semibold text-text-muted">
               <TermTooltip term="mdd">MDD</TermTooltip>
             </th>
-            <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-text-muted">거래</th>
+            <th className="px-4 py-2.5 text-right text-[12px] font-semibold text-text-muted">거래</th>
           </tr>
         </thead>
         <tbody>

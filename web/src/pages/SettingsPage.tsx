@@ -133,7 +133,7 @@ export function SettingsPage() {
 function StatusItem({ label, value, active }: { label: string; value: string; active?: boolean }) {
   return (
     <div>
-      <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">{label}</p>
+      <p className="text-[12px] font-semibold text-text-muted">{label}</p>
       <p className="mt-0.5 flex items-center gap-1.5 text-[13px] font-medium text-text-primary">
         {active && <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />}
         {value}
@@ -476,7 +476,7 @@ function AlertSection({ settings, isLoading }: { settings: UserSettings | undefi
       </div>
 
       <div className="mt-4 border-t border-border-subtle pt-4">
-        <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-muted">알림 조건</p>
+        <p className="mb-2.5 text-[12px] font-semibold text-text-muted">알림 조건</p>
         <div className="space-y-2">
           {alertConditions.map((condition) => (
             <label key={condition.key} className="flex items-center justify-between text-[12px]">
