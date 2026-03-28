@@ -84,6 +84,9 @@ export class BtcEmaCrossoverStrategy implements Strategy {
       const latestTrend = trendEmaValues[trendEmaValues.length - 1]
       const latestAdx = adxValues[adxValues.length - 1]
 
+      // NaN 방어: 지표 값이 유효하지 않으면 스킵
+      if ([latestClose, latestFast, latestSlow, prevFast, prevSlow, latestTrend, latestAdx].some(v => !Number.isFinite(v))) continue
+
       // 크로스 감지 (이전 캔들에서 교차 발생)
       const goldenCross = prevFast <= prevSlow && latestFast > latestSlow
       const deathCross = prevFast >= prevSlow && latestFast < latestSlow
@@ -211,8 +214,8 @@ export class BtcEmaCrossoverStrategy implements Strategy {
 
           // 트레일링 스탑 발동: peak 대비 가격이 trailDistance만큼 되돌림
           const trailHit = isLong
-            ? currentPrice <= trailStop && trailStop > pos.entryPrice
-            : currentPrice >= trailStop && trailStop < pos.entryPrice
+            ? currentPrice <= trailStop
+            : currentPrice >= trailStop
 
           if (trailHit) {
             exits.push({

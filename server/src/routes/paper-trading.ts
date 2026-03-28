@@ -57,6 +57,7 @@ paperTradingRoutes.post('/session', async (c) => {
     .insert({
       user_id: userId,
       strategy_id: parsed.data.strategyId ?? null,
+      strategy_type: parsed.data.strategyType ?? null,
       name: parsed.data.name,
       initial_capital: parsed.data.initialCapital,
       current_equity: parsed.data.initialCapital,

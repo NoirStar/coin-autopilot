@@ -19,7 +19,7 @@ const DEFAULT_PARAMS = {
   atrStopMult: 1.5,
   atrTrailMult: 2.5,
   timeLimitCandles: 24,     // 24 x 1H = 24시간
-  leverage: 3,
+  leverage: 2,
   volumeMultiplier: 1.2,
 }
 
@@ -89,6 +89,9 @@ export class BtcMacdMomentumStrategy implements Strategy {
       const latestRsi = rsiValues[rsiValues.length - 1]
       const latestAdx = adxValues[adxValues.length - 1]
       const latestTrend = trendEmaValues[trendEmaValues.length - 1]
+
+      // NaN 방어: 지표 값이 유효하지 않으면 스킵
+      if ([latestClose, latestMacd.macd, latestMacd.signal, latestMacd.histogram, latestRsi, latestAdx, latestTrend].some(v => !Number.isFinite(v))) continue
 
       // ADX 필터: 트렌드가 충분히 강한지
       if (latestAdx < adxThreshold) continue
@@ -220,8 +223,8 @@ export class BtcMacdMomentumStrategy implements Strategy {
             : peak * (1 + trailDistance)
 
           const trailHit = isLong
-            ? currentPrice <= trailStop && trailStop > pos.entryPrice
-            : currentPrice >= trailStop && trailStop < pos.entryPrice
+            ? currentPrice <= trailStop
+            : currentPrice >= trailStop
 
           if (trailHit) {
             exits.push({

@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
 import { BtcEmaCrossoverStrategy } from '../strategy/btc-ema-crossover.js'
 import { BtcBollingerReversionStrategy } from '../strategy/btc-bollinger-reversion.js'
+import { BtcMacdMomentumStrategy } from '../strategy/btc-macd-momentum.js'
+import { BtcDonchianBreakoutStrategy } from '../strategy/btc-donchian-breakout.js'
 import { AltDetectionStrategy } from '../strategy/alt-detection-strategy.js'
 import { runBacktest } from '../services/backtest-engine.js'
 import { fetchUpbitKrwSymbols } from '../data/candle-collector.js'
@@ -187,7 +189,7 @@ async function fetchOkxDirect(instId: string, tf: Timeframe, count: number): Pro
 const OKX_TARGET = ['ETH']
 
 const runBacktestSchema = z.object({
-  strategyId: z.enum(['alt_mean_reversion', 'btc_ema_crossover', 'btc_bollinger_reversion', 'alt_detection']).default('alt_mean_reversion'),
+  strategyId: z.enum(['alt_mean_reversion', 'btc_ema_crossover', 'btc_bollinger_reversion', 'btc_macd_momentum', 'btc_donchian_breakout', 'alt_detection']).default('alt_mean_reversion'),
   initialCapital: z.number().min(100_000).max(1_000_000_000).default(10_000_000),
   params: z.object({
     zScoreEntry: z.number().min(-3).max(0).optional(),
@@ -218,6 +220,10 @@ backtestRoutes.post('/run/stream', async (c) => {
         strategy = new BtcEmaCrossoverStrategy(params)
       } else if (strategyId === 'btc_bollinger_reversion') {
         strategy = new BtcBollingerReversionStrategy(params)
+      } else if (strategyId === 'btc_macd_momentum') {
+        strategy = new BtcMacdMomentumStrategy(params)
+      } else if (strategyId === 'btc_donchian_breakout') {
+        strategy = new BtcDonchianBreakoutStrategy(params)
       } else if (strategyId === 'alt_detection') {
         strategy = new AltDetectionStrategy(params)
       } else {
@@ -354,6 +360,10 @@ backtestRoutes.post('/run', async (c) => {
       strategy = new BtcEmaCrossoverStrategy(params)
     } else if (strategyId === 'btc_bollinger_reversion') {
       strategy = new BtcBollingerReversionStrategy(params)
+    } else if (strategyId === 'btc_macd_momentum') {
+      strategy = new BtcMacdMomentumStrategy(params)
+    } else if (strategyId === 'btc_donchian_breakout') {
+      strategy = new BtcDonchianBreakoutStrategy(params)
     } else if (strategyId === 'alt_detection') {
       strategy = new AltDetectionStrategy(params)
     } else {

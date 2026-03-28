@@ -44,7 +44,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
           {/* 모바일 햄버거 */}
           <button
             onClick={onMenuToggle}
-            className="rounded-md p-1.5 text-text-muted hover:bg-surface-hover lg:hidden"
+            className="rounded-md p-2.5 text-text-muted hover:bg-surface-hover lg:hidden"
           >
             <Menu className="h-4 w-4" />
           </button>
@@ -91,7 +91,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
             ) : (
               <button
                 onClick={() => setLoginOpen(true)}
-                className="flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:brightness-110"
+                className="flex items-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 text-[12px] font-medium text-background transition-colors hover:brightness-110"
               >
                 <LogIn className="h-3 w-3" />
                 로그인

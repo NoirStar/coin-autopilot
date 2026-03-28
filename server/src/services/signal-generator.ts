@@ -2,12 +2,20 @@ import { supabase } from './database.js'
 import { fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import { evaluateRegime, type RegimeDetail } from '../strategy/btc-regime-filter.js'
 import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
+import { BtcEmaCrossoverStrategy } from '../strategy/btc-ema-crossover.js'
+import { BtcBollingerReversionStrategy } from '../strategy/btc-bollinger-reversion.js'
+import { BtcMacdMomentumStrategy } from '../strategy/btc-macd-momentum.js'
+import { BtcDonchianBreakoutStrategy } from '../strategy/btc-donchian-breakout.js'
 import type { Candle, CandleMap, RegimeState, Strategy, Timeframe } from '../strategy/strategy-base.js'
 
 const UPBIT_API = 'https://api.upbit.com/v1'
+const OKX_API = 'https://www.okx.com/api/v5'
 
 const UPBIT_TF_MINUTES: Partial<Record<Timeframe, number>> = {
   '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440,
+}
+const OKX_BAR: Partial<Record<Timeframe, string>> = {
+  '5m': '5m', '15m': '15m', '1h': '1H', '4h': '4H', '1d': '1D',
 }
 
 function sleep(ms: number): Promise<void> {
@@ -53,9 +61,57 @@ async function fetchUpbitDirect(market: string, tf: Timeframe, count: number): P
   return all
 }
 
-/** 등록된 전략 목록 */
-const strategies: Strategy[] = [
+/** OKX에서 직접 캔들 수집 (페이징) */
+async function fetchOkxDirect(instId: string, tf: Timeframe, count: number): Promise<Candle[]> {
+  const bar = OKX_BAR[tf] ?? '4H'
+  const all: Candle[] = []
+  let after: string | undefined
+
+  while (all.length < count) {
+    const limit = Math.min(100, count - all.length)
+    const url = new URL(`${OKX_API}/market/candles`)
+    url.searchParams.set('instId', instId)
+    url.searchParams.set('bar', bar)
+    url.searchParams.set('limit', String(limit))
+    if (after) url.searchParams.set('after', after)
+
+    const res = await fetch(url.toString())
+    if (!res.ok) break
+
+    const json = await res.json() as { data: string[][] }
+    if (!json.data || json.data.length === 0) break
+
+    const candles = json.data.map((d) => ({
+      openTime: new Date(parseInt(d[0])),
+      open: parseFloat(d[1]), high: parseFloat(d[2]),
+      low: parseFloat(d[3]), close: parseFloat(d[4]),
+      volume: parseFloat(d[5]),
+    }))
+
+    all.unshift(...candles.reverse())
+    after = json.data[json.data.length - 1][0]
+    await sleep(100)
+    if (json.data.length < limit) break
+  }
+
+  return all
+}
+
+/** 등록된 전략 목록 — 업비트 현물 */
+const upbitStrategies: Strategy[] = [
   new AltMeanReversionStrategy(),
+]
+
+/** 등록된 전략 목록 — OKX 선물 (4H 타임프레임) */
+const okx4hStrategies: Strategy[] = [
+  new BtcEmaCrossoverStrategy(),
+  new BtcBollingerReversionStrategy(),
+]
+
+/** 등록된 전략 목록 — OKX 선물 (1H 타임프레임) */
+const okx1hStrategies: Strategy[] = [
+  new BtcMacdMomentumStrategy(),
+  new BtcDonchianBreakoutStrategy(),
 ]
 
 let previousRegime: RegimeState = 'risk_off'
@@ -99,17 +155,62 @@ export async function generateSignals(): Promise<void> {
     // 레짐 상태 저장
     await saveRegimeState(regimeDetail)
 
-    // 4. 각 전략에서 시그널 생성
-    for (const strategy of strategies) {
+    // 4. 업비트 전략 시그널 생성 (알트 평균회귀)
+    for (const strategy of upbitStrategies) {
       const signals = strategy.evaluate(candleMap, regimeDetail.regime)
       console.log(`[시그널] ${strategy.config.name}: ${signals.length}개 시그널`)
 
-      // 동시 5종목 초과 억제
       const activeSignals = signals.slice(0, 5)
-
-      // 시그널 저장
       for (const signal of activeSignals) {
         await saveSignal(strategy.config.id, signal.symbol, signal.direction, signal.reasoning, regimeDetail.regime)
+      }
+    }
+
+    // 5. OKX 4H 캔들 수집 (BTC, ETH USDT 선물)
+    console.log('[시그널] OKX 4H 캔들 수집 중...')
+    const okx4hMap: CandleMap = new Map()
+    try {
+      const btcOkx4h = await fetchOkxDirect('BTC-USDT', '4h', 500)
+      if (btcOkx4h.length > 0) okx4hMap.set('BTC', btcOkx4h)
+      const ethOkx4h = await fetchOkxDirect('ETH-USDT', '4h', 500)
+      if (ethOkx4h.length > 0) okx4hMap.set('ETH', ethOkx4h)
+    } catch (err) {
+      console.error('[시그널] OKX 4H 캔들 수집 오류:', err)
+    }
+
+    if (okx4hMap.size > 0) {
+      for (const strategy of okx4hStrategies) {
+        const signals = strategy.evaluate(okx4hMap, regimeDetail.regime)
+        console.log(`[시그널] ${strategy.config.name}: ${signals.length}개 시그널`)
+
+        const activeSignals = signals.slice(0, 3)
+        for (const signal of activeSignals) {
+          await saveSignal(strategy.config.id, signal.symbol, signal.direction, signal.reasoning, regimeDetail.regime)
+        }
+      }
+    }
+
+    // 6. OKX 1H 캔들 수집 (MACD, 돈치안 전략용)
+    console.log('[시그널] OKX 1H 캔들 수집 중...')
+    const okx1hMap: CandleMap = new Map()
+    try {
+      const btcOkx1h = await fetchOkxDirect('BTC-USDT', '1h', 500)
+      if (btcOkx1h.length > 0) okx1hMap.set('BTC', btcOkx1h)
+      const ethOkx1h = await fetchOkxDirect('ETH-USDT', '1h', 500)
+      if (ethOkx1h.length > 0) okx1hMap.set('ETH', ethOkx1h)
+    } catch (err) {
+      console.error('[시그널] OKX 1H 캔들 수집 오류:', err)
+    }
+
+    if (okx1hMap.size > 0) {
+      for (const strategy of okx1hStrategies) {
+        const signals = strategy.evaluate(okx1hMap, regimeDetail.regime)
+        console.log(`[시그널] ${strategy.config.name}: ${signals.length}개 시그널`)
+
+        const activeSignals = signals.slice(0, 3)
+        for (const signal of activeSignals) {
+          await saveSignal(strategy.config.id, signal.symbol, signal.direction, signal.reasoning, regimeDetail.regime)
+        }
       }
     }
 

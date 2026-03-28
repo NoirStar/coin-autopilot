@@ -375,10 +375,19 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [capital, setCapital] = useState(10_000_000)
+  const [strategyType, setStrategyType] = useState('alt_mean_reversion')
+
+  const strategyOptions = [
+    { id: 'alt_mean_reversion', name: '알트 평균회귀 (Upbit 현물)' },
+    { id: 'btc_ema_crossover', name: 'BTC EMA 크로스오버 (OKX 선물)' },
+    { id: 'btc_bollinger_reversion', name: 'BTC 볼린저 평균회귀 (OKX 선물)' },
+    { id: 'btc_macd_momentum', name: 'BTC MACD 모멘텀 (OKX 선물)' },
+    { id: 'btc_donchian_breakout', name: 'BTC 돈치안 브레이크아웃 (OKX 선물)' },
+  ]
 
   const createMutation = useMutation({
     mutationFn: () =>
-      api.startPaperSession({ name, initialCapital: capital }),
+      api.startPaperSession({ name, initialCapital: capital, strategyType }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['paper-sessions'] })
       onClose()
@@ -401,6 +410,19 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="mt-5 space-y-4">
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-text-muted">전략</label>
+            <select
+              value={strategyType}
+              onChange={(e) => setStrategyType(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-text-primary focus:border-[var(--accent)] focus:outline-none"
+            >
+              {strategyOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="mb-1.5 block text-[12px] font-medium text-text-muted">세션 이름</label>
             <input

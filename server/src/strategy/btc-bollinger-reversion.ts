@@ -76,6 +76,9 @@ export class BtcBollingerReversionStrategy implements Strategy {
       const latestRsi = rsiValues[rsiValues.length - 1]
       const latestTrend = trendEmaValues[trendEmaValues.length - 1]
 
+      // NaN 방어: 지표 값이 유효하지 않으면 스킵
+      if ([latestClose, prevClose, latestBB.upper, latestBB.lower, latestBB.middle, latestRsi, latestTrend].some(v => !Number.isFinite(v))) continue
+
       // 볼린저 밴드 폭 (스퀴즈 감지 — 밴드가 너무 좁으면 진입 금지)
       const bandwidth = (latestBB.upper - latestBB.lower) / latestBB.middle
       if (bandwidth < 0.02) continue  // 극단적 스퀴즈 중에는 진입 금지

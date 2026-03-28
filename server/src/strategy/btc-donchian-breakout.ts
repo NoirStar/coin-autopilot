@@ -11,11 +11,11 @@ import type {
 const DEFAULT_PARAMS = {
   donchianPeriod: 20,
   atrPeriod: 14,
-  atrStopMult: 2.0,
+  atrStopMult: 1.5,
   atrTrailMult: 3.0,
   volumeMultiplier: 2.0,
   timeLimitCandles: 20,     // 20 x 1H = 20시간
-  leverage: 3,
+  leverage: 2,
 }
 
 /**
@@ -76,6 +76,9 @@ export class BtcDonchianBreakoutStrategy implements Strategy {
       const prevDc = dcValues[dcValues.length - 2]
       const latestAtrPct = atrPctValues[atrPctValues.length - 1]
       const prevAtrPct = atrPctValues[atrPctValues.length - 2]
+
+      // NaN 방어: 지표 값이 유효하지 않으면 스킵
+      if ([latestClose, prevClose, prevDc.upper, prevDc.lower, latestAtrPct, prevAtrPct].some(v => !Number.isFinite(v))) continue
 
       // ATR 확장 중: 현재 ATR > 이전 ATR
       const atrExpanding = latestAtrPct > prevAtrPct
@@ -208,8 +211,8 @@ export class BtcDonchianBreakoutStrategy implements Strategy {
             : peak * (1 + trailDistance)
 
           const trailHit = isLong
-            ? currentPrice <= trailStop && trailStop > pos.entryPrice
-            : currentPrice >= trailStop && trailStop < pos.entryPrice
+            ? currentPrice <= trailStop
+            : currentPrice >= trailStop
 
           if (trailHit) {
             exits.push({

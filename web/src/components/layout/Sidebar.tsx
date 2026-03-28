@@ -92,7 +92,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               <button
                 type="button"
                 onClick={() => toggleSection(cat.label)}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-[12px] font-semibold text-text-muted transition-colors hover:text-text-secondary"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:text-text-secondary"
               >
                 {isOpen ? (
                   <ChevronDown className="h-3.5 w-3.5" />
@@ -112,7 +112,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       to={item.to}
                       onClick={onNavigate}
                       className={({ isActive }) =>
-                        `flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
+                        `flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
                           isActive
                             ? 'bg-[var(--accent-bg)] text-text-primary'
                             : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'

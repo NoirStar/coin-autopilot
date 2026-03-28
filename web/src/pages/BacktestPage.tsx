@@ -47,6 +47,7 @@ interface BacktestResultData {
 }
 
 export function BacktestPage() {
+  const [selectedStrategy, setSelectedStrategy] = useState('alt_mean_reversion')
   const [initialCapital, setInitialCapital] = useState(10_000_000)
   const [zScoreEntry, setZScoreEntry] = useState(-1.0)
   const [rsiMax, setRsiMax] = useState(78)
@@ -59,6 +60,16 @@ export function BacktestPage() {
     detail: string
   } | null>(null)
 
+  const strategyOptions = [
+    { id: 'alt_mean_reversion', name: '알트 평균회귀 (Upbit 현물)', timeframe: '4H' },
+    { id: 'btc_ema_crossover', name: 'BTC EMA 크로스오버 (OKX 선물)', timeframe: '4H' },
+    { id: 'btc_bollinger_reversion', name: 'BTC 볼린저 평균회귀 (OKX 선물)', timeframe: '4H' },
+    { id: 'btc_macd_momentum', name: 'BTC MACD 모멘텀 (OKX 선물)', timeframe: '1H' },
+    { id: 'btc_donchian_breakout', name: 'BTC 돈치안 브레이크아웃 (OKX 선물)', timeframe: '1H' },
+  ]
+
+  const selectedOption = strategyOptions.find((s) => s.id === selectedStrategy) ?? strategyOptions[0]
+
   const mutation = useMutation({
     mutationFn: async () => {
       setBtProgress(null)
@@ -66,7 +77,7 @@ export function BacktestPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          strategyId: 'alt_mean_reversion',
+          strategyId: selectedStrategy,
           initialCapital,
           params: { zScoreEntry, rsiMax, atrStopMult, maxPositions },
         }),
@@ -127,8 +138,19 @@ export function BacktestPage() {
       <div className="card-surface rounded-md p-5">
         <h3 className="mb-4 text-[12px] font-semibold text-text-muted">백테스트 설정</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <InputField label="전략" value="BTC 레짐 + 알트 평균회귀" disabled />
-          <InputField label="타임프레임" value="4H" disabled />
+          <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+            <label className="text-[12px] font-medium text-text-muted">전략</label>
+            <select
+              value={selectedStrategy}
+              onChange={(e) => setSelectedStrategy(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono-trading text-[13px] text-text-primary focus:border-[var(--accent)] focus:outline-none"
+            >
+              {strategyOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.name}</option>
+              ))}
+            </select>
+          </div>
+          <InputField label="타임프레임" value={selectedOption.timeframe} disabled />
           <NumberInput
             label="초기 자본 (KRW)"
             value={initialCapital}

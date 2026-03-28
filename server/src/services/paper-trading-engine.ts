@@ -3,10 +3,12 @@ import { calculatePnlPct } from './pnl-calculator.js'
 import { evaluateRegime } from '../strategy/btc-regime-filter.js'
 import { BtcEmaCrossoverStrategy } from '../strategy/btc-ema-crossover.js'
 import { BtcBollingerReversionStrategy } from '../strategy/btc-bollinger-reversion.js'
+import { BtcMacdMomentumStrategy } from '../strategy/btc-macd-momentum.js'
+import { BtcDonchianBreakoutStrategy } from '../strategy/btc-donchian-breakout.js'
 import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
 import { loadCandles } from '../data/candle-collector.js'
 import { fetchOkxCandles, fetchOkxPrice, calculatePositionSize } from '../exchange/okx-client.js'
-import type { Strategy, CandleMap, RegimeState, Candle } from '../strategy/strategy-base.js'
+import type { Strategy, CandleMap, RegimeState, Candle, Timeframe } from '../strategy/strategy-base.js'
 
 /**
  * 가상매매 엔진
@@ -46,6 +48,10 @@ function getStrategyInstance(strategyType: string): Strategy | null {
       return new BtcEmaCrossoverStrategy()
     case 'btc_bollinger_reversion':
       return new BtcBollingerReversionStrategy()
+    case 'btc_macd_momentum':
+      return new BtcMacdMomentumStrategy()
+    case 'btc_donchian_breakout':
+      return new BtcDonchianBreakoutStrategy()
     case 'alt_mean_reversion':
     case 'regime_mean_reversion':
       return new AltMeanReversionStrategy()
@@ -97,7 +103,8 @@ async function processSession(
 ): Promise<void> {
   const sessionId = session.id as number
   const userId = session.user_id as string
-  const strategyType = (session.strategies as Record<string, unknown>)?.type as string
+  const strategyType = (session.strategy_type as string)
+    ?? (session.strategies as Record<string, unknown>)?.type as string
     ?? 'btc_ema_crossover'
 
   const strategy = getStrategyInstance(strategyType)
@@ -107,20 +114,22 @@ async function processSession(
   }
 
   const exchange = strategy.config.exchange
+  const tf = (strategy.config.timeframe ?? '4h') as Timeframe
 
   // 캔들 로드
   const candleMap: CandleMap = new Map()
-  candleMap.set('BTC', btcCandles)
 
   if (exchange === 'okx') {
-    // OKX 선물: BTC + ETH
+    // OKX 선물: BTC + ETH (전략 타임프레임에 맞춰 로드)
+    const btcOkx = await loadCandles('okx', 'BTC', tf, 300)
+    candleMap.set('BTC', btcOkx.length > 0 ? btcOkx : btcCandles)
     try {
-      const ethCandles = await loadCandles('upbit', 'ETH', '4h', 300)
+      const ethCandles = await loadCandles('okx', 'ETH', tf, 300)
       if (ethCandles.length > 0) candleMap.set('ETH', ethCandles)
     } catch { /* ETH 캔들 실패 시 BTC만 진행 */ }
   } else {
-    // 업비트 현물: 알트코인
-    const altSymbols = ['ETH', 'XRP', 'SOL', 'DOGE', 'ADA', 'AVAX', 'DOT', 'LINK', 'ATOM']
+    // 업비트 현물: BTC + 알트코인
+    candleMap.set('BTC', btcCandles)
     for (const symbol of altSymbols) {
       try {
         const candles = await loadCandles('upbit', symbol, '4h', 300)
@@ -189,6 +198,28 @@ async function processSession(
       .eq('id', pos.id)
 
     console.log(`[가상매매] 세션 ${sessionId}: ${exit.symbol} ${exit.reason} (${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%)`)
+  }
+
+  // peakPrice 업데이트: 아직 열린 포지션의 최고/최저가 갱신
+  const exitedSymbols = new Set(exitSignals.map((e) => e.symbol))
+  for (const pos of positions) {
+    if (pos.status !== 'open' || exitedSymbols.has(pos.symbol)) continue
+    const currentCandles = candleMap.get(pos.symbol)
+    if (!currentCandles || currentCandles.length === 0) continue
+
+    const currentPrice = currentCandles[currentCandles.length - 1].close
+    const oldPeak = (pos as unknown as Record<string, unknown>).peak_price as number | undefined
+    const isLong = pos.direction === 'long'
+    const newPeak = isLong
+      ? Math.max(oldPeak ?? pos.entry_price, currentPrice)
+      : Math.min(oldPeak ?? pos.entry_price, currentPrice)
+
+    if (newPeak !== (oldPeak ?? pos.entry_price)) {
+      await supabase
+        .from('positions')
+        .update({ peak_price: newPeak })
+        .eq('id', pos.id)
+    }
   }
 
   // 진입 시그널 평가
