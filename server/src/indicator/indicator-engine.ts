@@ -141,6 +141,33 @@ export function calcMACD(
 }
 
 /**
+ * 돈치안 채널 계산
+ * upper = 기간 내 최고가, lower = 기간 내 최저가, middle = (upper + lower) / 2
+ * @returns 돈치안 채널 배열 (period-1개만큼 오프셋)
+ */
+export function calcDonchianChannel(
+  highs: number[],
+  lows: number[],
+  period: number
+): Array<{ upper: number; lower: number; middle: number }> {
+  const len = Math.min(highs.length, lows.length)
+  if (len < period) return []
+
+  const result: Array<{ upper: number; lower: number; middle: number }> = []
+  for (let i = period - 1; i < len; i++) {
+    let upper = -Infinity
+    let lower = Infinity
+    for (let j = i - period + 1; j <= i; j++) {
+      if (highs[j] > upper) upper = highs[j]
+      if (lows[j] < lower) lower = lows[j]
+    }
+    const middle = (upper + lower) / 2
+    result.push({ upper, lower, middle })
+  }
+  return result
+}
+
+/**
  * BTC 대비 알트코인 비율의 z-score
  * R_i = ln(ALT_i / BTC_i)
  */

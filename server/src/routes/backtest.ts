@@ -22,8 +22,90 @@ const OKX_BAR: Partial<Record<Timeframe, string>> = {
   '5m': '5m', '15m': '15m', '1h': '1H', '4h': '4H', '1d': '1D',
 }
 
+/** 캐시 유효 기간: 4시간 (밀리초) */
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+/**
+ * DB 캐시를 활용한 캔들 조회
+ *
+ * 1. DB에 충분한 캔들이 있고 최신 캔들이 TTL 이내면 캐시 반환
+ * 2. 없으면 API에서 가져온 후 DB에 upsert하고 반환
+ */
+async function getCandlesWithCache(
+  exchange: 'upbit' | 'okx',
+  symbol: string,
+  tf: Timeframe,
+  count: number
+): Promise<Candle[]> {
+  // 1. DB에서 캔들 조회
+  const { data: cached, error: cacheErr } = await supabase
+    .from('candles')
+    .select('open_time, open, high, low, close, volume')
+    .eq('exchange', exchange)
+    .eq('symbol', symbol)
+    .eq('timeframe', tf)
+    .order('open_time', { ascending: false })
+    .limit(count)
+
+  if (!cacheErr && cached && cached.length >= count) {
+    // 최신 캔들의 open_time이 TTL 이내인지 확인
+    const latestOpenTime = new Date(cached[0].open_time as string).getTime()
+    const isFresh = Date.now() - latestOpenTime < CACHE_TTL_MS
+
+    if (isFresh) {
+      // 캐시 히트 — 오래된 순으로 정렬하여 반환
+      return cached.reverse().map((row) => ({
+        openTime: new Date(row.open_time as string),
+        open: Number(row.open),
+        high: Number(row.high),
+        low: Number(row.low),
+        close: Number(row.close),
+        volume: Number(row.volume),
+      }))
+    }
+  }
+
+  // 2. 캐시 미스 — API에서 가져오기
+  let candles: Candle[]
+  if (exchange === 'upbit') {
+    candles = await fetchUpbitDirect(symbol, tf, count)
+  } else {
+    candles = await fetchOkxDirect(symbol, tf, count)
+  }
+
+  // 3. DB에 upsert (빈 결과면 스킵)
+  if (candles.length > 0) {
+    const rows = candles.map((c) => ({
+      exchange,
+      symbol,
+      timeframe: tf,
+      open_time: c.openTime.toISOString(),
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume,
+    }))
+
+    // 500개씩 배치 upsert (Supabase 제한 대응)
+    const BATCH_SIZE = 500
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE)
+      const { error: upsertErr } = await supabase
+        .from('candles')
+        .upsert(batch, { onConflict: 'exchange,symbol,timeframe,open_time' })
+
+      if (upsertErr) {
+        console.warn(`[캔들 캐싱] upsert 오류 (${exchange}/${symbol}):`, upsertErr.message)
+      }
+    }
+  }
+
+  return candles
 }
 
 /** 업비트에서 직접 캔들 수집 (페이징으로 최대 count개) */
@@ -162,12 +244,8 @@ backtestRoutes.post('/run/stream', async (c) => {
         event: 'progress',
       })
 
-      let btcCandles: Candle[]
-      if (exchange === 'okx') {
-        btcCandles = await fetchOkxDirect('BTC-USDT', timeframe, 2000)
-      } else {
-        btcCandles = await fetchUpbitDirect('KRW-BTC', timeframe, 2000)
-      }
+      const btcSymbol = exchange === 'okx' ? 'BTC-USDT' : 'KRW-BTC'
+      const btcCandles = await getCandlesWithCache(exchange, btcSymbol, timeframe, 2000)
       if (btcCandles.length < 201) {
         await stream.writeSSE({ data: JSON.stringify({ type: 'error', message: `BTC 캔들 부족 (${btcCandles.length}/201)` }), event: 'bt-error' })
         return
@@ -187,12 +265,8 @@ backtestRoutes.post('/run/stream', async (c) => {
         })
 
         try {
-          let candles: Candle[]
-          if (exchange === 'okx') {
-            candles = await fetchOkxDirect(`${symbol}-USDT`, timeframe, 2000)
-          } else {
-            candles = await fetchUpbitDirect(`KRW-${symbol}`, timeframe, 2000)
-          }
+          const candleSymbol = exchange === 'okx' ? `${symbol}-USDT` : `KRW-${symbol}`
+          const candles = await getCandlesWithCache(exchange, candleSymbol, timeframe, 2000)
           if (candles.length > 0) candleMap.set(symbol, candles)
         } catch {
           // skip
@@ -291,12 +365,8 @@ backtestRoutes.post('/run', async (c) => {
     const exchange = strategy.config.exchange === 'okx' ? 'okx' : 'upbit'
     const timeframe = strategy.config.timeframe
 
-    let btcCandles: Candle[]
-    if (exchange === 'okx') {
-      btcCandles = await fetchOkxDirect('BTC-USDT', timeframe, 2000)
-    } else {
-      btcCandles = await fetchUpbitDirect('KRW-BTC', timeframe, 2000)
-    }
+    const btcSymbol = exchange === 'okx' ? 'BTC-USDT' : 'KRW-BTC'
+    const btcCandles = await getCandlesWithCache(exchange, btcSymbol, timeframe, 2000)
     if (btcCandles.length < 201) {
       return c.json({ error: `BTC 캔들 데이터가 부족합니다 (${btcCandles.length}/201)` }, 422)
     }
@@ -313,12 +383,8 @@ backtestRoutes.post('/run', async (c) => {
     }
     for (const symbol of symbols) {
       try {
-        let candles: Candle[]
-        if (exchange === 'okx') {
-          candles = await fetchOkxDirect(`${symbol}-USDT`, timeframe, 2000)
-        } else {
-          candles = await fetchUpbitDirect(`KRW-${symbol}`, timeframe, 2000)
-        }
+        const candleSymbol = exchange === 'okx' ? `${symbol}-USDT` : `KRW-${symbol}`
+        const candles = await getCandlesWithCache(exchange, candleSymbol, timeframe, 2000)
         if (candles.length > 0) candleMap.set(symbol, candles)
       } catch {
         // 개별 코인 실패 스킵

@@ -10,15 +10,20 @@ import {
   Radar,
 } from 'lucide-react'
 
+/** 운용자 모드 네비게이션 항목 */
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: '대시보드' },
+  { to: '/operator/dashboard', icon: LayoutDashboard, label: '대시보드' },
+  { to: '/operator/strategy', icon: Brain, label: '전략 관리' },
+  { to: '/operator/backtest', icon: FlaskConical, label: '백테스팅' },
+  { to: '/operator/paper-trading', icon: PlayCircle, label: '가상매매' },
+  { to: '/operator/portfolio', icon: Wallet, label: '포트폴리오' },
+  { to: '/operator/settings', icon: Settings, label: '설정' },
+]
+
+/** 공개 페이지 바로가기 */
+const publicItems = [
   { to: '/signals', icon: Signal, label: '시그널' },
   { to: '/detection', icon: Radar, label: '알트 탐지' },
-  { to: '/strategy', icon: Brain, label: '전략 관리' },
-  { to: '/backtest', icon: FlaskConical, label: '백테스팅' },
-  { to: '/paper-trading', icon: PlayCircle, label: '가상매매' },
-  { to: '/portfolio', icon: Wallet, label: '포트폴리오' },
-  { to: '/settings', icon: Settings, label: '설정' },
 ]
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -35,13 +40,34 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="mx-4 h-px bg-border-subtle" />
 
-      {/* 네비게이션 */}
+      {/* 운용자 네비게이션 */}
       <nav className="flex-1 space-y-0.5 px-3 py-3">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
+                isActive
+                  ? 'text-foreground bg-surface-hover'
+                  : 'text-text-muted hover:bg-surface-hover hover:text-foreground'
+              }`
+            }
+          >
+            <item.icon className="h-[15px] w-[15px]" />
+            {item.label}
+          </NavLink>
+        ))}
+
+        {/* 구분선 */}
+        <div className="mx-2 my-2 h-px bg-border-subtle" />
+        <p className="px-3 py-1 text-[12px] font-semibold text-text-faint">공개 페이지</p>
+
+        {publicItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
             onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${

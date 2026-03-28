@@ -111,6 +111,7 @@ export class AltDetectionStrategy implements Strategy {
       entryTime: Date
       candlesSinceEntry: number
       side?: string
+      peakPrice?: number
     }>
   ): ExitSignal[] {
     const exits: ExitSignal[] = []

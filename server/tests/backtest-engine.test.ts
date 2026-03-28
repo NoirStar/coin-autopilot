@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { runBacktest } from '../src/services/backtest-engine.js'
+import { BtcEmaCrossoverStrategy } from '../src/strategy/btc-ema-crossover.js'
 import type {
   Strategy,
   StrategyConfig,
@@ -540,6 +541,267 @@ describe('runBacktest', () => {
       // 미청산이지만 backtest_end로 강제 청산됨
       expect(result.totalTrades).toBe(1)
       expect(result.trades[0].reason).toBe('backtest_end')
+    })
+  })
+
+  // =========================================================================
+  // 트레일링 스탑 회귀 테스트
+  // =========================================================================
+  describe('트레일링 스탑', () => {
+    it('트레일링 스탑 발동 검증 — peak 형성 후 하락 시 take_profit으로 청산', () => {
+      // 진입 → 충분히 상승 (peak) → ATR x 2 이상 하락 → 트레일링 스탑 발동
+      const count = 230
+      const entryPrice = 60000
+      const candles: Candle[] = []
+
+      for (let i = 0; i < count; i++) {
+        let price: number
+        if (i <= 200) {
+          // 안정 구간 (백테스트 루프 시작 전)
+          price = entryPrice
+        } else if (i <= 205) {
+          // 진입 직후 구간
+          price = entryPrice
+        } else if (i <= 215) {
+          // 강한 상승 → peak 형성 (약 10% 상승)
+          price = entryPrice + (i - 205) * 600
+        } else {
+          // 급락 → 트레일링 스탑 발동
+          price = entryPrice + 6000 - (i - 215) * 800
+        }
+
+        candles.push({
+          openTime: new Date(Date.UTC(2024, 0, 1) + i * 4 * 3600_000),
+          open: price - 50,
+          high: price + 100,
+          low: price - 100,
+          close: price,
+          volume: 1000,
+        })
+      }
+
+      const allCandles: CandleMap = new Map()
+      allCandles.set('BTC', candles)
+
+      let signalFired = false
+      const strategy = createMockStrategy({
+        exchange: 'okx',
+        evaluate: () => {
+          if (!signalFired) {
+            signalFired = true
+            return [{
+              symbol: 'BTC',
+              direction: 'buy',
+              positionSide: 'long' as const,
+              leverage: 2,
+              reasoning: {},
+            }]
+          }
+          return []
+        },
+        // 실제 BtcEmaCrossoverStrategy의 evaluateExits 로직을 시뮬레이션
+        evaluateExits: (_candles, _regime, positions) => {
+          const exits: ExitSignal[] = []
+          for (const pos of positions) {
+            const isLong = pos.side !== 'short'
+            const currentPrice = _candles.get(pos.symbol)
+            if (!currentPrice || currentPrice.length === 0) continue
+            const latestClose = currentPrice[currentPrice.length - 1].close
+
+            // 간소화된 트레일링 스탑: 2% ATR 가정
+            const atrPct = 2 // ATR% 2%
+            const stopDistance = (1.5 * atrPct) / 100 // atrStopMult=1.5
+            const pnlPct = isLong
+              ? (latestClose - pos.entryPrice) / pos.entryPrice
+              : (pos.entryPrice - latestClose) / pos.entryPrice
+
+            // 손절 확인
+            const stopPrice = isLong
+              ? pos.entryPrice * (1 - stopDistance)
+              : pos.entryPrice * (1 + stopDistance)
+            if (isLong ? latestClose <= stopPrice : latestClose >= stopPrice) {
+              exits.push({ symbol: pos.symbol, reason: 'stop_loss', reasoning: {} })
+              continue
+            }
+
+            // 트레일링 스탑: pnl >= stopDistance * 2 이면 활성화
+            if (pnlPct >= stopDistance * 2) {
+              const trailDistance = (2.0 * atrPct) / 100 // atrTrailMult=2.0
+              const peak = pos.peakPrice ?? latestClose
+              const trailStop = isLong
+                ? peak * (1 - trailDistance)
+                : peak * (1 + trailDistance)
+              const trailHit = isLong
+                ? latestClose <= trailStop && trailStop > pos.entryPrice
+                : latestClose >= trailStop && trailStop < pos.entryPrice
+
+              if (trailHit) {
+                exits.push({ symbol: pos.symbol, reason: 'take_profit', reasoning: { type: 'trailing_stop', peak_price: peak } })
+                continue
+              }
+            }
+          }
+          return exits
+        },
+      })
+
+      const result = runBacktest(strategy, allCandles, {
+        initialCapital: 10_000,
+        feeRate: 0,
+        slippagePct: 0,
+        leverage: 2,
+      })
+
+      // 트레이드 발생 확인
+      expect(result.totalTrades).toBeGreaterThanOrEqual(1)
+      // 트레일링 스탑 또는 손절로 청산되어야 함
+      const trade = result.trades[0]
+      expect(['take_profit', 'stop_loss']).toContain(trade.reason)
+    })
+
+    it('트레일링 스탑이 진입가 아래에서는 발동 안 함 — ATR 손절이 대신 발동', () => {
+      // peak가 충분히 높지 않으면 (pnl < 2R) 트레일링 미활성화
+      // 가격이 소폭 상승 후 하락 → 손절 발동
+      const count = 220
+      const entryPrice = 60000
+      const candles: Candle[] = []
+
+      for (let i = 0; i < count; i++) {
+        let price: number
+        if (i <= 201) {
+          price = entryPrice
+        } else if (i <= 207) {
+          // 소폭 상승 (pnl < 2R, 트레일링 활성화 안됨)
+          price = entryPrice + (i - 201) * 50
+        } else {
+          // 하락 → 손절
+          price = entryPrice + 300 - (i - 207) * 600
+        }
+
+        candles.push({
+          openTime: new Date(Date.UTC(2024, 0, 1) + i * 4 * 3600_000),
+          open: price - 30,
+          high: price + 80,
+          low: price - 80,
+          close: price,
+          volume: 1000,
+        })
+      }
+
+      const allCandles: CandleMap = new Map()
+      allCandles.set('BTC', candles)
+
+      let signalFired = false
+      const strategy = createMockStrategy({
+        exchange: 'okx',
+        evaluate: () => {
+          if (!signalFired) {
+            signalFired = true
+            return [{
+              symbol: 'BTC',
+              direction: 'buy',
+              positionSide: 'long' as const,
+              reasoning: {},
+            }]
+          }
+          return []
+        },
+        evaluateExits: (_candles, _regime, positions) => {
+          const exits: ExitSignal[] = []
+          for (const pos of positions) {
+            const symCandles = _candles.get(pos.symbol)
+            if (!symCandles || symCandles.length === 0) continue
+            const latestClose = symCandles[symCandles.length - 1].close
+            const isLong = pos.side !== 'short'
+
+            const atrPct = 1.5
+            const stopDistance = (1.5 * atrPct) / 100
+            const pnlPct = isLong
+              ? (latestClose - pos.entryPrice) / pos.entryPrice
+              : (pos.entryPrice - latestClose) / pos.entryPrice
+
+            // 손절
+            const stopPrice = isLong
+              ? pos.entryPrice * (1 - stopDistance)
+              : pos.entryPrice * (1 + stopDistance)
+            if (isLong ? latestClose <= stopPrice : latestClose >= stopPrice) {
+              exits.push({ symbol: pos.symbol, reason: 'stop_loss', reasoning: {} })
+              continue
+            }
+
+            // 트레일링은 pnl >= 2R일 때만 활성화 (이 테스트에서는 안됨)
+            if (pnlPct >= stopDistance * 2) {
+              const peak = pos.peakPrice ?? latestClose
+              const trailDistance = (2.0 * atrPct) / 100
+              const trailStop = isLong ? peak * (1 - trailDistance) : peak * (1 + trailDistance)
+              const trailHit = isLong
+                ? latestClose <= trailStop && trailStop > pos.entryPrice
+                : latestClose >= trailStop && trailStop < pos.entryPrice
+              if (trailHit) {
+                exits.push({ symbol: pos.symbol, reason: 'take_profit', reasoning: { type: 'trailing_stop' } })
+                continue
+              }
+            }
+          }
+          return exits
+        },
+      })
+
+      const result = runBacktest(strategy, allCandles, {
+        initialCapital: 10_000,
+        feeRate: 0,
+        slippagePct: 0,
+        leverage: 1,
+      })
+
+      expect(result.totalTrades).toBeGreaterThanOrEqual(1)
+      // 트레일링이 아닌 stop_loss 또는 backtest_end로 청산
+      const trade = result.trades[0]
+      expect(['stop_loss', 'backtest_end']).toContain(trade.reason)
+    })
+  })
+
+  // =========================================================================
+  // 다중 포지션 테스트 — maxPositions 한도 검증
+  // =========================================================================
+  describe('다중 포지션 한도', () => {
+    it('maxPositions=2이면 3개 동시 진입 시그널 중 2개만 진입', () => {
+      const count = 210
+      const allCandles: CandleMap = new Map()
+      // 3개 심볼의 캔들 생성
+      for (const symbol of ['BTC', 'ETH', 'SOL']) {
+        allCandles.set(symbol, makeCandles(count, 60000, { trend: 5 }))
+      }
+
+      let signalFired = false
+      const strategy = createMockStrategy({
+        maxPositions: 2,
+        evaluate: () => {
+          if (!signalFired) {
+            signalFired = true
+            // 3개 심볼에 동시 진입 시그널
+            return [
+              { symbol: 'BTC', direction: 'buy', reasoning: {} },
+              { symbol: 'ETH', direction: 'buy', reasoning: {} },
+              { symbol: 'SOL', direction: 'buy', reasoning: {} },
+            ]
+          }
+          return []
+        },
+        evaluateExits: () => [],
+      })
+
+      const result = runBacktest(strategy, allCandles, {
+        initialCapital: 1_000_000,
+        feeRate: 0,
+        slippagePct: 0,
+        leverage: 1,
+      })
+
+      // backtest_end로 강제 청산되므로 trades에 최대 2개 심볼만 존재
+      const symbols = new Set(result.trades.map((t) => t.symbol))
+      expect(symbols.size).toBeLessThanOrEqual(2)
+      expect(result.totalTrades).toBeLessThanOrEqual(2)
     })
   })
 

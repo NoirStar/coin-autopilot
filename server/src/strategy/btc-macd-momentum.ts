@@ -1,4 +1,4 @@
-import { calcEMA, calcADX, calcATRPercent } from '../indicator/indicator-engine.js'
+import { calcMACD, calcRSI, calcADX, calcATRPercent, calcEMA } from '../indicator/indicator-engine.js'
 import type {
   Strategy,
   StrategyConfig,
@@ -9,41 +9,45 @@ import type {
 } from './strategy-base.js'
 
 const DEFAULT_PARAMS = {
-  fastEma: 12,
-  slowEma: 26,
+  macdFast: 12,
+  macdSlow: 26,
+  macdSignal: 9,
+  rsiPeriod: 14,
+  adxPeriod: 14,
+  adxThreshold: 25,
   trendEma: 200,
-  adxThreshold: 20,
   atrStopMult: 1.5,
-  atrTrailMult: 2.0,
-  riskRewardMin: 2.0,
-  timeLimitCandles: 30,     // 30 x 4H = 120시간 = 5일
-  leverage: 2,
+  atrTrailMult: 2.5,
+  timeLimitCandles: 24,     // 24 x 1H = 24시간
+  leverage: 3,
   volumeMultiplier: 1.2,
 }
 
 /**
- * BTC/ETH EMA 크로스오버 전략 (OKX 선물용)
+ * BTC MACD 모멘텀 전략 (OKX 선물용)
+ *
+ * MACD(12,26,9) + RSI(14) + ADX > 25 + EMA(200) 트렌드 필터
  *
  * 진입:
- *   롱: Fast EMA > Slow EMA (골든크로스) + 가격 > EMA(200) + ADX > 20
- *   숏: Fast EMA < Slow EMA (데드크로스) + 가격 < EMA(200) + ADX > 20
+ *   롱: MACD 히스토그램 양수 전환 + RSI 50-70 + ADX > 25 + 가격 > EMA(200)
+ *   숏: MACD 히스토그램 음수 전환 + RSI 30-50 + ADX > 25 + 가격 < EMA(200)
  *
  * 청산:
  *   손절: ATR(14) x 1.5
- *   트레일링 스탑: ATR(14) x 2.0
- *   시간 청산: 30캔들 (5일)
- *   반대 크로스: 역 시그널 발생 시
+ *   트레일링 스탑: ATR(14) x 2.5 (peak 기반)
+ *   시간 청산: 24캔들
+ *   반대 크로스: MACD 히스토그램 방향 전환 시
  */
-export class BtcEmaCrossoverStrategy implements Strategy {
+export class BtcMacdMomentumStrategy implements Strategy {
   config: StrategyConfig
 
   constructor(overrides?: Partial<typeof DEFAULT_PARAMS>) {
     const params = { ...DEFAULT_PARAMS, ...overrides }
     this.config = {
-      id: 'btc_ema_crossover',
-      name: 'BTC EMA 크로스오버',
-      description: 'EMA(12/26) 크로스 + EMA(200) 트렌드 필터 + ADX 확인. OKX 선물 롱/숏.',
-      timeframe: '4h',
+      id: 'btc_macd_momentum',
+      name: 'BTC MACD 모멘텀',
+      description: 'MACD 히스토그램 전환 + RSI 범위 + ADX 트렌드 + EMA(200) 필터. OKX 선물.',
+      timeframe: '1h',
       exchange: 'okx',
       params,
     }
@@ -51,9 +55,12 @@ export class BtcEmaCrossoverStrategy implements Strategy {
 
   evaluate(candles: CandleMap, regime: RegimeState): StrategySignal[] {
     const signals: StrategySignal[] = []
-    const { fastEma, slowEma, trendEma, adxThreshold, leverage, volumeMultiplier } = this.config.params
+    const {
+      macdFast, macdSlow, macdSignal: macdSignalPeriod,
+      rsiPeriod, adxPeriod, adxThreshold,
+      trendEma, leverage, volumeMultiplier,
+    } = this.config.params
 
-    // BTC와 ETH 모두 평가
     for (const symbol of ['BTC', 'ETH']) {
       const symbolCandles = candles.get(symbol)
       if (!symbolCandles || symbolCandles.length < trendEma + 1) continue
@@ -64,29 +71,24 @@ export class BtcEmaCrossoverStrategy implements Strategy {
       const volumes = symbolCandles.map((c) => c.volume)
 
       // 지표 계산
-      const fastEmaValues = calcEMA(closes, fastEma)
-      const slowEmaValues = calcEMA(closes, slowEma)
+      const macdValues = calcMACD(closes, macdFast, macdSlow, macdSignalPeriod)
+      const rsiValues = calcRSI(closes, rsiPeriod)
+      const adxValues = calcADX(highs, lows, closes, adxPeriod)
       const trendEmaValues = calcEMA(closes, trendEma)
-      const adxValues = calcADX(highs, lows, closes, 14)
 
       if (
-        fastEmaValues.length < 2 ||
-        slowEmaValues.length < 2 ||
-        trendEmaValues.length === 0 ||
-        adxValues.length === 0
+        macdValues.length < 2 ||
+        rsiValues.length === 0 ||
+        adxValues.length === 0 ||
+        trendEmaValues.length === 0
       ) continue
 
       const latestClose = closes[closes.length - 1]
-      const latestFast = fastEmaValues[fastEmaValues.length - 1]
-      const latestSlow = slowEmaValues[slowEmaValues.length - 1]
-      const prevFast = fastEmaValues[fastEmaValues.length - 2]
-      const prevSlow = slowEmaValues[slowEmaValues.length - 2]
-      const latestTrend = trendEmaValues[trendEmaValues.length - 1]
+      const latestMacd = macdValues[macdValues.length - 1]
+      const prevMacd = macdValues[macdValues.length - 2]
+      const latestRsi = rsiValues[rsiValues.length - 1]
       const latestAdx = adxValues[adxValues.length - 1]
-
-      // 크로스 감지 (이전 캔들에서 교차 발생)
-      const goldenCross = prevFast <= prevSlow && latestFast > latestSlow
-      const deathCross = prevFast >= prevSlow && latestFast < latestSlow
+      const latestTrend = trendEmaValues[trendEmaValues.length - 1]
 
       // ADX 필터: 트렌드가 충분히 강한지
       if (latestAdx < adxThreshold) continue
@@ -99,40 +101,49 @@ export class BtcEmaCrossoverStrategy implements Strategy {
       const latestVolume = volumes[volumes.length - 1]
       if (volumeSma20 > 0 && latestVolume <= volumeSma20 * volumeMultiplier) continue
 
-      // 롱 시그널: 골든크로스 + 가격 > 200 EMA
-      if (goldenCross && latestClose > latestTrend) {
+      // MACD 히스토그램 양수 전환 감지
+      const histogramBullFlip = prevMacd.histogram <= 0 && latestMacd.histogram > 0
+      // MACD 히스토그램 음수 전환 감지
+      const histogramBearFlip = prevMacd.histogram >= 0 && latestMacd.histogram < 0
+
+      // 롱: 히스토그램 양수 전환 + RSI 50-70 + 가격 > EMA(200)
+      if (histogramBullFlip && latestRsi >= 50 && latestRsi <= 70 && latestClose > latestTrend) {
         signals.push({
           symbol,
           direction: 'buy',
           positionSide: 'long',
           leverage,
           reasoning: {
-            type: 'ema_crossover',
-            cross: 'golden',
-            fast_ema: round(latestFast),
-            slow_ema: round(latestSlow),
-            trend_ema: round(latestTrend),
-            adx: round(latestAdx),
+            type: 'macd_momentum',
+            side: 'long',
             close: round(latestClose),
+            macd: round(latestMacd.macd, 4),
+            signal: round(latestMacd.signal, 4),
+            histogram: round(latestMacd.histogram, 4),
+            rsi: round(latestRsi, 1),
+            adx: round(latestAdx),
+            trend_ema: round(latestTrend),
           },
         })
       }
 
-      // 숏 시그널: 데드크로스 + 가격 < 200 EMA
-      if (deathCross && latestClose < latestTrend) {
+      // 숏: 히스토그램 음수 전환 + RSI 30-50 + 가격 < EMA(200)
+      if (histogramBearFlip && latestRsi >= 30 && latestRsi <= 50 && latestClose < latestTrend) {
         signals.push({
           symbol,
           direction: 'sell',
           positionSide: 'short',
           leverage,
           reasoning: {
-            type: 'ema_crossover',
-            cross: 'death',
-            fast_ema: round(latestFast),
-            slow_ema: round(latestSlow),
-            trend_ema: round(latestTrend),
-            adx: round(latestAdx),
+            type: 'macd_momentum',
+            side: 'short',
             close: round(latestClose),
+            macd: round(latestMacd.macd, 4),
+            signal: round(latestMacd.signal, 4),
+            histogram: round(latestMacd.histogram, 4),
+            rsi: round(latestRsi, 1),
+            adx: round(latestAdx),
+            trend_ema: round(latestTrend),
           },
         })
       }
@@ -154,7 +165,7 @@ export class BtcEmaCrossoverStrategy implements Strategy {
     }>
   ): ExitSignal[] {
     const exits: ExitSignal[] = []
-    const { fastEma, slowEma, atrStopMult, atrTrailMult, timeLimitCandles } = this.config.params
+    const { macdFast, macdSlow, macdSignal: macdSignalPeriod, atrStopMult, atrTrailMult, timeLimitCandles } = this.config.params
 
     for (const pos of openPositions) {
       const symbolCandles = candles.get(pos.symbol)
@@ -196,20 +207,18 @@ export class BtcEmaCrossoverStrategy implements Strategy {
           continue
         }
 
-        // 2. 트레일링 스탑 (peak 기반 — 진입 후 최고/최저가 대비)
+        // 2. 트레일링 스탑 (peak 기반)
         const pnlPct = isLong
           ? (currentPrice - pos.entryPrice) / pos.entryPrice
           : (pos.entryPrice - currentPrice) / pos.entryPrice
 
         if (pnlPct >= stopDistance * 2) {
           const trailDistance = (atrTrailMult * latestAtrPct) / 100
-          // peakPrice: 롱이면 진입 후 최고가, 숏이면 진입 후 최저가
           const peak = pos.peakPrice ?? currentPrice
           const trailStop = isLong
             ? peak * (1 - trailDistance)
             : peak * (1 + trailDistance)
 
-          // 트레일링 스탑 발동: peak 대비 가격이 trailDistance만큼 되돌림
           const trailHit = isLong
             ? currentPrice <= trailStop && trailStop > pos.entryPrice
             : currentPrice >= trailStop && trailStop < pos.entryPrice
@@ -230,28 +239,25 @@ export class BtcEmaCrossoverStrategy implements Strategy {
         }
       }
 
-      // 3. 반대 크로스 청산
-      const fastEmaValues = calcEMA(closes, fastEma)
-      const slowEmaValues = calcEMA(closes, slowEma)
+      // 3. 반대 MACD 크로스 청산
+      const macdValues = calcMACD(closes, macdFast, macdSlow, macdSignalPeriod)
+      if (macdValues.length >= 2) {
+        const latestMacd = macdValues[macdValues.length - 1]
+        const prevMacd = macdValues[macdValues.length - 2]
 
-      if (fastEmaValues.length >= 2 && slowEmaValues.length >= 2) {
-        const latestFast = fastEmaValues[fastEmaValues.length - 1]
-        const latestSlow = slowEmaValues[slowEmaValues.length - 1]
-        const prevFast = fastEmaValues[fastEmaValues.length - 2]
-        const prevSlow = slowEmaValues[slowEmaValues.length - 2]
-
+        // 롱 보유 중 히스토그램 음수 전환, 숏 보유 중 히스토그램 양수 전환
         const reverseCross = isLong
-          ? (prevFast >= prevSlow && latestFast < latestSlow)  // 롱 보유 중 데드크로스
-          : (prevFast <= prevSlow && latestFast > latestSlow)  // 숏 보유 중 골든크로스
+          ? (prevMacd.histogram >= 0 && latestMacd.histogram < 0)
+          : (prevMacd.histogram <= 0 && latestMacd.histogram > 0)
 
         if (reverseCross) {
           exits.push({
             symbol: pos.symbol,
             reason: 'take_profit',
             reasoning: {
-              type: 'reverse_cross',
-              fast_ema: round(latestFast),
-              slow_ema: round(latestSlow),
+              type: 'reverse_macd_cross',
+              macd: round(latestMacd.macd, 4),
+              histogram: round(latestMacd.histogram, 4),
             },
           })
           continue

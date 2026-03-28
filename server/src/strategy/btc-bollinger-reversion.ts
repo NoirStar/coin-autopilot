@@ -18,6 +18,7 @@ const DEFAULT_PARAMS = {
   atrStopMult: 1.0,
   timeLimitCandles: 20,     // 20 x 4H = 80시간 ≈ 3.3일
   leverage: 2,
+  volumeMultiplier: 1.2,
 }
 
 /**
@@ -52,13 +53,14 @@ export class BtcBollingerReversionStrategy implements Strategy {
 
   evaluate(candles: CandleMap, regime: RegimeState): StrategySignal[] {
     const signals: StrategySignal[] = []
-    const { bbPeriod, bbStdDev, rsiPeriod, rsiOversold, rsiOverbought, trendEma, leverage } = this.config.params
+    const { bbPeriod, bbStdDev, rsiPeriod, rsiOversold, rsiOverbought, trendEma, leverage, volumeMultiplier } = this.config.params
 
     for (const symbol of ['BTC', 'ETH']) {
       const symbolCandles = candles.get(symbol)
       if (!symbolCandles || symbolCandles.length < trendEma + 1) continue
 
       const closes = symbolCandles.map((c) => c.close)
+      const volumes = symbolCandles.map((c) => c.volume)
 
       // 지표 계산
       const bbValues = calcBollingerBands(closes, bbPeriod, bbStdDev)
@@ -77,6 +79,14 @@ export class BtcBollingerReversionStrategy implements Strategy {
       // 볼린저 밴드 폭 (스퀴즈 감지 — 밴드가 너무 좁으면 진입 금지)
       const bandwidth = (latestBB.upper - latestBB.lower) / latestBB.middle
       if (bandwidth < 0.02) continue  // 극단적 스퀴즈 중에는 진입 금지
+
+      // 볼륨 필터: 현재 거래량 > SMA(20) x volumeMultiplier
+      const volumeWindow = volumes.slice(-20)
+      const volumeSma20 = volumeWindow.length >= 20
+        ? volumeWindow.reduce((a, b) => a + b, 0) / 20
+        : 0
+      const latestVolume = volumes[volumes.length - 1]
+      if (volumeSma20 > 0 && latestVolume <= volumeSma20 * volumeMultiplier) continue
 
       // 롱: 하단 밴드 터치 후 복귀 + RSI 과매도 + 상승 트렌드
       const touchedLower = prevClose <= prevBB.lower
@@ -139,6 +149,7 @@ export class BtcBollingerReversionStrategy implements Strategy {
       entryTime: Date
       candlesSinceEntry: number
       side?: string
+      peakPrice?: number
     }>
   ): ExitSignal[] {
     const exits: ExitSignal[] = []

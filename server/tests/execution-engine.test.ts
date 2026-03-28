@@ -3,31 +3,35 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── 외부 의존성 mock ──
 
 // supabase mock
+// supabase mock — 체인 가능한 빌더 패턴
+function createChainMock(resolveData: unknown = null): Record<string, ReturnType<typeof vi.fn>> {
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+  const methods = ['select', 'eq', 'gte', 'lte', 'order', 'limit', 'insert', 'update']
+  for (const m of methods) {
+    chain[m] = vi.fn(() => chain)
+  }
+  chain.single = vi.fn(() => Promise.resolve({ data: resolveData, error: null }))
+  return chain
+}
+
 vi.mock('../src/services/database.js', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      insert: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(() => Promise.resolve({ data: { id: 'pos-uuid-123' } })),
-        })),
-      })),
-      update: vi.fn(() => ({
-        eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
-      })),
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              order: vi.fn(() => ({
-                limit: vi.fn(() => ({
-                  single: vi.fn(() => Promise.resolve({ data: { id: 'pos-uuid-456' } })),
-                })),
-              })),
-            })),
+    from: vi.fn((table: string) => {
+      if (table === 'positions') {
+        const chain = createChainMock({ id: 'pos-uuid-456', opened_at: '2026-03-27T10:00:00Z', peak_price: 62000, stop_order_id: 'stop-123', pnl: -50 })
+        // insert 체인은 data.id를 반환해야 함
+        chain.insert = vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: vi.fn(() => Promise.resolve({ data: { id: 'pos-uuid-123' } })),
           })),
-        })),
-      })),
-    })),
+        }))
+        chain.update = vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        }))
+        return chain
+      }
+      return createChainMock()
+    }),
   },
 }))
 
@@ -42,6 +46,8 @@ vi.mock('../src/exchange/okx-client.js', async () => {
     fetchBalance: vi.fn(),
     fetchOpenPositions: vi.fn(),
     createMarketOrder: vi.fn(),
+    createStopOrder: vi.fn(() => Promise.resolve({ id: 'stop-123', success: true })),
+    cancelStopOrder: vi.fn(() => Promise.resolve(true)),
     setLeverage: vi.fn(),
     setMarginMode: vi.fn(),
     fetchOkxPrice: vi.fn(),

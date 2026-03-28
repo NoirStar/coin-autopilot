@@ -1,4 +1,5 @@
 import { supabase } from './database.js'
+import { calculatePnlPct } from './pnl-calculator.js'
 import { evaluateRegime } from '../strategy/btc-regime-filter.js'
 import { BtcEmaCrossoverStrategy } from '../strategy/btc-ema-crossover.js'
 import { BtcBollingerReversionStrategy } from '../strategy/btc-bollinger-reversion.js'
@@ -13,9 +14,15 @@ import type { Strategy, CandleMap, RegimeState, Candle } from '../strategy/strat
  * 크론(4H)에서 호출되어:
  * 1. 활성 세션 조회
  * 2. 각 세션의 전략으로 시그널 평가
- * 3. 가상 포지션 진입/청산
+ * 3. 가상 포지션 진입/청산 (캔들 시가 + 슬리피지 기반)
  * 4. 세션 성과 업데이트
  */
+
+/** 거래소별 슬리피지 기본값 (불리한 방향으로 적용) */
+const SLIPPAGE: Record<string, number> = {
+  upbit: 0.001,   // 0.1% — 업비트 현물
+  okx: 0.0005,    // 0.05% — OKX 선물
+}
 
 interface PaperPosition {
   id: number
@@ -136,12 +143,15 @@ async function processSession(
   const posArray = positions.map((p) => {
     const openedAt = new Date(p.opened_at)
     const hoursSince = (Date.now() - openedAt.getTime()) / (1000 * 60 * 60)
+    // peak 가격: DB에 저장된 값이 있으면 ���용, 없으면 진입가로 초기화
+    const peakPrice = (p as unknown as Record<string, unknown>).peak_price as number | undefined
     return {
       symbol: p.symbol,
       entryPrice: p.entry_price,
       entryTime: openedAt,
       candlesSinceEntry: Math.floor(hoursSince / 4), // 4H 캔들 기준
-      side: p.direction,
+      side: p.direction as 'long' | 'short',
+      peakPrice: peakPrice ?? p.entry_price,
     }
   })
 
@@ -151,16 +161,20 @@ async function processSession(
     const pos = positions.find((p) => p.symbol === exit.symbol && p.status === 'open')
     if (!pos) continue
 
-    // 현재가로 가상 청산
+    // 캔들 시가 + 슬리피지로 가상 청산 (종가 대신 시가 사용 — 이미 확정된 정보)
     const currentCandles = candleMap.get(exit.symbol)
-    const exitPrice = currentCandles
-      ? currentCandles[currentCandles.length - 1].close
+    const slippage = SLIPPAGE[pos.exchange] ?? SLIPPAGE.upbit
+    const rawExitPrice = currentCandles
+      ? currentCandles[currentCandles.length - 1].open
       : pos.entry_price
+    // 청산 시 불리한 방향: 롱 = 낮게, 숏 = 높게
+    const isLongExit = pos.direction === 'long'
+    const exitPrice = isLongExit
+      ? rawExitPrice * (1 - slippage)
+      : rawExitPrice * (1 + slippage)
 
-    const isLong = pos.direction === 'long'
-    const rawPnlPct = isLong
-      ? (exitPrice - pos.entry_price) / pos.entry_price
-      : (pos.entry_price - exitPrice) / pos.entry_price
+    const side = isLongExit ? 'long' as const : 'short' as const
+    const { rawPnlPct } = calculatePnlPct(pos.entry_price, exitPrice, side)
     const pnlPct = rawPnlPct * 100
 
     await supabase
@@ -187,18 +201,24 @@ async function processSession(
     if (positions.some((p) => p.symbol === signal.symbol && p.status === 'open')) continue
 
     const currentCandles = candleMap.get(signal.symbol)
-    const entryPrice = currentCandles
-      ? currentCandles[currentCandles.length - 1].close
+    const rawEntryPrice = currentCandles
+      ? currentCandles[currentCandles.length - 1].open
       : 0
 
-    if (entryPrice <= 0) continue
+    if (rawEntryPrice <= 0) continue
+
+    const side = signal.positionSide ?? (signal.direction === 'buy' ? 'long' : 'short')
+
+    // 진입 시 불리한 방향: 롱 = 높게, 숏 = 낮게
+    const entrySlippage = SLIPPAGE[exchange] ?? SLIPPAGE.upbit
+    const entryPrice = side === 'long'
+      ? rawEntryPrice * (1 + entrySlippage)
+      : rawEntryPrice * (1 - entrySlippage)
 
     // 포지션 사이징: 세션 자본의 1/maxPositions
     const sessionCapital = (session.current_equity as number) ?? 10_000_000
     const allocation = sessionCapital / maxPositions
     const quantity = allocation / entryPrice
-
-    const side = signal.positionSide ?? (signal.direction === 'buy' ? 'long' : 'short')
 
     await supabase
       .from('positions')

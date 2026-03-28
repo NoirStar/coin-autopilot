@@ -90,7 +90,7 @@ export class AltMeanReversionStrategy implements Strategy {
   evaluateExits(
     candles: CandleMap,
     regime: RegimeState,
-    openPositions: Array<{ symbol: string; entryPrice: number; entryTime: Date; candlesSinceEntry: number }>
+    openPositions: Array<{ symbol: string; entryPrice: number; entryTime: Date; candlesSinceEntry: number; side?: string; peakPrice?: number }>
   ): ExitSignal[] {
     const btcCandles = candles.get('BTC')
     if (!btcCandles) return []

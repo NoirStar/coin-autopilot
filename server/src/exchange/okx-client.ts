@@ -163,6 +163,16 @@ export interface OrderResult {
   timestamp: Date
 }
 
+export interface StopOrderResult {
+  id: string
+  symbol: string
+  side: 'buy' | 'sell'
+  stopPrice: number
+  size: number
+  status: string
+  timestamp: Date
+}
+
 /** 레버리지 설정 */
 export async function setLeverage(symbol: string, leverage: number): Promise<void> {
   const okx = getOkxExchange()
@@ -232,11 +242,47 @@ export async function createLimitOrder(
   }
 }
 
+/** Stop-Market 주문 (stopPrice 도달 시 시장가 청산) */
+export async function createStopOrder(
+  symbol: string,
+  side: 'buy' | 'sell',
+  stopPrice: number,
+  size: number
+): Promise<StopOrderResult> {
+  const okx = getOkxExchange()
+  const pair = `${symbol}/USDT:USDT`
+
+  // OKX algo order: trigger 가격 도달 시 시장가 실행
+  const order = await okx.createOrder(pair, 'market', side, size, undefined, {
+    stopPrice,
+    triggerPrice: stopPrice,
+    reduceOnly: true,
+  })
+
+  return {
+    id: String(order.id),
+    symbol,
+    side,
+    stopPrice,
+    size,
+    status: String(order.status ?? 'unknown'),
+    timestamp: new Date(order.timestamp ?? Date.now()),
+  }
+}
+
 /** 미체결 주문 취소 */
 export async function cancelOrder(symbol: string, orderId: string): Promise<void> {
   const okx = getOkxExchange()
   const pair = `${symbol}/USDT:USDT`
   await okx.cancelOrder(orderId, pair)
+}
+
+/** Stop order 취소 (algo order) */
+export async function cancelStopOrder(symbol: string, orderId: string): Promise<void> {
+  const okx = getOkxExchange()
+  const pair = `${symbol}/USDT:USDT`
+  // OKX algo order 취소
+  await okx.cancelOrder(orderId, pair, { stop: true })
 }
 
 /** 미체결 주문 전체 조회 */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcEMA, calcRSI, calcATRPercent, calcBollingerBands, calcADX, calcMACD, calcZScore, calcAltBtcZScore } from '../src/indicator/indicator-engine.js'
+import { calcEMA, calcRSI, calcATRPercent, calcBollingerBands, calcADX, calcMACD, calcZScore, calcAltBtcZScore, calcDonchianChannel } from '../src/indicator/indicator-engine.js'
 
 describe('calcEMA', () => {
   it('기본 EMA 계산', () => {
@@ -92,5 +92,46 @@ describe('calcZScore', () => {
     const data = [10, 10, 10, 10, 10, 10, 10, 10, 10, 50]
     const result = calcZScore(data, 9)
     expect(result[result.length - 1]).toBeGreaterThan(2)
+  })
+})
+
+describe('calcDonchianChannel', () => {
+  it('알려진 데이터로 upper/lower/middle 정확히 계산', () => {
+    // 5기간 돈치안 채널
+    const highs  = [10, 12, 11, 14, 13, 15, 12, 16, 14, 11]
+    const lows   = [ 5,  6,  4,  7,  8,  9,  6, 10,  7,  5]
+    const result = calcDonchianChannel(highs, lows, 5)
+
+    // 기간=5이므로 result[0]은 인덱스 0~4, result[1]은 인덱스 1~5 ...
+    // result[0]: highs[0..4] max=14, lows[0..4] min=4
+    expect(result[0].upper).toBe(14)
+    expect(result[0].lower).toBe(4)
+    expect(result[0].middle).toBe((14 + 4) / 2) // 9
+
+    // result[1]: highs[1..5] = [12,11,14,13,15] max=15, lows[1..5] = [6,4,7,8,9] min=4
+    expect(result[1].upper).toBe(15)
+    expect(result[1].lower).toBe(4)
+    expect(result[1].middle).toBe((15 + 4) / 2) // 9.5
+
+    // result[5]: highs[5..9] max=16, lows[5..9] min=5
+    expect(result[5].upper).toBe(16)
+    expect(result[5].lower).toBe(5)
+    expect(result[5].middle).toBe((16 + 5) / 2) // 10.5
+
+    // 결과 길이: len - period + 1 = 10 - 5 + 1 = 6
+    expect(result.length).toBe(6)
+  })
+
+  it('데이터 부족 시 빈 배열', () => {
+    expect(calcDonchianChannel([1, 2], [1, 2], 5)).toEqual([])
+  })
+
+  it('period=1이면 각 캔들 자체가 채널', () => {
+    const highs = [10, 20, 30]
+    const lows  = [ 5, 15, 25]
+    const result = calcDonchianChannel(highs, lows, 1)
+    expect(result.length).toBe(3)
+    expect(result[0]).toEqual({ upper: 10, lower: 5, middle: 7.5 })
+    expect(result[2]).toEqual({ upper: 30, lower: 25, middle: 27.5 })
   })
 })

@@ -72,6 +72,7 @@ export function runBacktest(
     allocation: Decimal
     side: 'long' | 'short'
     leverage: number
+    peakPrice: number  // 롱: 진입 후 최고가, 숏: 진입 후 최저가
   }
   const openPositions: Map<string, OpenPosition> = new Map()
 
@@ -89,6 +90,19 @@ export function runBacktest(
       }
     }
 
+    // peak 가격 업데이트 (트레일링 스탑용)
+    for (const [symbol, pos] of openPositions) {
+      const symbolCandles = allCandles.get(symbol)
+      if (!symbolCandles || symbolCandles.length <= i) continue
+      const currentHigh = symbolCandles[i].high
+      const currentLow = symbolCandles[i].low
+      if (pos.side === 'long') {
+        pos.peakPrice = Math.max(pos.peakPrice, currentHigh)
+      } else {
+        pos.peakPrice = Math.min(pos.peakPrice, currentLow)
+      }
+    }
+
     // 청산 평가
     const openPosArray = Array.from(openPositions.entries()).map(([symbol, pos]) => ({
       symbol,
@@ -96,6 +110,7 @@ export function runBacktest(
       entryTime: pos.entryTime,
       candlesSinceEntry: i - pos.entryIndex,
       side: pos.side,
+      peakPrice: pos.peakPrice,
     }))
 
     const exitSignals = strategy.evaluateExits(slicedCandles, regimeDetail.regime, openPosArray)
@@ -168,6 +183,7 @@ export function runBacktest(
         allocation,
         side,
         leverage,
+        peakPrice: entryPrice, // 진입가로 초기화, 이후 캔들마다 업데이트
       })
 
       equity = equity.sub(allocation)

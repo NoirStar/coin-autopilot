@@ -111,7 +111,7 @@ export function DetectionPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">알트코인 탐지</h1>
           <p className="text-[13px] text-text-muted">
-            업비트 KRW 마켓 · <span className="font-mono-trading">1시간봉</span> 기준 · 수동 스캔
+            업비트 KRW 마켓 · <span className="font-mono-trading">1</span>시간봉 기준 · 수동 스캔
           </p>
         </div>
         <button
@@ -177,8 +177,8 @@ export function DetectionPage() {
                 <span className="font-medium text-text-secondary">{scanProgress?.symbol || '마켓 목록 로딩'}</span> 스캔 중
               </span>
             </div>
-            <span className="font-mono-trading text-text-muted">
-              {scanProgress ? `${scanProgress.current}/${scanProgress.total}` : '준비 중...'}
+            <span className="text-text-muted">
+              {scanProgress ? <span className="font-mono-trading">{scanProgress.current}/{scanProgress.total}</span> : '준비 중...'}
             </span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">

@@ -82,6 +82,6 @@ export interface Strategy {
   evaluateExits(
     candles: CandleMap,
     regime: RegimeState,
-    openPositions: Array<{ symbol: string; entryPrice: number; entryTime: Date; candlesSinceEntry: number }>
+    openPositions: Array<{ symbol: string; entryPrice: number; entryTime: Date; candlesSinceEntry: number; side?: PositionDirection; peakPrice?: number }>
   ): ExitSignal[]
 }
