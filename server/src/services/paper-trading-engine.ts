@@ -6,7 +6,7 @@ import { BtcBollingerReversionStrategy } from '../strategy/btc-bollinger-reversi
 import { BtcMacdMomentumStrategy } from '../strategy/btc-macd-momentum.js'
 import { BtcDonchianBreakoutStrategy } from '../strategy/btc-donchian-breakout.js'
 import { AltMeanReversionStrategy } from '../strategy/alt-mean-reversion.js'
-import { loadCandles } from '../data/candle-collector.js'
+import { loadCandles, fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import { fetchOkxCandles, fetchOkxPrice, calculatePositionSize } from '../exchange/okx-client.js'
 import type { Strategy, CandleMap, RegimeState, Candle, Timeframe } from '../strategy/strategy-base.js'
 
@@ -130,6 +130,7 @@ async function processSession(
   } else {
     // 업비트 현물: BTC + 알트코인
     candleMap.set('BTC', btcCandles)
+    const altSymbols = await fetchUpbitKrwSymbols()
     for (const symbol of altSymbols) {
       try {
         const candles = await loadCandles('upbit', symbol, '4h', 300)
@@ -255,6 +256,7 @@ async function processSession(
       .from('positions')
       .insert({
         user_id: userId,
+        session_id: sessionId,
         session_type: 'paper',
         exchange: strategy.config.exchange,
         strategy: strategy.config.id,
@@ -280,6 +282,7 @@ async function updateSessionPerformance(sessionId: number, userId: string): Prom
     .from('positions')
     .select('pnl_pct, pnl')
     .eq('user_id', userId)
+    .eq('session_id', sessionId)
     .eq('session_type', 'paper')
     .eq('status', 'closed')
 

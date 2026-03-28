@@ -17,7 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { api } from '../services/api'
+import { api, type DetectionResultItem } from '../services/api'
 import { TermTooltip } from '../components/ui/term-tooltip'
 
 // --- 타입 ---
@@ -127,6 +127,23 @@ function useDetectionCache() {
     staleTime: 5 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
   })
+}
+
+function getDetectionRecommendation(result: DetectionResultItem): { label: string; color: string } {
+  const { score, rsi14 } = result
+  const activeCount = Object.values(result.signals).filter((signal) => signal?.active).length
+
+  if (rsi14 >= 70) {
+    return { label: '매도 주의', color: 'bg-[var(--loss-bg)] text-loss' }
+  }
+
+  if (score >= 0.8 && activeCount >= 4) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
+  if (score >= 0.8) return { label: '매수 추천', color: 'bg-[var(--profit-bg)] text-profit' }
+  if (score >= 0.6) return { label: '매수 관심', color: 'bg-[var(--warning-bg)] text-warning' }
+  if (score >= 0.35) return { label: '관찰 필요', color: 'bg-secondary text-text-secondary' }
+  if (score > 0) return { label: '관망', color: 'bg-secondary text-text-muted' }
+
+  return { label: '신호 약함', color: 'bg-secondary text-text-faint' }
 }
 
 // --- Fear & Greed ---
@@ -516,31 +533,38 @@ function TopCoins() {
         </span>
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {top3.map((coin) => (
-          <a
-            key={coin.symbol}
-            href="/detection"
-            className="flex items-center justify-between rounded-md bg-secondary p-3 transition-colors hover:bg-surface-hover"
-          >
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-semibold text-text-primary">{coin.koreanName}</span>
-                <span className={`rounded-full px-1.5 py-0.5 font-mono-trading text-[12px] font-semibold ${
-                  coin.score >= 0.8 ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--warning-bg)] text-warning'
-                }`}>
-                  {Math.round(coin.score * 100)}점
-                </span>
+        {top3.map((coin) => {
+          const rec = getDetectionRecommendation(coin)
+
+          return (
+            <a
+              key={coin.symbol}
+              href="/detection"
+              className="flex items-center justify-between rounded-md bg-secondary p-3 transition-colors hover:bg-surface-hover"
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[13px] font-semibold text-text-primary">{coin.koreanName}</span>
+                  <span className={`rounded-full px-1.5 py-0.5 font-mono-trading text-[12px] font-semibold ${
+                    coin.score >= 0.8 ? 'bg-[var(--profit-bg)] text-profit' : coin.score >= 0.6 ? 'bg-[var(--warning-bg)] text-warning' : 'bg-secondary text-text-muted'
+                  }`}>
+                    {Math.round(coin.score * 100)}점
+                  </span>
+                  <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${rec.color}`}>
+                    {rec.label}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-center gap-2 text-[12px] text-text-muted">
+                  <span className="font-mono-trading">{coin.price.toLocaleString('ko-KR')}원</span>
+                  <span className={`font-mono-trading ${coin.changePct >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {coin.changePct >= 0 ? '+' : ''}{coin.changePct.toFixed(2)}%
+                  </span>
+                </div>
               </div>
-              <div className="mt-0.5 flex items-center gap-2 text-[12px] text-text-muted">
-                <span className="font-mono-trading">{coin.price.toLocaleString('ko-KR')}원</span>
-                <span className={`font-mono-trading ${coin.changePct >= 0 ? 'text-profit' : 'text-loss'}`}>
-                  {coin.changePct >= 0 ? '+' : ''}{coin.changePct.toFixed(2)}%
-                </span>
-              </div>
-            </div>
-            <ArrowRight className="h-3.5 w-3.5 text-text-faint" />
-          </a>
-        ))}
+              <ArrowRight className="h-3.5 w-3.5 text-text-faint" />
+            </a>
+          )
+        })}
       </div>
     </div>
   )

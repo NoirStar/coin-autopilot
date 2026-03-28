@@ -13,7 +13,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react'
-import { api, API_BASE, type DetectionResultItem, type DetectionCacheResponse } from '../services/api'
+import { api, getApiBase, type DetectionResultItem, type DetectionCacheResponse } from '../services/api'
 import { TermTooltip } from '../components/ui/term-tooltip'
 
 // --- 캐시된 결과 조회 ---
@@ -55,7 +55,7 @@ export function DetectionPage() {
     setScanError(null)
     setScanProgress(null)
 
-    const es = new EventSource(`${API_BASE}/api/detection/scan/stream`)
+    const es = new EventSource(`${getApiBase()}/api/detection/scan/stream`)
     let connected = false
 
     es.addEventListener('progress', (e) => {
@@ -226,7 +226,7 @@ export function DetectionPage() {
           <TermTooltip term="detection_indicators">분석 지표 안내</TermTooltip>
         </h3>
         <div className="grid grid-cols-1 gap-2 text-[12px] md:grid-cols-2">
-          <IndicatorInfo name="매수 점수" description="5개 지표의 가중 합산. 60점 이상이면 매수 시그널." />
+          <IndicatorInfo name="매수 점수" description="지표들의 가중 합산. 60점 이상이면 매수 시그널." />
           <IndicatorInfo name="RSI(14)" description="과매수/과매도 지표 (0~100). 30 이하 과매도, 70 이상 과매수." />
           <IndicatorInfo name="거래량 Z-Score" weight="20%" description="20일 평균 대비 거래량 이상치. Z 1.0~2.5 구간에서 부분점수." />
           <IndicatorInfo name="BTC 보정 급등" weight="20%" description="BTC 연동분 제거 후 독립 상승률. 0.5%~2.0% 구간에서 부분점수." />
@@ -379,8 +379,10 @@ function getRecommendation(result: DetectionResultItem): { label: string; color:
   if (score >= 0.8 && activeCount >= 4) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
   if (score >= 0.8) return { label: '매수 추천', color: 'bg-[var(--profit-bg)] text-profit' }
   if (score >= 0.6) return { label: '매수 관심', color: 'bg-[var(--warning-bg)] text-warning' }
+  if (score >= 0.35) return { label: '관찰 필요', color: 'bg-secondary text-text-secondary' }
+  if (score > 0) return { label: '관망', color: 'bg-secondary text-text-muted' }
 
-  return null
+  return { label: '신호 약함', color: 'bg-secondary text-text-faint' }
 }
 
 // --- 보조 컴포넌트 ---

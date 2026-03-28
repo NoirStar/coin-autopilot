@@ -115,6 +115,29 @@ const okx1hStrategies: Strategy[] = [
 ]
 
 let previousRegime: RegimeState = 'risk_off'
+let regimeInitialized = false
+
+/** 서버 시작 시 DB에서 마지막 레짐 상태 복원 */
+async function initPreviousRegime(): Promise<void> {
+  if (regimeInitialized) return
+  regimeInitialized = true
+
+  try {
+    const { data } = await supabase
+      .from('regime_states')
+      .select('regime')
+      .order('evaluated_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (data?.regime === 'risk_on' || data?.regime === 'risk_off') {
+      previousRegime = data.regime
+      console.log(`[시그널] DB에서 레짐 복원: ${previousRegime}`)
+    }
+  } catch {
+    console.log('[시그널] 이전 레짐 복원 실패, 기본값(risk_off) 사용')
+  }
+}
 
 /**
  * 시그널 생성 파이프라인
@@ -124,6 +147,8 @@ export async function generateSignals(): Promise<void> {
   console.log('[시그널] 파이프라인 시작')
 
   try {
+    // 서버 재시작 시 DB에서 레짐 복원 (첫 호출 시 1회만)
+    await initPreviousRegime()
     // 1. 업비트에서 직접 BTC 4h 캔들 수집 (EMA200에 최소 201개 필요)
     console.log('[시그널] BTC 4h 캔들 직접 수집 중...')
     const btcCandles = await fetchUpbitDirect('KRW-BTC', '4h', 500)

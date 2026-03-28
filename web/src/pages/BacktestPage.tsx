@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { TermTooltip } from '@/components/ui/term-tooltip'
-import { API_BASE } from '@/services/api'
+import { getApiBase } from '@/services/api'
 
 interface BacktestTradeResult {
   symbol: string
@@ -73,7 +73,7 @@ export function BacktestPage() {
   const mutation = useMutation({
     mutationFn: async () => {
       setBtProgress(null)
-      const res = await fetch(`${API_BASE}/api/backtest/run/stream`, {
+      const res = await fetch(`${getApiBase()}/api/backtest/run/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

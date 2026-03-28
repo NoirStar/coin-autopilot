@@ -117,6 +117,91 @@ settingsRoutes.put('/alerts', async (c) => {
   return c.json({ success: true })
 })
 
+/** PUT /api/settings/api-keys — API 키 저장 */
+settingsRoutes.put('/api-keys', async (c) => {
+  const userId = c.get('userId')
+
+  const schema = z.object({
+    exchange: z.enum(['upbit', 'okx']),
+    accessKey: z.string().min(1),
+    secretKey: z.string().min(1),
+    passphrase: z.string().optional(), // OKX 전용
+  })
+
+  const body = await c.req.json().catch(() => ({}))
+  const parsed = schema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: '잘못된 요청', details: parsed.error.flatten() }, 400)
+  }
+
+  const { exchange, accessKey, secretKey, passphrase } = parsed.data
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (exchange === 'upbit') {
+    updates.upbit_access_key = accessKey
+    updates.upbit_secret_key = secretKey
+    updates.upbit_configured = true
+  } else {
+    updates.okx_access_key = accessKey
+    updates.okx_secret_key = secretKey
+    updates.okx_passphrase = passphrase ?? ''
+    updates.okx_configured = true
+  }
+
+  const defaults = getDefaultSettings(userId)
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({
+      ...defaults,
+      ...updates,
+    }, { onConflict: 'user_id' })
+
+  if (error) {
+    return c.json({ error: 'API 키 저장 실패' }, 500)
+  }
+
+  return c.json({ success: true })
+})
+
+/** DELETE /api/settings/api-keys/:exchange — API 키 삭제 */
+settingsRoutes.delete('/api-keys/:exchange', async (c) => {
+  const userId = c.get('userId')
+  const exchange = c.req.param('exchange')
+
+  if (exchange !== 'upbit' && exchange !== 'okx') {
+    return c.json({ error: '잘못된 거래소' }, 400)
+  }
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (exchange === 'upbit') {
+    updates.upbit_access_key = null
+    updates.upbit_secret_key = null
+    updates.upbit_configured = false
+  } else {
+    updates.okx_access_key = null
+    updates.okx_secret_key = null
+    updates.okx_passphrase = null
+    updates.okx_configured = false
+  }
+
+  const { error } = await supabase
+    .from('user_settings')
+    .update(updates)
+    .eq('user_id', userId)
+
+  if (error) {
+    return c.json({ error: 'API 키 삭제 실패' }, 500)
+  }
+
+  return c.json({ success: true })
+})
+
 /** GET /api/settings/agent-status — 에이전트 상태 */
 settingsRoutes.get('/agent-status', async (c) => {
   // 현재 에이전트는 같은 프로세스에서 실행 — 크론 상태 반환

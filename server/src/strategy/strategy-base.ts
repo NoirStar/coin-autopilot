@@ -39,6 +39,8 @@ export interface StrategySignal {
 export interface ExitSignal {
   symbol: string
   reason: 'stop_loss' | 'take_profit' | 'time_exit' | 'regime_stop'
+  /** 부분 청산 비율 (0.5 = 50%). 미지정 시 전량 청산 */
+  partialExitRatio?: number
   reasoning: Record<string, unknown>
 }
 

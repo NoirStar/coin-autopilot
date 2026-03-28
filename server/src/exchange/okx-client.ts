@@ -6,11 +6,10 @@ import type { Candle } from '../strategy/strategy-base.js'
  * CCXT를 래핑하여 프로젝트에서 사용하는 타입으로 변환
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let exchange: any = null
+let exchange: ccxt.okx | null = null
 
 /** OKX 인스턴스 초기화 (싱글턴) */
-export function getOkxExchange() {
+export function getOkxExchange(): ccxt.okx {
   if (exchange) return exchange
 
   const apiKey = process.env.OKX_API_KEY || ''
@@ -118,8 +117,7 @@ export async function fetchOpenPositions(): Promise<OkxPosition[]> {
   const okx = getOkxExchange()
   const positions = await okx.fetchPositions()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (positions as any[])
+  return positions
     .filter((p) => parseFloat(String(p.contracts ?? 0)) > 0)
     .map((p) => ({
       symbol: String(p.symbol ?? '').replace('/USDT:USDT', ''),
@@ -139,7 +137,7 @@ export async function fetchBalance(): Promise<{ total: number; free: number; use
   const okx = getOkxExchange()
   const balance = await okx.fetchBalance({ type: 'swap' })
 
-  const usdt = balance?.USDT ?? balance?.total?.USDT ? balance : { USDT: { total: 0, free: 0, used: 0 } }
+  const usdt = (balance?.USDT ?? balance?.total?.USDT) ? balance : { USDT: { total: 0, free: 0, used: 0 } }
 
   return {
     total: parseFloat(String(usdt.USDT?.total ?? balance?.total?.USDT ?? 0)),
@@ -292,8 +290,7 @@ export async function fetchOpenOrders(symbol?: string): Promise<OrderResult[]> {
 
   const orders = await okx.fetchOpenOrders(pair)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (orders as any[]).map((o) => ({
+  return orders.map((o) => ({
     id: String(o.id),
     symbol: String(o.symbol ?? '').replace('/USDT:USDT', ''),
     side: o.side as 'buy' | 'sell',

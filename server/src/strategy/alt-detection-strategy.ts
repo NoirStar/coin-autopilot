@@ -115,7 +115,7 @@ export class AltDetectionStrategy implements Strategy {
     }>
   ): ExitSignal[] {
     const exits: ExitSignal[] = []
-    const { takeProfitPct1, stopLossPct, timeLimitCandles } = this.config.params
+    const { takeProfitPct1, takeProfitPct2, stopLossPct, timeLimitCandles } = this.config.params
 
     for (const pos of openPositions) {
       const altCandles = candles.get(pos.symbol)
@@ -139,8 +139,8 @@ export class AltDetectionStrategy implements Strategy {
         continue
       }
 
-      // 2. 익절: +5% 이상
-      if (pnlPct >= takeProfitPct1) {
+      // 2. 2단계 익절: +10% 전량 청산
+      if (pnlPct >= takeProfitPct2) {
         exits.push({
           symbol: pos.symbol,
           reason: 'take_profit',
@@ -148,13 +148,31 @@ export class AltDetectionStrategy implements Strategy {
             entry_price: pos.entryPrice,
             current_price: currentPrice,
             pnl_pct: Math.round(pnlPct * 100) / 100,
-            target_pct: takeProfitPct1,
+            target_pct: takeProfitPct2,
+            stage: 2,
           },
         })
         continue
       }
 
-      // 3. 시간 청산: 24시간 (24캔들)
+      // 3. 1단계 익절: +5% → 50% 부분 청산
+      if (pnlPct >= takeProfitPct1) {
+        exits.push({
+          symbol: pos.symbol,
+          reason: 'take_profit',
+          partialExitRatio: 0.5,
+          reasoning: {
+            entry_price: pos.entryPrice,
+            current_price: currentPrice,
+            pnl_pct: Math.round(pnlPct * 100) / 100,
+            target_pct: takeProfitPct1,
+            stage: 1,
+          },
+        })
+        continue
+      }
+
+      // 4. 시간 청산: 24시간 (24캔들)
       if (pos.candlesSinceEntry >= timeLimitCandles) {
         exits.push({
           symbol: pos.symbol,

@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabase'
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+/** API URL: localStorage 우선 → 환경변수 → localhost 폴백 */
+export function getApiBase(): string {
+  return localStorage.getItem('coin-autopilot-api-url') || import.meta.env.VITE_API_URL || 'http://localhost:3001'
+}
+export const API_BASE = getApiBase()
 
 export interface DetectionResultItem {
   symbol: string
@@ -51,7 +55,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const authHeaders = await getAuthHeaders()
   // AbortSignal 제거 — 탭 이동 시 진행 중인 요청이 취소되지 않도록
   const { signal: _signal, ...restOptions } = options ?? {}
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${getApiBase()}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,
@@ -111,4 +115,8 @@ export const api = {
   getAgentStatus: () => request('/api/settings/agent-status'),
   updateRiskProfile: (data: unknown) => request('/api/settings/risk-profile', { method: 'PUT', body: JSON.stringify(data) }),
   updateAlerts: (data: unknown) => request('/api/settings/alerts', { method: 'PUT', body: JSON.stringify(data) }),
+  saveApiKeys: (data: { exchange: string; accessKey: string; secretKey: string; passphrase?: string }) =>
+    request('/api/settings/api-keys', { method: 'PUT', body: JSON.stringify(data) }),
+  deleteApiKeys: (exchange: string) =>
+    request(`/api/settings/api-keys/${exchange}`, { method: 'DELETE' }),
 }

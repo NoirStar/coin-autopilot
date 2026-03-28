@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   TrendingDown,
@@ -127,7 +127,19 @@ export function DashboardPage() {
   const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true'
   const profileSelected = localStorage.getItem('profile_selected') === 'true'
   const backtestRun = (perf?.total_trades ?? 0) > 0
-  const paperStarted = false // TODO: paper session count 조회
+  const { data: paperSessionCount } = useQuery({
+    queryKey: ['paper-session-count'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('paper_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'running')
+      return count ?? 0
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  })
+  const paperStarted = (paperSessionCount ?? 0) > 0
 
   return (
     <div className="space-y-5">

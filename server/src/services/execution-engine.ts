@@ -239,9 +239,15 @@ async function executeStrategy(
       const result = await createMarketOrder(pos.symbol, side, pos.size, true)
       console.log(`[실전매매] ${pos.symbol} 청산 (${exit.reason}): ${result.status}`)
 
+      // 체결 가격 확인 — null이면 현재 시장가로 폴백
+      const exitPrice = result.price ?? pos.markPrice ?? pos.entryPrice
+      if (!result.price) {
+        console.warn(`[실전매매] ${pos.symbol} 체결가 미수신, 마크가격으로 대체: $${exitPrice}`)
+      }
+
       // DB에 거래 기록 (position id로 정확한 행 지정)
       if (dbPos?.id) {
-        await logTrade(dbPos.id as string, side, pos.entryPrice, result.price ?? 0, pos.size, exit.reason)
+        await logTrade(dbPos.id as string, side, pos.entryPrice, exitPrice, pos.size, exit.reason)
       }
     } catch (err) {
       console.error(`[실전매매] ${pos.symbol} 청산 실패:`, err)
@@ -311,6 +317,9 @@ async function executeStrategy(
 
       // 주문 실행
       const result = await createMarketOrder(signal.symbol, side, amount)
+      if (!result.price) {
+        console.warn(`[실전매매] ${signal.symbol} 체결가 미수신, 시장가 $${price}로 대체`)
+      }
       const entryPrice = result.price ?? price
       console.log(`[실전매매] ${signal.symbol} ${signal.positionSide ?? 'long'} 진입: $${entryPrice} x ${amount.toFixed(4)}`)
 

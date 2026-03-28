@@ -135,11 +135,13 @@ paperTradingRoutes.get('/compare', async (c) => {
 /** GET /api/paper-trading/session/:id/positions — 세션의 가상 포지션 */
 paperTradingRoutes.get('/session/:id/positions', async (c) => {
   const userId = c.get('userId')
+  const sessionId = c.req.param('id')
 
   const { data, error } = await supabase
     .from('positions')
     .select('*')
     .eq('user_id', userId)
+    .eq('session_id', sessionId)
     .eq('session_type', 'paper')
     .eq('status', 'open')
     .order('opened_at', { ascending: false })

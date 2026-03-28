@@ -11,7 +11,7 @@ import type {
 const DEFAULT_PARAMS = {
   donchianPeriod: 20,
   atrPeriod: 14,
-  atrStopMult: 1.5,
+  atrStopMult: 2.0,
   atrTrailMult: 3.0,
   volumeMultiplier: 2.0,
   timeLimitCandles: 20,     // 20 x 1H = 20시간
