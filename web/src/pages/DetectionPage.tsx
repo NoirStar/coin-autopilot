@@ -141,7 +141,7 @@ export function DetectionPage() {
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-text-muted">
+      <p className="text-[12px] text-text-muted">
         {STRATEGY_TABS.find((t) => t.id === strategy)?.desc}
       </p>
 
@@ -160,7 +160,7 @@ export function DetectionPage() {
               {data.detected}개
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+          <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
             <Clock className="h-3 w-3" />
             {getTimeAgo(data.scannedAt)}
           </div>
@@ -211,7 +211,7 @@ export function DetectionPage() {
         <div className="card-surface rounded-md py-12 text-center" style={{ border: '1px dashed var(--border)' }}>
           <Search className="mx-auto mb-3 h-8 w-8 text-text-faint" />
           <p className="text-[13px] font-medium text-text-secondary">현재 탐지된 코인이 없습니다</p>
-          <p className="mt-1 text-[11px] text-text-muted">
+          <p className="mt-1 text-[12px] text-text-muted">
             {strategy === 'composite' && '5개 지표 중 3개 이상 합의해야 시그널이 발생합니다'}
             {strategy === 'oversold' && 'RSI(14)가 30 이하인 과매도 코인이 없습니다'}
             {strategy === 'momentum' && 'RSI 50~70 구간의 건강한 상승 종목이 없습니다'}
@@ -235,7 +235,7 @@ export function DetectionPage() {
       {/* 지표 설명 */}
       <div className="card-surface rounded-md p-4">
         <h3 className="data-table-header mb-3">탐지 지표</h3>
-        <div className="grid grid-cols-1 gap-2 text-[11px] md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 text-[12px] md:grid-cols-2">
           <IndicatorInfo name="RSI(14)" description="과매수/과매도 지표 (0~100). 30↓ 과매도, 70↑ 과매수" />
           <IndicatorInfo name="ATR%" description="가격 대비 평균 변동폭의 비율(%). 4%↓ 조용, 6%↑ 격변" />
           <IndicatorInfo name="거래량 Z-Score" weight="25%" description="20일 평균 대비 거래량 이상치 (Z > 2.5)" />
@@ -262,19 +262,19 @@ function DetectionCard({ result, strategy }: { result: DetectionResult; strategy
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
             <span className="text-[15px] font-semibold text-text-primary">{result.koreanName || result.symbol}</span>
-            <span className="text-[11px] text-text-muted">{result.symbol}</span>
+            <span className="text-[12px] text-text-muted">{result.symbol}</span>
           </div>
           <ScoreBadge score={result.score} strategy={strategy} />
           <RecommendBadge result={result} strategy={strategy} />
           {result.changePct !== 0 && (
-            <span className={`flex items-center gap-0.5 font-mono-trading text-[11px] ${result.changePct > 0 ? 'text-profit' : 'text-loss'}`}>
+            <span className={`flex items-center gap-0.5 font-mono-trading text-[12px] ${result.changePct > 0 ? 'text-profit' : 'text-loss'}`}>
               {result.changePct > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
               {result.changePct > 0 ? '+' : ''}{result.changePct.toFixed(2)}%
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="font-mono-trading text-[11px] text-text-muted">
+          <span className="font-mono-trading text-[12px] text-text-muted">
             {result.price ? `₩${result.price.toLocaleString()}` : ''}
           </span>
           {expanded
@@ -293,13 +293,13 @@ function DetectionCard({ result, strategy }: { result: DetectionResult; strategy
           value={(result.signals.volumeZScore.value as number).toFixed(1)}
           color={(result.signals.volumeZScore.value as number) > 2.5 ? 'profit' : 'muted'}
         />
-        <span className="mx-1 self-center text-[11px] text-text-faint">|</span>
+        <span className="mx-1 self-center text-[12px] text-text-faint">|</span>
         <SignalDot label="거래량" active={result.signals.volumeZScore.active} />
         <SignalDot label="BTC보정" active={result.signals.btcAdjustedPump.active} />
         <SignalDot label="호가" active={result.signals.orderbookImbalance.active} />
         <SignalDot label="OBV" active={result.signals.obvDivergence.active} />
         <SignalDot label="9시" active={result.signals.morningReset.active} />
-        <span className="ml-auto text-[11px] text-text-muted">{activeCount}/5</span>
+        <span className="ml-auto text-[12px] text-text-muted">{activeCount}/5</span>
       </div>
 
       {/* 상세 */}
@@ -362,7 +362,7 @@ function ScoreBadge({ score, strategy }: { score: number; strategy: StrategyType
   }
 
   return (
-    <span className={`rounded-full px-2 py-0.5 font-mono-trading text-[11px] font-semibold ${color}`}>
+    <span className={`rounded-full px-2 py-0.5 font-mono-trading text-[12px] font-semibold ${color}`}>
       {label}
     </span>
   )
@@ -401,7 +401,7 @@ function RecommendBadge({ result, strategy }: { result: DetectionResult; strateg
   const rec = getRecommendation(result, strategy)
   if (!rec) return null
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${rec.color}`}>
+    <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${rec.color}`}>
       {rec.label}
     </span>
   )
@@ -410,7 +410,7 @@ function RecommendBadge({ result, strategy }: { result: DetectionResult; strateg
 function MetricPill({ label, value, color }: { label: string; value: string; color: string }) {
   const colorClass = color === 'profit' ? 'text-profit' : color === 'loss' ? 'text-loss' : color === 'warning' ? 'text-warning' : 'text-text-muted'
   return (
-    <span className={`rounded-md bg-secondary px-2 py-0.5 text-[11px] ${colorClass}`}>
+    <span className={`rounded-md bg-secondary px-2 py-0.5 text-[12px] ${colorClass}`}>
       <span className="text-text-muted">{label}</span> <span className="font-mono-trading font-medium">{value}</span>
     </span>
   )
@@ -420,16 +420,16 @@ function MetricBox({ label, value, desc, color }: { label: string; value: string
   const colorClass = color === 'profit' ? 'text-profit' : color === 'loss' ? 'text-loss' : color === 'warning' ? 'text-warning' : 'text-text-secondary'
   return (
     <div className="rounded-md bg-secondary p-2 text-center">
-      <div className="text-[11px] text-text-muted">{label}</div>
+      <div className="text-[12px] text-text-muted">{label}</div>
       <div className={`font-mono-trading text-[14px] font-semibold ${colorClass}`}>{value}</div>
-      {desc && <div className="text-[11px] text-text-muted">{desc}</div>}
+      {desc && <div className="text-[12px] text-text-muted">{desc}</div>}
     </div>
   )
 }
 
 function SignalDot({ label, active }: { label: string; active: boolean }) {
   return (
-    <div className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+    <div className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] ${
       active ? 'bg-[var(--profit-bg)] text-profit' : 'bg-secondary text-text-faint'
     }`}>
       <span className={`inline-block h-1.5 w-1.5 rounded-full ${active ? 'bg-profit' : 'bg-text-faint'}`} />
@@ -452,7 +452,7 @@ function SignalDetail({ label, active, value, threshold }: {
       </div>
       <div className="flex items-center gap-3">
         <span className={`font-mono-trading ${active ? 'text-profit' : 'text-text-faint'}`}>{value}</span>
-        <span className="text-[11px] text-text-muted">기준: {threshold}</span>
+        <span className="text-[12px] text-text-muted">기준: {threshold}</span>
       </div>
     </div>
   )
@@ -463,9 +463,9 @@ function IndicatorInfo({ name, weight, description }: { name: string; weight?: s
     <div className="rounded-md bg-secondary p-2.5">
       <div className="flex items-center justify-between">
         <span className="font-medium text-text-secondary">{name}</span>
-        {weight && <span className="font-mono-trading text-[11px] text-text-muted">{weight}</span>}
+        {weight && <span className="font-mono-trading text-[12px] text-text-muted">{weight}</span>}
       </div>
-      <p className="mt-0.5 text-[11px] text-text-muted">{description}</p>
+      <p className="mt-0.5 text-[12px] text-text-muted">{description}</p>
     </div>
   )
 }

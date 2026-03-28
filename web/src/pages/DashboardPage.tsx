@@ -238,10 +238,10 @@ function KpiCard({ title, value, unit, sub, change, icon, variant }: {
         }`}>
           {value}
         </span>
-        {unit && <span className="text-[11px] text-text-muted">{unit}</span>}
+        {unit && <span className="text-[12px] text-text-muted">{unit}</span>}
       </div>
       {change !== undefined && change !== null && (
-        <div className={`mt-1.5 flex items-center gap-1 text-[11px] font-medium ${
+        <div className={`mt-1.5 flex items-center gap-1 text-[12px] font-medium ${
           change >= 0 ? 'text-profit' : 'text-loss'
         }`}>
           {change >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
@@ -249,7 +249,7 @@ function KpiCard({ title, value, unit, sub, change, icon, variant }: {
           <span className="ml-1 text-text-muted">vs 어제</span>
         </div>
       )}
-      {sub && <div className="mt-0.5 text-[11px] text-text-muted">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[12px] text-text-muted">{sub}</div>}
     </div>
   )
 }
@@ -259,7 +259,7 @@ function RegimeBadge({ regime }: { regime: RegimeState }) {
   const timeAgo = getTimeAgo(regime.timestamp)
 
   return (
-    <div className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+    <div className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-[12px] font-medium ${
       isOn
         ? 'border-profit bg-[var(--profit-bg)] text-profit'
         : 'border-loss bg-[var(--loss-bg)] text-loss'
@@ -347,7 +347,7 @@ function SignalFeed({ signals }: { signals: Signal[] }) {
           <Radio className="h-3 w-3" />
           최근 시그널
         </h3>
-        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[11px] text-text-muted">
+        <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[12px] text-text-muted">
           {signals.length}건
         </span>
       </div>
@@ -357,7 +357,7 @@ function SignalFeed({ signals }: { signals: Signal[] }) {
             <div key={sig.id} className="flex items-center gap-3 rounded-md bg-surface px-3 py-2 text-[13px]">
               <span className="text-text-muted">{getTimeAgo(sig.created_at)}</span>
               <span className="font-medium text-text-primary">{sig.symbol}</span>
-              <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
+              <span className={`rounded-md px-1.5 py-0.5 text-[12px] font-semibold ${
                 sig.direction === 'buy'
                   ? 'bg-[var(--profit-bg)] text-profit'
                   : 'bg-[var(--loss-bg)] text-loss'
@@ -380,7 +380,7 @@ function SignalFeed({ signals }: { signals: Signal[] }) {
               <Clock className="h-3.5 w-3.5 text-text-faint" />
             </div>
             <p className="text-[13px] text-text-muted">시그널 기록 없음</p>
-            <p className="mt-0.5 text-[11px] text-text-muted">4시간마다 시그널이 생성됩니다</p>
+            <p className="mt-0.5 text-[12px] text-text-muted">4시간마다 시그널이 생성됩니다</p>
           </div>
         </div>
       )}
@@ -424,14 +424,14 @@ function ScanStatusWidget() {
           {scanData.results.slice(0, 3).map((r) => (
             <span
               key={r.symbol}
-              className="rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]"
+              className="rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[12px] font-medium text-[var(--accent)]"
             >
               {r.symbol}
             </span>
           ))}
         </div>
       )}
-      <div className="ml-auto flex items-center gap-1 text-[11px] text-text-muted">
+      <div className="ml-auto flex items-center gap-1 text-[12px] text-text-muted">
         <Clock className="h-3 w-3" />
         {getTimeAgo(scanData.scannedAt)}
       </div>

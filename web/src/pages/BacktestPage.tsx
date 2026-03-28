@@ -213,13 +213,13 @@ export function BacktestPage() {
           <AlertTriangle className="h-4 w-4 shrink-0 text-loss" />
           <div>
             <p className="text-[13px] font-medium text-text-secondary">백테스트 실행 실패</p>
-            <p className="mt-0.5 text-[11px] text-text-muted">
+            <p className="mt-0.5 text-[12px] text-text-muted">
               {(mutation.error as Error)?.message ?? '알 수 없는 오류'}
             </p>
           </div>
           <button
             onClick={() => mutation.mutate()}
-            className="ml-auto flex items-center gap-1 rounded-md bg-secondary px-3 py-1.5 text-[11px] text-text-secondary transition-colors hover:bg-surface-hover"
+            className="ml-auto flex items-center gap-1 rounded-md bg-secondary px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-surface-hover"
           >
             <RotateCcw className="h-3 w-3" />
             재시도
@@ -236,7 +236,7 @@ export function BacktestPage() {
           <p className="text-[13px] font-medium text-text-secondary">
             백테스트를 실행하면 결과가 여기에 표시됩니다
           </p>
-          <p className="mt-1 text-[11px] text-text-muted">
+          <p className="mt-1 text-[12px] text-text-muted">
             설정을 조정하고 "백테스트 실행" 버튼을 클릭하세요
           </p>
         </div>
@@ -364,7 +364,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
         <div className="flex gap-1">
           <button
             onClick={() => setSortBy('time')}
-            className={`rounded-md px-2 py-1 text-[11px] ${
+            className={`rounded-md px-2 py-1 text-[12px] ${
               sortBy === 'time' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-text-muted'
             }`}
           >
@@ -372,7 +372,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
           </button>
           <button
             onClick={() => setSortBy('pnl')}
-            className={`rounded-md px-2 py-1 text-[11px] ${
+            className={`rounded-md px-2 py-1 text-[12px] ${
               sortBy === 'pnl' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-text-muted'
             }`}
           >
@@ -420,7 +420,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
           </tbody>
         </table>
         {trades.length > 50 && (
-          <div className="border-t border-border-subtle px-4 py-2 text-center text-[11px] text-text-muted">
+          <div className="border-t border-border-subtle px-4 py-2 text-center text-[12px] text-text-muted">
             최근 50건 표시 (전체 {trades.length}건)
           </div>
         )}
@@ -433,7 +433,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-text-primary">{trade.symbol}</span>
-                <span className="text-[11px] text-text-muted">
+                <span className="text-[12px] text-text-muted">
                   {reasonLabels[trade.reason] ?? trade.reason}
                 </span>
               </div>
@@ -443,7 +443,7 @@ function TradeHistory({ trades }: { trades: BacktestTradeResult[] }) {
                 {trade.pnlPct >= 0 ? '+' : ''}{trade.pnlPct.toFixed(2)}%
               </span>
             </div>
-            <div className="mt-1 flex gap-3 text-[11px] text-text-muted">
+            <div className="mt-1 flex gap-3 text-[12px] text-text-muted">
               <span>진입: {formatPrice(trade.entryPrice)}</span>
               <span>청산: {formatPrice(trade.exitPrice)}</span>
               <span>{new Date(trade.exitTime).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}</span>
@@ -474,7 +474,7 @@ function KpiCard({ label, value, sub, icon, variant }: {
       }`}>
         {value}
       </div>
-      {sub && <div className="mt-0.5 text-[11px] text-text-muted">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[12px] text-text-muted">{sub}</div>}
     </div>
   )
 }
@@ -486,7 +486,7 @@ function InputField({ label, value, disabled }: {
 }) {
   return (
     <div>
-      <label className="text-[11px] font-medium text-text-muted">{label}</label>
+      <label className="text-[12px] font-medium text-text-muted">{label}</label>
       <div className={`mt-1 rounded-md border border-border-subtle bg-surface px-3 py-2 text-[13px] ${
         disabled ? 'text-text-muted' : 'text-text-primary'
       }`}>
@@ -506,7 +506,7 @@ function NumberInput({ label, value, onChange, min, max, step }: {
 }) {
   return (
     <div>
-      <label className="text-[11px] font-medium text-text-muted">{label}</label>
+      <label className="text-[12px] font-medium text-text-muted">{label}</label>
       <input
         type="number"
         value={value}

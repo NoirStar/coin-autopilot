@@ -151,7 +151,7 @@ export function StrategyPage() {
                   <Icon className={`h-4 w-4 ${isActive ? 'text-[var(--accent)]' : 'text-text-muted'}`} />
                   <h4 className="text-[13px] font-semibold">{profile.name}</h4>
                   {isActive && (
-                    <span className="rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
+                    <span className="rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[12px] font-medium text-[var(--accent)]">
                       선택됨
                     </span>
                   )}
@@ -261,12 +261,12 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
         <div className="flex items-center gap-2">
           <h4 className="text-[13px] font-medium">{strategy.name}</h4>
           {strategy.is_active && isImplemented && (
-            <span className="rounded bg-[var(--profit-bg)] px-2 py-0.5 text-[11px] font-semibold text-profit">
+            <span className="rounded bg-[var(--profit-bg)] px-2 py-0.5 text-[12px] font-semibold text-profit">
               활성
             </span>
           )}
           {!isImplemented && (
-            <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[11px] text-text-muted">
+            <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[12px] text-text-muted">
               <Lock className="h-2.5 w-2.5" />
               개발 중
             </span>
@@ -276,7 +276,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
           <button
             onClick={() => toggleMutation.mutate()}
             disabled={toggleMutation.isPending}
-            className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
               strategy.is_active
                 ? 'bg-[var(--profit-bg)] text-profit hover:bg-profit hover:text-background'
                 : 'bg-muted text-text-muted hover:bg-secondary hover:text-text-secondary'
@@ -292,17 +292,17 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
         )}
       </div>
 
-      <p className="mt-1.5 text-[11px] text-text-muted">
+      <p className="mt-1.5 text-[12px] text-text-muted">
         {strategyDescriptions[strategy.type] ?? strategy.type}
       </p>
-      <p className="mt-0.5 font-mono-trading text-[11px] text-text-faint">{strategy.type}</p>
+      <p className="mt-0.5 font-mono-trading text-[12px] text-text-faint">{strategy.type}</p>
 
       {/* 파라미터 편집 (구현된 전략만) */}
       {isImplemented && (
         <>
           <button
             onClick={() => setShowParams(!showParams)}
-            className="mt-3 flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary"
+            className="mt-3 flex items-center gap-1 text-[12px] text-text-muted hover:text-text-secondary"
           >
             <Settings2 className="h-3 w-3" />
             {showParams ? '파라미터 닫기' : '파라미터 설정'}
@@ -314,7 +314,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
                 const value = currentParams[param.key] ?? DEFAULT_PARAMS[param.key]
                 return (
                   <div key={param.key} className="flex items-center justify-between gap-4">
-                    <label className="text-[11px] text-text-muted">
+                    <label className="text-[12px] text-text-muted">
                       {param.term ? (
                         <TermTooltip term={param.term}>{param.label}</TermTooltip>
                       ) : (
@@ -332,7 +332,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
                         className="w-20 rounded border border-border bg-background px-2 py-1 font-mono-trading text-[12px] text-text-primary focus:border-[var(--accent)] focus:outline-none"
                       />
                       {param.unit && (
-                        <span className="text-[11px] text-text-muted">{param.unit}</span>
+                        <span className="text-[12px] text-text-muted">{param.unit}</span>
                       )}
                     </div>
                   </div>
@@ -343,7 +343,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
                 <button
                   onClick={handleSave}
                   disabled={!editingParams || saveMutation.isPending}
-                  className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+                  className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-background transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
                 >
                   {saveMutation.isPending ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -354,7 +354,7 @@ function StrategyCard({ strategy }: { strategy: StrategyData }) {
                 </button>
                 <button
                   onClick={handleReset}
-                  className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-[11px] font-medium text-text-muted transition-colors hover:bg-secondary"
+                  className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-secondary"
                 >
                   <RotateCcw className="h-3 w-3" />
                   기본값 복원

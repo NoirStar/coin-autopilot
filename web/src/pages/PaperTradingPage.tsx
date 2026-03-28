@@ -62,7 +62,7 @@ export function PaperTradingPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-text-muted">
+          <span className="text-[12px] text-text-muted">
             활성 세션: {runningSessions.length}/10
           </span>
           <button
@@ -104,7 +104,7 @@ export function PaperTradingPage() {
         <div className="card-surface rounded-md p-10 text-center" style={{ border: '1px dashed var(--border)' }}>
           <Play className="mx-auto mb-3 h-8 w-8 text-text-faint" />
           <p className="text-[13px] font-medium text-text-secondary">첫 가상매매 세션을 시작하세요</p>
-          <p className="mt-1 text-[11px] text-text-muted">
+          <p className="mt-1 text-[12px] text-text-muted">
             전략을 선택하고 가상 자본으로 실시간 시뮬레이션을 진행합니다
           </p>
           <button
@@ -137,7 +137,7 @@ export function PaperTradingPage() {
             ))}
             <button
               onClick={() => setShowCompare(!showCompare)}
-              className={`ml-auto flex items-center gap-1 px-3 py-2 text-[11px] transition-colors ${
+              className={`ml-auto flex items-center gap-1 px-3 py-2 text-[12px] transition-colors ${
                 showCompare ? 'text-[var(--accent)]' : 'text-text-faint hover:text-text-muted'
               }`}
             >
@@ -195,7 +195,7 @@ function SessionDetail({ session }: { session: PaperSessionRow }) {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-[14px] font-medium">{session.name}</h3>
-            <p className="text-[11px] text-text-muted">
+            <p className="text-[12px] text-text-muted">
               시작: {startedAgo} | 초기: {formatKrwShort(session.initial_capital)}
             </p>
           </div>
@@ -204,7 +204,7 @@ function SessionDetail({ session }: { session: PaperSessionRow }) {
               <button
                 onClick={() => actionMutation.mutate('pause')}
                 disabled={actionMutation.isPending}
-                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-text-muted hover:bg-secondary"
+                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-text-muted hover:bg-secondary"
               >
                 <Pause className="h-3 w-3" />
                 일시정지
@@ -214,7 +214,7 @@ function SessionDetail({ session }: { session: PaperSessionRow }) {
               <button
                 onClick={() => actionMutation.mutate('resume')}
                 disabled={actionMutation.isPending}
-                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-profit hover:bg-[var(--profit-bg)]"
+                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-profit hover:bg-[var(--profit-bg)]"
               >
                 <Play className="h-3 w-3" />
                 재개
@@ -224,7 +224,7 @@ function SessionDetail({ session }: { session: PaperSessionRow }) {
               <button
                 onClick={() => actionMutation.mutate('stop')}
                 disabled={actionMutation.isPending}
-                className="flex items-center gap-1 rounded-md border border-loss px-2.5 py-1 text-[11px] text-loss hover:bg-[var(--loss-bg)]"
+                className="flex items-center gap-1 rounded-md border border-loss px-2.5 py-1 text-[12px] text-loss hover:bg-[var(--loss-bg)]"
               >
                 <Square className="h-3 w-3" />
                 종료
@@ -265,7 +265,7 @@ function SessionDetail({ session }: { session: PaperSessionRow }) {
           <div className="text-center">
             <Inbox className="mx-auto mb-2 h-6 w-6 text-text-faint" />
             <p className="text-[13px] text-text-muted">아직 진입 조건을 충족한 종목이 없습니다</p>
-            <p className="mt-0.5 text-[11px] text-text-muted">다음 4H 분석에서 시그널이 발생하면 자동 진입합니다</p>
+            <p className="mt-0.5 text-[12px] text-text-muted">다음 4H 분석에서 시그널이 발생하면 자동 진입합니다</p>
           </div>
         </div>
       </div>
@@ -292,7 +292,7 @@ function KpiCard({ label, value, sub, positive }: {
       <p className="text-[12px] font-semibold text-text-muted">{label}</p>
       <p className="mt-1 font-mono-trading text-[16px] font-bold text-text-primary">{value}</p>
       {sub && (
-        <p className={`mt-0.5 font-mono-trading text-[11px] ${
+        <p className={`mt-0.5 font-mono-trading text-[12px] ${
           positive === true ? 'text-profit' : positive === false ? 'text-loss' : 'text-text-muted'
         }`}>
           {sub}
@@ -402,7 +402,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
 
         <div className="mt-5 space-y-4">
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium text-text-muted">세션 이름</label>
+            <label className="mb-1.5 block text-[12px] font-medium text-text-muted">세션 이름</label>
             <input
               type="text"
               value={name}
@@ -413,7 +413,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium text-text-muted">초기 자본 (KRW)</label>
+            <label className="mb-1.5 block text-[12px] font-medium text-text-muted">초기 자본 (KRW)</label>
             <input
               type="number"
               value={capital}
@@ -423,7 +423,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
               step={1_000_000}
               className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono-trading text-[13px] text-text-primary focus:border-[var(--accent)] focus:outline-none"
             />
-            <p className="mt-1 text-[11px] text-text-muted">
+            <p className="mt-1 text-[12px] text-text-muted">
               {formatKrwShort(capital)}
             </p>
           </div>
@@ -447,7 +447,7 @@ function CreateSessionModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {createMutation.isError && (
-          <p className="mt-3 text-[11px] text-loss">세션 생성에 실패했습니다. 다시 시도해주세요.</p>
+          <p className="mt-3 text-[12px] text-loss">세션 생성에 실패했습니다. 다시 시도해주세요.</p>
         )}
       </div>
     </div>

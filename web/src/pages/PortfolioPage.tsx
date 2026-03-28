@@ -116,7 +116,7 @@ export function PortfolioPage() {
             <select
               value={exchangeFilter}
               onChange={(e) => { setExchangeFilter(e.target.value); setTradesPage(0) }}
-              className="rounded border border-border bg-background px-2 py-1 text-[11px] text-text-secondary focus:outline-none"
+              className="rounded border border-border bg-background px-2 py-1 text-[12px] text-text-secondary focus:outline-none"
             >
               <option value="">전체 거래소</option>
               <option value="upbit">업비트</option>
@@ -125,7 +125,7 @@ export function PortfolioPage() {
             <select
               value={daysFilter}
               onChange={(e) => { setDaysFilter(parseInt(e.target.value, 10)); setTradesPage(0) }}
-              className="rounded border border-border bg-background px-2 py-1 text-[11px] text-text-secondary focus:outline-none"
+              className="rounded border border-border bg-background px-2 py-1 text-[12px] text-text-secondary focus:outline-none"
             >
               <option value="0">전체 기간</option>
               <option value="7">최근 7일</option>
@@ -145,7 +145,7 @@ export function PortfolioPage() {
           <div className="py-10 text-center" style={{ border: '1px dashed var(--border)', borderRadius: '6px', marginTop: '16px' }}>
             <FileText className="mx-auto mb-2 h-8 w-8 text-text-faint" />
             <p className="text-[13px] font-medium text-text-secondary">거래 기록이 없습니다</p>
-            <p className="mt-1 text-[11px] text-text-muted">가상매매 또는 실전매매에서 거래가 발생하면 여기에 표시됩니다</p>
+            <p className="mt-1 text-[12px] text-text-muted">가상매매 또는 실전매매에서 거래가 발생하면 여기에 표시됩니다</p>
           </div>
         ) : (
           <>
@@ -170,7 +170,7 @@ export function PortfolioPage() {
                       <td className="px-3 py-2 text-text-secondary">{trade.exchange ?? '—'}</td>
                       <td className="px-3 py-2 font-medium text-text-primary">{trade.symbol}</td>
                       <td className="px-3 py-2">
-                        <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                        <span className={`rounded px-1.5 py-0.5 text-[12px] font-semibold ${
                           trade.direction === 'long' ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--loss-bg)] text-loss'
                         }`}>
                           {trade.direction === 'long' ? '매수' : '매도'}
@@ -200,7 +200,7 @@ export function PortfolioPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] font-medium text-text-primary">{trade.symbol}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                      <span className={`rounded px-1.5 py-0.5 text-[12px] font-semibold ${
                         trade.direction === 'long' ? 'bg-[var(--profit-bg)] text-profit' : 'bg-[var(--loss-bg)] text-loss'
                       }`}>
                         {trade.direction === 'long' ? '매수' : '매도'}
@@ -212,7 +212,7 @@ export function PortfolioPage() {
                       {trade.pnl_pct != null ? formatPercent(trade.pnl_pct) : '—'}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-text-muted">{formatDate(trade.closed_at)}</p>
+                  <p className="mt-1 text-[12px] text-text-muted">{formatDate(trade.closed_at)}</p>
                 </div>
               ))}
             </div>
@@ -227,7 +227,7 @@ export function PortfolioPage() {
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-[11px] text-text-muted">
+                <span className="text-[12px] text-text-muted">
                   {tradesPage + 1} / {totalPages}
                 </span>
                 <button
@@ -277,14 +277,14 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
           <div>
             <h3 className="data-table-header">{name} ({type})</h3>
           </div>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-text-muted">미설정</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[12px] text-text-muted">미설정</span>
         </div>
         <div className="mt-4 text-center" style={{ border: '1px dashed var(--border)', borderRadius: '6px', padding: '20px' }}>
           <Key className="mx-auto mb-2 h-6 w-6 text-text-faint" />
           <p className="text-[13px] text-text-secondary">API 키를 설정하면 잔고를 확인할 수 있습니다</p>
           <button
             onClick={onGoToSettings}
-            className="mt-3 flex items-center gap-1 mx-auto rounded-md border border-border px-3 py-1.5 text-[11px] text-text-muted hover:bg-secondary"
+            className="mt-3 flex items-center gap-1 mx-auto rounded-md border border-border px-3 py-1.5 text-[12px] text-text-muted hover:bg-secondary"
           >
             <Settings className="h-3 w-3" />
             설정으로 이동
@@ -298,7 +298,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
     <div className="card-surface rounded-md p-4">
       <div className="flex items-center justify-between">
         <h3 className="data-table-header">{name} ({type})</h3>
-        <span className="flex items-center gap-1 text-[11px] text-profit">
+        <span className="flex items-center gap-1 text-[12px] text-profit">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />
           연결됨
         </span>
@@ -309,7 +309,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
       {positions.length > 0 ? (
         <div className="mt-3 space-y-1.5">
           {positions.map((pos, i) => (
-            <div key={i} className="flex items-center justify-between text-[11px]">
+            <div key={i} className="flex items-center justify-between text-[12px]">
               <span className="text-text-secondary">{pos.symbol}</span>
               <span className="font-mono-trading text-text-muted">{pos.entryPrice.toLocaleString()}</span>
               <span className={`font-mono-trading ${pos.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
@@ -319,7 +319,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-[11px] text-text-muted">보유 코인: 없음</p>
+        <p className="mt-2 text-[12px] text-text-muted">보유 코인: 없음</p>
       )}
     </div>
   )

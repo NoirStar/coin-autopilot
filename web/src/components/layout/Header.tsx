@@ -49,7 +49,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
           <div className="hidden h-3 w-px bg-border-subtle sm:block" />
           <div className="hidden items-center gap-2 sm:flex">
             <span className="text-text-muted">레짐</span>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+            <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${
               regimeState === 'risk_on'
                 ? 'bg-[var(--profit-bg)] text-profit'
                 : regimeState === 'risk_off'
@@ -68,7 +68,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
           {!loading && (
             user ? (
               <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-hover text-[11px] font-medium text-text-secondary">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-hover text-[12px] font-medium text-text-secondary">
                   {user.email?.charAt(0).toUpperCase() ?? <User className="h-3 w-3" />}
                 </div>
                 <button
@@ -108,7 +108,7 @@ function ResetCountdown() {
 
   return (
     <div className="hidden items-center gap-1.5 rounded border border-border-subtle px-2 py-1 sm:flex">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">RESET</span>
+      <span className="text-[12px] font-semibold uppercase tracking-wider text-text-muted">RESET</span>
       <span className="font-mono-trading text-[12px] font-semibold text-warning">{timeStr}</span>
     </div>
   )

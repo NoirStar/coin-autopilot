@@ -57,10 +57,10 @@ export function WelcomeModal({ open, onClose, onComplete }: WelcomeModalProps) {
               </div>
               <div>
                 <p className="text-[13px] font-medium text-text-primary">
-                  <span className="mr-1.5 font-mono-trading text-[11px] text-text-faint">{i + 1}</span>
+                  <span className="mr-1.5 font-mono-trading text-[12px] text-text-faint">{i + 1}</span>
                   {item.label}
                 </p>
-                <p className="text-[11px] text-text-muted">{item.desc}</p>
+                <p className="text-[12px] text-text-muted">{item.desc}</p>
               </div>
             </div>
           ))}

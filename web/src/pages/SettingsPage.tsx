@@ -175,7 +175,7 @@ function ApiKeySection({ settings, isLoading }: { settings: UserSettings | undef
           permissions="읽기 + 거래 (출금 권한 금지)"
         />
       </div>
-      <p className="mt-4 text-[11px] text-text-muted">
+      <p className="mt-4 text-[12px] text-text-muted">
         API 키는 서버에 암호화되어 저장됩니다. 출금 권한은 절대 부여하지 마세요.
       </p>
     </div>
@@ -198,22 +198,22 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-[13px] font-medium">{exchange}</h4>
-          <p className="text-[11px] text-text-muted">{description}</p>
+          <p className="text-[12px] text-text-muted">{description}</p>
         </div>
         {configured ? (
-          <span className="flex items-center gap-1 rounded-full bg-[var(--profit-bg)] px-2.5 py-0.5 text-[11px] font-medium text-profit">
+          <span className="flex items-center gap-1 rounded-full bg-[var(--profit-bg)] px-2.5 py-0.5 text-[12px] font-medium text-profit">
             <Check className="h-2.5 w-2.5" />
             연결됨
           </span>
         ) : (
-          <span className="rounded bg-muted px-2 py-0.5 text-[11px] text-text-muted">미설정</span>
+          <span className="rounded bg-muted px-2 py-0.5 text-[12px] text-text-muted">미설정</span>
         )}
       </div>
 
       {!configured && !showForm && (
         <button
           onClick={() => setShowForm(true)}
-          className="mt-3 flex items-center gap-1 text-[11px] text-[var(--accent)] hover:underline"
+          className="mt-3 flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
         >
           <Key className="h-3 w-3" />
           API 키 등록
@@ -223,7 +223,7 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
       {showForm && (
         <div className="mt-3 space-y-2.5 border-t border-border-subtle pt-3">
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-text-muted">Access Key</label>
+            <label className="mb-1 block text-[12px] font-medium text-text-muted">Access Key</label>
             <input
               type="text"
               value={accessKey}
@@ -233,7 +233,7 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
             />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-text-muted">Secret Key</label>
+            <label className="mb-1 block text-[12px] font-medium text-text-muted">Secret Key</label>
             <div className="relative">
               <input
                 type={showSecret ? 'text' : 'password'}
@@ -251,15 +251,15 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
               </button>
             </div>
           </div>
-          <p className="text-[11px] text-text-muted">필요 권한: {permissions}</p>
+          <p className="text-[12px] text-text-muted">필요 권한: {permissions}</p>
           <div className="flex gap-2">
-            <button className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background hover:brightness-110">
+            <button className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-background hover:brightness-110">
               <Save className="h-3 w-3" />
               저장
             </button>
             <button
               onClick={() => setShowForm(false)}
-              className="rounded-md border border-border px-3 py-1.5 text-[11px] text-text-muted hover:bg-secondary"
+              className="rounded-md border border-border px-3 py-1.5 text-[12px] text-text-muted hover:bg-secondary"
             >
               취소
             </button>
@@ -269,9 +269,9 @@ function ApiKeyCard({ exchange, description, configured, permissions }: {
 
       {configured && (
         <div className="mt-3 flex gap-2">
-          <button className="text-[11px] text-text-muted hover:text-text-secondary">수정</button>
+          <button className="text-[12px] text-text-muted hover:text-text-secondary">수정</button>
           <span className="text-text-faint">·</span>
-          <button className="text-[11px] text-loss hover:underline">삭제</button>
+          <button className="text-[12px] text-loss hover:underline">삭제</button>
         </div>
       )}
     </div>
@@ -350,7 +350,7 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
           <h3 className="data-table-header">리스크 파라미터</h3>
         </div>
         {toast && (
-          <span className="flex items-center gap-1 text-[11px] text-profit">
+          <span className="flex items-center gap-1 text-[12px] text-profit">
             <Check className="h-3 w-3" />
             {toast}
           </span>
@@ -392,21 +392,21 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
             <button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
-              className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[11px] font-medium text-background hover:brightness-110"
+              className="flex items-center gap-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-[12px] font-medium text-background hover:brightness-110"
             >
               {saveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
               저장
             </button>
             <button
               onClick={() => { setValues(DEFAULT_RISK); }}
-              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-[11px] text-text-muted hover:bg-secondary"
+              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-[12px] text-text-muted hover:bg-secondary"
             >
               <RotateCcw className="h-3 w-3" />
               기본값 복원
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="rounded-md border border-border px-3 py-1.5 text-[11px] text-text-muted hover:bg-secondary"
+              className="rounded-md border border-border px-3 py-1.5 text-[12px] text-text-muted hover:bg-secondary"
             >
               취소
             </button>
@@ -414,7 +414,7 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
         ) : (
           <button
             onClick={() => setEditing(true)}
-            className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-[11px] text-text-muted hover:bg-secondary"
+            className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-[12px] text-text-muted hover:bg-secondary"
           >
             수정
           </button>
@@ -538,20 +538,20 @@ function DangerZone() {
           <div key={action.id} className="flex items-center justify-between">
             <div>
               <p className="text-[12px] text-text-secondary">{action.label}</p>
-              <p className="text-[11px] text-text-muted">{action.description}</p>
+              <p className="text-[12px] text-text-muted">{action.description}</p>
             </div>
             {showConfirm === action.id ? (
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-loss">정말 삭제하시겠습니까?</span>
+                <span className="text-[12px] text-loss">정말 삭제하시겠습니까?</span>
                 <button
                   onClick={() => setShowConfirm(null)}
-                  className="rounded border border-loss px-2 py-1 text-[11px] font-medium text-loss hover:bg-[var(--loss-bg)]"
+                  className="rounded border border-loss px-2 py-1 text-[12px] font-medium text-loss hover:bg-[var(--loss-bg)]"
                 >
                   확인
                 </button>
                 <button
                   onClick={() => setShowConfirm(null)}
-                  className="rounded border border-border px-2 py-1 text-[11px] text-text-muted hover:bg-secondary"
+                  className="rounded border border-border px-2 py-1 text-[12px] text-text-muted hover:bg-secondary"
                 >
                   취소
                 </button>
@@ -559,7 +559,7 @@ function DangerZone() {
             ) : (
               <button
                 onClick={() => setShowConfirm(action.id)}
-                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-text-muted hover:border-loss hover:text-loss"
+                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-text-muted hover:border-loss hover:text-loss"
               >
                 <Trash2 className="h-3 w-3" />
                 삭제

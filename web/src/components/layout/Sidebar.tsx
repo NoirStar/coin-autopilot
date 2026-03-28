@@ -64,7 +64,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <span className="h-1.5 w-1.5 rounded-full bg-profit status-active" />
             <span className="text-[12px] font-medium text-text-primary">서버 연결됨</span>
           </div>
-          <p className="mt-0.5 pl-3.5 text-[11px] text-text-muted">4H 주기 자동 실행</p>
+          <p className="mt-0.5 pl-3.5 text-[12px] text-text-muted">4H 주기 자동 실행</p>
         </div>
       </div>
     </aside>

@@ -39,7 +39,7 @@ export function OnboardingChecklist({
       <div className="flex items-center justify-between">
         <h3 className="text-[12px] font-semibold text-text-primary">시작 가이드</h3>
         <div className="flex items-center gap-2">
-          <span className="font-mono-trading text-[11px] text-text-muted">
+          <span className="font-mono-trading text-[12px] text-text-muted">
             {completedCount}/{items.length}
           </span>
           <button onClick={onDismiss} className="text-text-faint hover:text-text-muted" title="닫기">

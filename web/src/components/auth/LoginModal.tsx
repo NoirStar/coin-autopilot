@@ -105,13 +105,13 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
 
             <div className="my-4 flex items-center gap-3">
               <div className="h-px flex-1 bg-border-subtle" />
-              <span className="text-[11px] text-text-faint">또는</span>
+              <span className="text-[12px] text-text-faint">또는</span>
               <div className="h-px flex-1 bg-border-subtle" />
             </div>
 
             {/* Email magic link */}
             <form onSubmit={handleEmailLogin}>
-              <label className="text-[11px] font-medium text-text-muted">이메일</label>
+              <label className="text-[12px] font-medium text-text-muted">이메일</label>
               <input
                 type="email"
                 required
@@ -138,7 +138,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
         )}
 
         {error && (
-          <p className="mt-3 text-center text-[11px] text-loss">{error}</p>
+          <p className="mt-3 text-center text-[12px] text-loss">{error}</p>
         )}
       </div>
     </div>
