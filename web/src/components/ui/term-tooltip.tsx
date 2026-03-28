@@ -22,7 +22,7 @@ const TERM_DICTIONARY: Record<string, string> = {
   market_temperature: '시장 온도 (0~100). BTC 레짐, 공포/탐욕 지수, BTC 도미넌스, 활성 시그널을 종합한 매수 적합도. 높을수록 매수에 유리한 시장 분위기',
   btc_dominance: 'BTC가 전체 암호화폐 시장에서 차지하는 비중(%). 낮을수록 자금이 알트코인으로 이동 중이라 알트코인 매수에 유리',
   top_coins: '코인 분석에서 매수 점수가 가장 높은 상위 3개 코인. 점수는 거래량, 호가, OBV 등 5개 지표의 가중 합산',
-  detection_indicators: '알트코인 분석에 사용하는 5개 지표. 각 지표의 활성 여부와 가중치를 합산하여 매수 점수를 산출',
+  detection_indicators: '알트코인 분석에 사용하는 지표. 각 지표의 활성 여부와 가중치를 합산하여 매수 점수를 산출',
 }
 
 interface TermTooltipProps {

@@ -1,15 +1,17 @@
 /**
- * 복합 스코어링 시스템
+ * 복합 스코어링 시스템 v2 — 부분점수제
  *
- * 5개 Tier 1 지표의 가중합산으로 최종 스코어 산출.
- * 스코어 > 0.6이면 시그널 발생.
+ * 6개 지표의 가중합산으로 최종 스코어 산출.
+ * 각 지표는 0.0~1.0 사이의 연속 부분점수를 반환 (이진 ON/OFF → 그라데이션).
+ * 최종 스코어 > 0.35이면 시그널 발생.
  *
  * 가중치:
- * - 거래량 Z-Score:      0.25
- * - BTC 보정 급등:       0.25
- * - 호가 Bid-Ask Ratio:  0.20
- * - OBV 다이버전스:      0.15
- * - 9시 리셋 모멘텀:     0.15
+ * - 거래량 Z-Score:       0.20
+ * - BTC 보정 급등:        0.20
+ * - 호가 Bid-Ask Ratio:   0.15
+ * - OBV 다이버전스:       0.15
+ * - 일중 모멘텀:          0.15  (기존 9시 리셋 확장)
+ * - RSI 과매도 반등:      0.15  (신규)
  */
 
 import type { Candle } from '../strategy/strategy-base.js'
@@ -17,8 +19,7 @@ import { detectVolumeAnomaly } from './volume-zscore.js'
 import { detectBtcAdjustedPump } from './btc-adjusted-pump.js'
 import { detectOrderbookImbalance, type OrderbookSnapshot } from './orderbook-imbalance.js'
 import { detectOBVDivergence } from './obv-divergence.js'
-import { detectMorningResetMomentum } from './morning-reset.js'
-import { calcRSI, calcATRPercent, calcZScore } from '../indicator/indicator-engine.js'
+import { calcRSI, calcATRPercent } from '../indicator/indicator-engine.js'
 
 interface DetectionInput {
   symbol: string
@@ -39,24 +40,33 @@ interface DetectionResult {
   changePct: number           // 24시간 변동률 %
   price: number               // 현재가
   signals: {
-    volumeZScore: { active: boolean; value: number; weight: number }
-    btcAdjustedPump: { active: boolean; value: number; weight: number }
-    orderbookImbalance: { active: boolean; value: number; weight: number }
-    obvDivergence: { active: boolean; value: string; weight: number }
-    morningReset: { active: boolean; value: number; weight: number }
+    volumeZScore: { active: boolean; value: number; weight: number; partialScore: number }
+    btcAdjustedPump: { active: boolean; value: number; weight: number; partialScore: number }
+    orderbookImbalance: { active: boolean; value: number; weight: number; partialScore: number }
+    obvDivergence: { active: boolean; value: string; weight: number; partialScore: number }
+    dailyMomentum: { active: boolean; value: number; weight: number; partialScore: number }
+    rsiOversold: { active: boolean; value: number; weight: number; partialScore: number }
   }
   reasoning: Record<string, unknown>
 }
 
 const WEIGHTS = {
-  volumeZScore: 0.25,
-  btcAdjustedPump: 0.25,
-  orderbookImbalance: 0.20,
+  volumeZScore: 0.20,
+  btcAdjustedPump: 0.20,
+  orderbookImbalance: 0.15,
   obvDivergence: 0.15,
-  morningReset: 0.15,
+  dailyMomentum: 0.15,
+  rsiOversold: 0.15,
 }
 
-const SCORE_THRESHOLD = 0.6
+const SCORE_THRESHOLD = 0.35
+
+/** 선형 보간 부분점수: min 이하 → 0, max 이상 → 1, 사이 → 선형 */
+function partialLinear(value: number, min: number, max: number): number {
+  if (value <= min) return 0
+  if (value >= max) return 1
+  return (value - min) / (max - min)
+}
 
 export function computeDetectionScore(input: DetectionInput): DetectionResult {
   const volumes = input.candles.map((c) => c.volume)
@@ -67,7 +77,7 @@ export function computeDetectionScore(input: DetectionInput): DetectionResult {
   // RSI(14) & ATR%(14) — 보조 지표
   const rsiValues = calcRSI(closes, 14)
   const atrPctValues = calcATRPercent(highs, lows, closes, 14)
-  const rsi14 = rsiValues.length > 0 ? rsiValues[rsiValues.length - 1] : 0
+  const rsi14 = rsiValues.length > 0 ? rsiValues[rsiValues.length - 1] : 50
   const atrPct = atrPctValues.length > 0 ? atrPctValues[atrPctValues.length - 1] : 0
 
   // 24시간 변동률 (candles가 1h면 24개 전)
@@ -76,40 +86,55 @@ export function computeDetectionScore(input: DetectionInput): DetectionResult {
     ? ((closes[closes.length - 1] - closes[closes.length - 1 - lookback]) / closes[closes.length - 1 - lookback]) * 100
     : 0
 
-  // 1. 거래량 Z-Score
+  // ── 1. 거래량 Z-Score (z=1.0→0, z=2.5→1.0) ──
   const volumeResult = detectVolumeAnomaly(volumes)
+  const volPartial = partialLinear(volumeResult.zScore, 1.0, 2.5)
 
-  // 2. BTC 보정 급등
+  // ── 2. BTC 보정 급등 (adj=0.5%→0, adj=2.0%→1.0) ──
   const btcAdjResult = detectBtcAdjustedPump(closes, input.btcPrices)
+  const btcPartial = partialLinear(btcAdjResult.adjustedChangePct, 0.5, 2.0)
 
-  // 3. 호가 불균형
+  // ── 3. 호가 불균형 (ratio=1.1→0, ratio=2.0→1.0) ──
   const obResult = input.orderbook
     ? detectOrderbookImbalance(input.orderbook)
     : { detected: false, bidAskRatio: 1.0, totalBidSize: 0, totalAskSize: 0 }
+  const obPartial = partialLinear(obResult.bidAskRatio, 1.1, 2.0)
 
-  // 4. OBV 다이버전스
+  // ── 4. OBV 다이버전스: 불리시만 인정, 기울기 차이로 강도 계산 ──
   const obvResult = detectOBVDivergence(input.candles)
+  let obvPartial = 0
+  if (obvResult.divergenceType === 'bullish') {
+    const divergenceStrength = Math.abs(obvResult.obvSlope) + Math.abs(obvResult.priceSlope)
+    obvPartial = Math.min(1.0, divergenceStrength / 0.008)
+  }
 
-  // 5. 9시 리셋 모멘텀
-  const morningResult = detectMorningResetMomentum(
-    input.currentPrice,
-    input.openPriceAt9,
-    input.currentTimeKST
-  )
+  // ── 5. 일중 모멘텀 (기존 모닝 리셋 확장 — 하루 종일 동작) ──
+  let dailyChangePct = 0
+  if (input.openPriceAt9 > 0) {
+    dailyChangePct = ((input.currentPrice - input.openPriceAt9) / input.openPriceAt9) * 100
+  }
+  const dailyPartial = dailyChangePct > 0 ? partialLinear(dailyChangePct, 0.3, 2.0) : 0
 
-  // 가중합산
-  let score = 0
-  if (volumeResult.detected) score += WEIGHTS.volumeZScore
-  if (btcAdjResult.detected) score += WEIGHTS.btcAdjustedPump
-  if (obResult.detected) score += WEIGHTS.orderbookImbalance
-  if (obvResult.detected && obvResult.divergenceType === 'bullish') score += WEIGHTS.obvDivergence
-  if (morningResult.detected) score += WEIGHTS.morningReset
+  // ── 6. RSI 과매도 반등 (RSI 40→0, RSI 20→1.0 역방향) ──
+  let rsiPartial = 0
+  if (rsi14 < 40) {
+    rsiPartial = partialLinear(40 - rsi14, 0, 20) // RSI 40 → 0점, RSI 20 → 만점
+  }
+
+  // 가중합산 (부분점수 × 가중치)
+  const score =
+    volPartial * WEIGHTS.volumeZScore +
+    btcPartial * WEIGHTS.btcAdjustedPump +
+    obPartial * WEIGHTS.orderbookImbalance +
+    obvPartial * WEIGHTS.obvDivergence +
+    dailyPartial * WEIGHTS.dailyMomentum +
+    rsiPartial * WEIGHTS.rsiOversold
 
   const detected = score >= SCORE_THRESHOLD
 
   return {
     symbol: input.symbol,
-    score: Math.round(score * 100) / 100,
+    score: Math.round(score * 1000) / 1000,
     detected,
     rsi14: Math.round(rsi14 * 10) / 10,
     atrPct: Math.round(atrPct * 100) / 100,
@@ -117,42 +142,60 @@ export function computeDetectionScore(input: DetectionInput): DetectionResult {
     price: input.currentPrice,
     signals: {
       volumeZScore: {
-        active: volumeResult.detected,
+        active: volPartial > 0,
         value: volumeResult.zScore,
         weight: WEIGHTS.volumeZScore,
+        partialScore: Math.round(volPartial * 1000) / 1000,
       },
       btcAdjustedPump: {
-        active: btcAdjResult.detected,
+        active: btcPartial > 0,
         value: btcAdjResult.adjustedChangePct,
         weight: WEIGHTS.btcAdjustedPump,
+        partialScore: Math.round(btcPartial * 1000) / 1000,
       },
       orderbookImbalance: {
-        active: obResult.detected,
+        active: obPartial > 0,
         value: obResult.bidAskRatio,
         weight: WEIGHTS.orderbookImbalance,
+        partialScore: Math.round(obPartial * 1000) / 1000,
       },
       obvDivergence: {
-        active: obvResult.detected && obvResult.divergenceType === 'bullish',
+        active: obvPartial > 0,
         value: obvResult.divergenceType,
         weight: WEIGHTS.obvDivergence,
+        partialScore: Math.round(obvPartial * 1000) / 1000,
       },
-      morningReset: {
-        active: morningResult.detected,
-        value: morningResult.changePct,
-        weight: WEIGHTS.morningReset,
+      dailyMomentum: {
+        active: dailyPartial > 0,
+        value: Math.round(dailyChangePct * 100) / 100,
+        weight: WEIGHTS.dailyMomentum,
+        partialScore: Math.round(dailyPartial * 1000) / 1000,
+      },
+      rsiOversold: {
+        active: rsiPartial > 0,
+        value: rsi14,
+        weight: WEIGHTS.rsiOversold,
+        partialScore: Math.round(rsiPartial * 1000) / 1000,
       },
     },
     reasoning: {
-      composite_score: score,
+      composite_score: Math.round(score * 1000) / 1000,
       threshold: SCORE_THRESHOLD,
+      scoring: 'partial_v2',
       rsi_14: rsi14,
       atr_pct: atrPct,
       change_pct_24h: changePct,
       volume_zscore: volumeResult.zScore,
+      volume_partial: Math.round(volPartial * 1000) / 1000,
       btc_adjusted_change: btcAdjResult.adjustedChangePct,
+      btc_partial: Math.round(btcPartial * 1000) / 1000,
       bid_ask_ratio: obResult.bidAskRatio,
+      orderbook_partial: Math.round(obPartial * 1000) / 1000,
       obv_divergence: obvResult.divergenceType,
-      morning_change: morningResult.changePct,
+      obv_partial: Math.round(obvPartial * 1000) / 1000,
+      daily_change_pct: Math.round(dailyChangePct * 100) / 100,
+      daily_partial: Math.round(dailyPartial * 1000) / 1000,
+      rsi_oversold_partial: Math.round(rsiPartial * 1000) / 1000,
     },
   }
 }

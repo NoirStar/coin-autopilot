@@ -228,11 +228,12 @@ export function DetectionPage() {
         <div className="grid grid-cols-1 gap-2 text-[12px] md:grid-cols-2">
           <IndicatorInfo name="매수 점수" description="5개 지표의 가중 합산. 60점 이상이면 매수 시그널." />
           <IndicatorInfo name="RSI(14)" description="과매수/과매도 지표 (0~100). 30 이하 과매도, 70 이상 과매수." />
-          <IndicatorInfo name="거래량 Z-Score" weight="25%" description="20일 평균 대비 거래량 이상치. Z > 2.5이면 활성." />
-          <IndicatorInfo name="BTC 보정 급등" weight="25%" description="BTC 연동분 제거 후 독립 상승률. > 2%이면 활성." />
-          <IndicatorInfo name="호가 불균형" weight="20%" description="매수/매도 호가 비율. Bid/Ask > 2.0이면 활성." />
-          <IndicatorInfo name="OBV 다이버전스" weight="15%" description="가격 하락 + 거래량 상승 = 숨겨진 축적." />
-          <IndicatorInfo name="9시 리셋" weight="15%" description="업비트 09:00 리셋 직후 상승 모멘텀. > 1%이면 활성." />
+          <IndicatorInfo name="거래량 Z-Score" weight="20%" description="20일 평균 대비 거래량 이상치. Z 1.0~2.5 구간에서 부분점수." />
+          <IndicatorInfo name="BTC 보정 급등" weight="20%" description="BTC 연동분 제거 후 독립 상승률. 0.5%~2.0% 구간에서 부분점수." />
+          <IndicatorInfo name="호가 불균형" weight="15%" description="매수/매도 호가 비율. 1.1~2.0 구간에서 부분점수." />
+          <IndicatorInfo name="OBV 다이버전스" weight="15%" description="가격 하락 + 거래량 상승 = 숨겨진 축적. 강도에 따라 부분점수." />
+          <IndicatorInfo name="일중 모멘텀" weight="15%" description="09시 시가 대비 상승률. 0.3%~2.0% 구간에서 부분점수." />
+          <IndicatorInfo name="RSI 과매도" weight="15%" description="RSI 40 이하에서 반등 가능성. RSI 20 이하면 만점." />
         </div>
       </div>
     </div>
@@ -300,29 +301,29 @@ function DetectionCard({ result }: { result: DetectionResultItem }) {
             <MetricBox label="24h 변동" value={`${result.changePct > 0 ? '+' : ''}${result.changePct.toFixed(2)}%`} desc="" color={result.changePct > 0 ? 'profit' : result.changePct < 0 ? 'loss' : 'muted'} />
           </div>
 
-          {/* 5개 시그널 상세 */}
+          {/* 6개 시그널 상세 (부분점수제) */}
           <div className="space-y-1.5">
-            <p className="text-[12px] font-semibold text-text-muted">탐지 지표</p>
+            <p className="text-[12px] font-semibold text-text-muted">탐지 지표 (부분점수)</p>
             <SignalDetail
               label="거래량 Z-Score"
               active={result.signals.volumeZScore.active}
               value={`Z = ${(result.signals.volumeZScore.value as number).toFixed(2)}`}
-              threshold="Z > 2.5"
-              weight="25%"
+              threshold="1.0~2.5"
+              weight="20%"
             />
             <SignalDetail
               label="BTC 보정 급등"
               active={result.signals.btcAdjustedPump.active}
               value={`${(result.signals.btcAdjustedPump.value as number).toFixed(2)}%`}
-              threshold="> 2.0%"
-              weight="25%"
+              threshold="0.5~2.0%"
+              weight="20%"
             />
             <SignalDetail
               label="호가 Bid/Ask"
               active={result.signals.orderbookImbalance.active}
               value={`${(result.signals.orderbookImbalance.value as number).toFixed(2)}`}
-              threshold="> 2.0"
-              weight="20%"
+              threshold="1.1~2.0"
+              weight="15%"
             />
             <SignalDetail
               label="OBV 다이버전스"
@@ -331,13 +332,33 @@ function DetectionCard({ result }: { result: DetectionResultItem }) {
               threshold="bullish"
               weight="15%"
             />
-            <SignalDetail
-              label="9시 리셋"
-              active={result.signals.morningReset.active}
-              value={`${(result.signals.morningReset.value as number).toFixed(2)}%`}
-              threshold="> 1.0%"
-              weight="15%"
-            />
+            {result.signals.dailyMomentum && (
+              <SignalDetail
+                label="일중 모멘텀"
+                active={result.signals.dailyMomentum.active}
+                value={`${(result.signals.dailyMomentum.value as number).toFixed(2)}%`}
+                threshold="0.3~2.0%"
+                weight="15%"
+              />
+            )}
+            {result.signals.rsiOversold && (
+              <SignalDetail
+                label="RSI 과매도"
+                active={result.signals.rsiOversold.active}
+                value={`RSI ${(result.signals.rsiOversold.value as number).toFixed(1)}`}
+                threshold="< 40"
+                weight="15%"
+              />
+            )}
+            {result.signals.morningReset && !result.signals.dailyMomentum && (
+              <SignalDetail
+                label="9시 리셋"
+                active={result.signals.morningReset.active}
+                value={`${(result.signals.morningReset.value as number).toFixed(2)}%`}
+                threshold="> 1.0%"
+                weight="15%"
+              />
+            )}
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap } from '../data/candle-co
 import { supabase } from '../services/database.js'
 import { notifyStrongBuySignals } from '../services/telegram-notifier.js'
 import type { Candle } from '../strategy/strategy-base.js'
+import type { OrderbookSnapshot } from '../detector/orderbook-imbalance.js'
 
 export const detectionRoutes = new Hono()
 
@@ -12,6 +13,30 @@ const UPBIT_API = 'https://api.upbit.com/v1'
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+/** 업비트 오더북 가져오기 */
+async function fetchUpbitOrderbook(market: string): Promise<OrderbookSnapshot | undefined> {
+  try {
+    const res = await fetch(`${UPBIT_API}/orderbook?markets=${market}`)
+    if (!res.ok) return undefined
+    const data = await res.json() as Array<{
+      orderbook_units: Array<{
+        ask_price: number
+        bid_price: number
+        ask_size: number
+        bid_size: number
+      }>
+    }>
+    if (!data[0]?.orderbook_units) return undefined
+    const units = data[0].orderbook_units
+    return {
+      bids: units.map((u) => ({ price: u.bid_price, size: u.bid_size })),
+      asks: units.map((u) => ({ price: u.ask_price, size: u.ask_size })),
+    }
+  } catch {
+    return undefined
+  }
 }
 
 /** 업비트에서 직접 캔들 가져오기 (DB 거치지 않고 실시간) */
@@ -126,6 +151,7 @@ export async function runFullScan(): Promise<{
     currentPrice: number
     openPriceAt9: number
     currentTimeKST: Date
+    orderbook?: OrderbookSnapshot
   }> = []
 
   for (const symbol of allKrwSymbols) {
@@ -139,6 +165,9 @@ export async function runFullScan(): Promise<{
         ? altCandles[altCandles.length - 9].open
         : altCandles[0].open
 
+      // 오더북 데이터 가져오기 (실패해도 무시)
+      const orderbook = await fetchUpbitOrderbook(`KRW-${symbol}`)
+
       inputs.push({
         symbol,
         candles: altCandles,
@@ -146,6 +175,7 @@ export async function runFullScan(): Promise<{
         currentPrice,
         openPriceAt9,
         currentTimeKST: kstNow,
+        orderbook,
       })
     } catch {
       // 개별 코인 실패 시 스킵
@@ -260,6 +290,7 @@ detectionRoutes.get('/scan/stream', async (c) => {
         symbol: string
         candles: Candle[]
         btcPrices: number[]
+        orderbook?: OrderbookSnapshot
         currentPrice: number
         openPriceAt9: number
         currentTimeKST: Date
@@ -282,11 +313,13 @@ detectionRoutes.get('/scan/stream', async (c) => {
           const openPriceAt9 = altCandles.length > 9
             ? altCandles[altCandles.length - 9].open
             : altCandles[0].open
+          const orderbook = await fetchUpbitOrderbook(`KRW-${symbol}`)
 
           inputs.push({
             symbol,
             candles: altCandles,
             btcPrices: btcPrices.slice(-altCandles.length),
+            orderbook,
             currentPrice,
             openPriceAt9,
             currentTimeKST: kstNow,
@@ -372,11 +405,13 @@ detectionRoutes.get('/score/:symbol', async (c) => {
     const openPriceAt9 = altCandles.length > 9
       ? altCandles[altCandles.length - 9].open
       : altCandles[0].open
+    const orderbook = await fetchUpbitOrderbook(`KRW-${symbol}`)
 
     const result = computeDetectionScore({
       symbol,
       candles: altCandles,
       btcPrices: btcPrices.slice(-altCandles.length),
+      orderbook,
       currentPrice,
       openPriceAt9,
       currentTimeKST: kstNow,

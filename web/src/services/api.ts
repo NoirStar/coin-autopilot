@@ -11,11 +11,13 @@ export interface DetectionResultItem {
   changePct: number
   price: number
   signals: {
-    volumeZScore: { active: boolean; value: number; weight: number }
-    btcAdjustedPump: { active: boolean; value: number; weight: number }
-    orderbookImbalance: { active: boolean; value: number; weight: number }
-    obvDivergence: { active: boolean; value: string; weight: number }
-    morningReset: { active: boolean; value: number; weight: number }
+    volumeZScore: { active: boolean; value: number; weight: number; partialScore?: number }
+    btcAdjustedPump: { active: boolean; value: number; weight: number; partialScore?: number }
+    orderbookImbalance: { active: boolean; value: number; weight: number; partialScore?: number }
+    obvDivergence: { active: boolean; value: string; weight: number; partialScore?: number }
+    dailyMomentum?: { active: boolean; value: number; weight: number; partialScore?: number }
+    rsiOversold?: { active: boolean; value: number; weight: number; partialScore?: number }
+    morningReset?: { active: boolean; value: number; weight: number }
   }
   reasoning: Record<string, unknown>
 }
