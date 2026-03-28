@@ -1,12 +1,12 @@
 export function StatusBar() {
   return (
-    <div className="flex h-7 items-center justify-between border-t border-border-subtle px-5 text-[12px] text-text-secondary">
-      <div className="flex items-center gap-4">
-        <span className="flex items-center gap-1.5">
+    <div className="flex min-h-7 items-center justify-between border-t border-border-subtle px-3 py-1 text-[12px] text-text-secondary sm:px-5">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="h-1 w-1 rounded-full bg-profit" />
           Upbit
         </span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
           <span className="h-1 w-1 rounded-full bg-profit" />
           OKX
         </span>

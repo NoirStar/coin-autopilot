@@ -328,14 +328,14 @@ function MarketDashboard() {
       {/* BTC 가격 */}
       <div className="card-surface rounded-md px-4 py-3">
         <div className="text-[12px] font-semibold text-text-muted">BTC 가격</div>
-        <div className="mt-1.5 flex items-baseline gap-1.5 overflow-hidden">
-          <span className="whitespace-nowrap font-mono-trading text-[14px] font-semibold text-text-primary">
+        <div className="mt-1.5">
+          <div className="whitespace-nowrap font-mono-trading text-[14px] font-semibold text-text-primary">
             {btcPrice?.price ? formatKrw(btcPrice.price) : '—'}
-          </span>
+          </div>
           {btcPrice?.changeRate !== undefined && (
-            <span className={`whitespace-nowrap font-mono-trading text-[12px] ${btcPrice.changeRate >= 0 ? 'text-profit' : 'text-loss'}`}>
+            <div className={`font-mono-trading text-[12px] ${btcPrice.changeRate >= 0 ? 'text-profit' : 'text-loss'}`}>
               {btcPrice.changeRate >= 0 ? '+' : ''}{(btcPrice.changeRate * 100).toFixed(2)}%
-            </span>
+            </div>
           )}
         </div>
       </div>
