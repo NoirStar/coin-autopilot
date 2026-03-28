@@ -19,7 +19,11 @@
       "Bash(npx vitest:*)",
       "Bash(ls -la /mnt/c/Dev/coin-autopilot/web/*.*)",
       "Bash(npm run:*)",
-      "Skill(plan-eng-review)"
+      "Skill(plan-eng-review)",
+      "Bash(B=~/.claude/skills/gstack/browse/dist/browse $B goto \"https://coin-autopilot.vercel.app/\")",
+      "Bash(export BUN_INSTALL=\"/home/namwoo/.bun\")",
+      "Bash(export PATH=\"$BUN_INSTALL/bin:$PATH\" B=~/.claude/skills/gstack/browse/dist/browse $B goto \"https://coin-autopilot.vercel.app/\")",
+      "Bash(export PATH=\"$BUN_INSTALL/bin:$PATH\" B=~/.claude/skills/gstack/browse/dist/browse REPORT_DIR=~/.gstack/projects/NoirStar-coin-autopilot/designs/design-audit-20260328 $B screenshot \"$REPORT_DIR/screenshots/first-impression.png\")"
     ]
   }
 }

@@ -164,12 +164,12 @@ function MarketSummary() {
   const signalCount = signals?.length ?? 0
   const env = getBuyEnvironment(regime, signalCount)
 
-  const fgLabel = (v: number) => {
-    if (v <= 25) return '극단 공포'
-    if (v <= 45) return '공포'
-    if (v <= 55) return '중립'
-    if (v <= 75) return '탐욕'
-    return '극단 탐욕'
+  const fgInfo = (v: number): { label: string; color: string } => {
+    if (v <= 25) return { label: '극도의 공포', color: 'var(--loss)' }
+    if (v <= 45) return { label: '공포', color: 'var(--warning)' }
+    if (v <= 55) return { label: '중립', color: 'var(--text-secondary)' }
+    if (v <= 75) return { label: '탐욕', color: 'var(--info)' }
+    return { label: '극도의 탐욕', color: 'var(--profit)' }
   }
 
   return (
@@ -222,13 +222,18 @@ function MarketSummary() {
             <button onClick={() => refetchFg()} className="text-[12px] text-text-muted hover:underline">
               확인 불가 · 재시도
             </button>
-          ) : fearGreed ? (
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono-trading text-[14px] font-semibold text-text-primary">
-                {fearGreed.value}
-              </span>
-              <span className="text-[12px] text-text-muted">{fgLabel(fearGreed.value)}</span>
-            </div>
+          ) : fearGreed ? (() => {
+            const fg = fgInfo(fearGreed.value)
+            return (
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full" style={{ background: fg.color }} />
+                <span className="font-mono-trading text-[14px] font-semibold" style={{ color: fg.color }}>
+                  {fearGreed.value}
+                </span>
+                <span className="text-[12px]" style={{ color: fg.color }}>{fg.label}</span>
+              </div>
+            )
+          })()
           ) : null}
         </div>
       </div>
