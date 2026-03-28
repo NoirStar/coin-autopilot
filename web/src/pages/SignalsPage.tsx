@@ -17,7 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { api, type DetectionCacheResponse, type DetectionResultItem } from '../services/api'
+import { api } from '../services/api'
 import { TermTooltip } from '../components/ui/term-tooltip'
 
 // --- 타입 ---
