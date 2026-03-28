@@ -107,7 +107,7 @@ export function DetectionPage() {
           <p className="text-[13px] font-medium text-text-secondary">탐지 스캔에 실패했습니다</p>
           <p className="text-[12px] text-text-muted">
             {error.message.includes('fetch') || error.message.includes('network')
-              ? '서버에 연결할 수 없습니다. VPS 서버가 실행 중인지 확인하세요.'
+              ? '서버에 연결할 수 없습니다. 백엔드 서버(localhost:3001)가 실행 중인지 확인하세요.'
               : error.message}
           </p>
           <button onClick={() => refetch()} className="mt-2 rounded-md border border-border px-3 py-1.5 text-[12px] text-text-secondary hover:bg-surface-hover">
