@@ -222,14 +222,18 @@ function MarketSummary() {
             <button onClick={() => refetchFg()} className="text-[12px] text-text-muted hover:underline">
               확인 불가 · 재시도
             </button>
-          ) : fearGreed ? (
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono-trading text-[14px] font-semibold text-text-primary">
-                {fearGreed.value}
-              </span>
-              <span className="text-[12px] text-text-muted">{fgInfo(fearGreed.value).label}</span>
-            </div>
-          ) : null}
+          ) : fearGreed ? (() => {
+            const fg = fgInfo(fearGreed.value)
+            return (
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full" style={{ background: fg.color }} />
+                <span className="font-mono-trading text-[14px] font-semibold" style={{ color: fg.color }}>
+                  {fearGreed.value}
+                </span>
+                <span className="text-[12px]" style={{ color: fg.color }}>{fg.label}</span>
+              </div>
+            )
+          })() : null}
         </div>
       </div>
     </div>
