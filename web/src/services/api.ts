@@ -34,6 +34,7 @@ export const api = {
   // Dashboard
   getDashboardSummary: () => request('/api/dashboard/summary'),
   getEquityHistory: () => request('/api/dashboard/equity-history'),
+  getBtcPrice: () => request<{ price: number; changeRate: number }>('/api/dashboard/btc-price'),
 
   // Portfolio
   getBalance: () => request('/api/portfolio/balance'),

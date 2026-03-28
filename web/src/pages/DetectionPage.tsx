@@ -275,7 +275,7 @@ function DetectionCard({ result, strategy }: { result: DetectionResult; strategy
         </div>
         <div className="flex items-center gap-3">
           <span className="font-mono-trading text-[12px] text-text-muted">
-            {result.price ? `₩${result.price.toLocaleString()}` : ''}
+            {result.price ? `${result.price.toLocaleString('ko-KR')}원` : ''}
           </span>
           {expanded
             ? <ChevronUp className="h-4 w-4 text-text-faint" />

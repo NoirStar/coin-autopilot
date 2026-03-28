@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { supabase } from '../services/database.js'
+import { generateSignals } from '../services/signal-generator.js'
 
 export const signalRoutes = new Hono()
 
@@ -40,4 +41,14 @@ signalRoutes.get('/performance', async (c) => {
 
   if (error) return c.json({ error: error.message }, 500)
   return c.json({ performance: data })
+})
+
+/** 수동 시그널 생성 트리거 */
+signalRoutes.post('/generate', async (c) => {
+  try {
+    await generateSignals()
+    return c.json({ success: true, message: '시그널 생성 완료' })
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 500)
+  }
 })

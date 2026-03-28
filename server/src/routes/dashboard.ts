@@ -50,6 +50,21 @@ dashboardRoutes.get('/summary', async (c) => {
   }
 })
 
+/** GET /api/dashboard/btc-price — 업비트 실시간 BTC 가격 */
+dashboardRoutes.get('/btc-price', async (c) => {
+  try {
+    const res = await fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC')
+    if (!res.ok) throw new Error(`Upbit API ${res.status}`)
+    const [ticker] = await res.json() as [{ trade_price: number; signed_change_rate: number }]
+    return c.json({
+      price: ticker.trade_price,
+      changeRate: ticker.signed_change_rate,
+    })
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 502)
+  }
+})
+
 /** GET /api/dashboard/equity-history — 에퀴티 히스토리 */
 dashboardRoutes.get('/equity-history', async (c) => {
   // 최신 시스템 백테스트의 에퀴티 커브를 반환

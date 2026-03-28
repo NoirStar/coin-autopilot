@@ -15,6 +15,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { api } from '../services/api'
 import { TermTooltip } from '../components/ui/term-tooltip'
 
 // --- 타입 ---
@@ -52,6 +53,15 @@ interface Performance {
 }
 
 // --- 데이터 페칭 ---
+
+function useBtcPrice() {
+  return useQuery({
+    queryKey: ['btc-price'],
+    queryFn: () => api.getBtcPrice(),
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+  })
+}
 
 function useRegime() {
   return useQuery({
@@ -99,11 +109,12 @@ function usePerformance() {
         .is('user_id', null)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
       if (error) throw error
-      return data as Performance
+      return data as Performance | null
     },
     staleTime: 60 * 60 * 1000,
+    retry: false,
   })
 }
 
@@ -189,45 +200,65 @@ function RegimeHero() {
           value={regime.btc_close > regime.ema_200 ? 'Above' : 'Below'}
           detail={formatKrw(regime.ema_200)}
           positive={regime.btc_close > regime.ema_200}
+          mono
         />
         <IndicatorCard
           label={<TermTooltip term="rsi">RSI(14)</TermTooltip>}
           value={regime.rsi_14.toFixed(1)}
           detail="52~70 안전"
           positive={regime.rsi_14 >= 52 && regime.rsi_14 <= 70}
+          mono
         />
         <IndicatorCard
           label={<TermTooltip term="atr_pct">ATR%</TermTooltip>}
           value={`${regime.atr_pct.toFixed(2)}%`}
           detail="4.5% 이하 안전"
           positive={regime.atr_pct <= 4.5}
+          mono
         />
-        <IndicatorCard
-          label="BTC 가격"
-          value={formatKrw(regime.btc_close)}
-          detail=""
-          positive={null}
-        />
+        <BtcPriceCard />
       </div>
     </div>
   )
 }
 
-function IndicatorCard({ label, value, detail, positive }: {
+function IndicatorCard({ label, value, detail, positive, mono }: {
   label: React.ReactNode
   value: string
   detail: string
   positive: boolean | null
+  mono?: boolean
 }) {
   return (
     <div className="rounded-md bg-secondary p-2.5">
       <p className="mb-1 text-[12px] font-semibold text-text-muted">{label}</p>
-      <p className={`font-mono-trading text-[15px] font-bold ${
+      <p className={`text-[15px] font-bold ${
         positive === true ? 'text-profit' : positive === false ? 'text-loss' : 'text-text-primary'
       }`}>
-        {value}
+        {mono ? <span className="font-mono-trading">{value}</span> : value}
       </p>
-      {detail && <p className="text-[12px] text-text-muted">{detail}</p>}
+      {detail && <p className={`text-[12px] text-text-muted${mono ? ' font-mono-trading' : ''}`}>{detail}</p>}
+    </div>
+  )
+}
+
+function BtcPriceCard() {
+  const { data } = useBtcPrice()
+  const price = data?.price
+  const changeRate = data?.changeRate ?? 0
+  const isUp = changeRate >= 0
+
+  return (
+    <div className="rounded-md bg-secondary p-2.5">
+      <p className="mb-1 text-[12px] font-semibold text-text-muted">BTC 가격</p>
+      <p className="text-[15px] font-bold text-text-primary">
+        <span className="font-mono-trading">{price ? formatKrw(price) : '—'}</span>
+      </p>
+      {price && (
+        <p className={`font-mono-trading text-[12px] ${isUp ? 'text-profit' : 'text-loss'}`}>
+          {isUp ? '+' : ''}{(changeRate * 100).toFixed(2)}%
+        </p>
+      )}
     </div>
   )
 }
@@ -487,9 +518,7 @@ function SignalListSkeleton() {
 // --- 유틸 ---
 
 function formatKrw(value: number): string {
-  if (value >= 100_000_000) return `${(value / 100_000_000).toFixed(1)}억`
-  if (value >= 10_000) return `${(value / 10_000).toFixed(0)}만`
-  return value.toLocaleString('ko-KR')
+  return `${value.toLocaleString('ko-KR')}원`
 }
 
 function getTimeAgo(timestamp: string): string {
