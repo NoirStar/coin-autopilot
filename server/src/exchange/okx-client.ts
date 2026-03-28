@@ -6,10 +6,12 @@ import type { Candle } from '../strategy/strategy-base.js'
  * CCXT를 래핑하여 프로젝트에서 사용하는 타입으로 변환
  */
 
-let exchange: ccxt.okx | null = null
+type OkxExchange = InstanceType<typeof ccxt.okx>
+
+let exchange: OkxExchange | null = null
 
 /** OKX 인스턴스 초기화 (싱글턴) */
-export function getOkxExchange(): ccxt.okx {
+export function getOkxExchange(): OkxExchange {
   if (exchange) return exchange
 
   const apiKey = process.env.OKX_API_KEY || ''
@@ -61,13 +63,13 @@ export async function fetchOkxCandles(
 
   const ohlcv = await okx.fetchOHLCV(pair, timeframe, undefined, limit)
 
-  return ohlcv.map((bar: number[]) => ({
-    openTime: new Date(bar[0]),
-    open: bar[1],
-    high: bar[2],
-    low: bar[3],
-    close: bar[4],
-    volume: bar[5],
+  return ohlcv.map((bar) => ({
+    openTime: new Date(Number(bar[0])),
+    open: Number(bar[1]),
+    high: Number(bar[2]),
+    low: Number(bar[3]),
+    close: Number(bar[4]),
+    volume: Number(bar[5]),
   }))
 }
 
@@ -137,12 +139,15 @@ export async function fetchBalance(): Promise<{ total: number; free: number; use
   const okx = getOkxExchange()
   const balance = await okx.fetchBalance({ type: 'swap' })
 
-  const usdt = (balance?.USDT ?? balance?.total?.USDT) ? balance : { USDT: { total: 0, free: 0, used: 0 } }
+  const balanceInfo = balance as Record<string, unknown>
+  const totalMap = (balanceInfo.total ?? {}) as Record<string, number>
+  const freeMap = (balanceInfo.free ?? {}) as Record<string, number>
+  const usedMap = (balanceInfo.used ?? {}) as Record<string, number>
 
   return {
-    total: parseFloat(String(usdt.USDT?.total ?? balance?.total?.USDT ?? 0)),
-    free: parseFloat(String(usdt.USDT?.free ?? balance?.free?.USDT ?? 0)),
-    used: parseFloat(String(usdt.USDT?.used ?? balance?.used?.USDT ?? 0)),
+    total: parseFloat(String(totalMap.USDT ?? 0)),
+    free: parseFloat(String(freeMap.USDT ?? 0)),
+    used: parseFloat(String(usedMap.USDT ?? 0)),
   }
 }
 

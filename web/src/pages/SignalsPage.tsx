@@ -134,7 +134,7 @@ function getDetectionRecommendation(result: DetectionResultItem): { label: strin
   const activeCount = Object.values(result.signals).filter((signal) => signal?.active).length
 
   if (rsi14 >= 70) {
-    return { label: '매도 주의', color: 'bg-[var(--loss-bg)] text-loss' }
+    return { label: '매수과열 주의', color: 'bg-[var(--loss-bg)] text-loss' }
   }
 
   if (score >= 0.8 && activeCount >= 4) return { label: '강력 매수', color: 'bg-[var(--profit-bg)] text-profit' }
@@ -812,7 +812,7 @@ function RefreshButton() {
     <button
       onClick={handleRefresh}
       disabled={refreshing}
-      className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[12px] text-text-muted hover:bg-secondary disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
+      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-2.5 py-1 text-[12px] text-text-muted hover:bg-secondary disabled:cursor-not-allowed disabled:text-[var(--text-faint)]"
     >
       {refreshing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
       {refreshing ? '갱신 중...' : '갱신'}
@@ -825,11 +825,11 @@ function RefreshButton() {
 export function SignalsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-5 py-2">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold tracking-tight">알트코인 매매 시그널</h1>
           <p className="text-[13px] text-text-muted">
-            BTC 시장 상태를 기반으로 알트코인 매수 시점을 추천합니다. 4시간마다 갱신.
+            BTC 시장 상태를 기반으로 알트코인 매수 시점을 추천합니다.
           </p>
         </div>
         <RefreshButton />
