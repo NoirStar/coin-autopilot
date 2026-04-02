@@ -3,11 +3,8 @@ import {
   FlaskConical,
   Loader2,
   AlertTriangle,
-  Search,
   Trophy,
   Clock,
-  CheckCircle2,
-  XCircle,
   ArrowUpCircle,
 } from 'lucide-react'
 import { getApiBase } from '@/services/api'

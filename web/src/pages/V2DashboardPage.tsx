@@ -376,11 +376,18 @@ const ProofChart = ({
   if (bands.length > 1) {
     let start = 0
     for (let i = 1; i < bands.length; i++) {
-      if (bands[i].regime !== bands[start].regime || i === bands.length - 1) {
+      const currentBand = bands[i]
+      const startBand = bands[start]
+
+      if (!currentBand || !startBand) {
+        continue
+      }
+
+      if (currentBand.regime !== startBand.regime || i === bands.length - 1) {
         bandRanges.push({
-          x1: bands[start].recorded_at,
-          x2: bands[i].recorded_at,
-          color: regimeBandColor(bands[start].regime),
+          x1: startBand.recorded_at,
+          x2: currentBand.recorded_at,
+          color: regimeBandColor(startBand.regime),
         })
         start = i
       }
@@ -473,8 +480,8 @@ const ProofChart = ({
                   fontSize: 12,
                   fontFamily: 'JetBrains Mono',
                 }}
-                labelFormatter={(v: string) => formatTime(v)}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, '에퀴티']}
+                labelFormatter={value => formatTime(String(value ?? ''))}
+                formatter={value => [`$${Number(value ?? 0).toLocaleString()}`, '에퀴티']}
               />
 
               {/* 섀도우 레이스 (비활성 전략 비교 — 토글 ON일 때) */}
