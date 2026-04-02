@@ -74,11 +74,18 @@ class AltDetectionV2 implements Strategy {
 
       const currentPrice = altCandles[altCandles.length - 1].close
 
-      // 9시 시가 추정: 당일 KST 09:00 이후 첫 캔들
-      // 간이: 현재 캔들 중 09:00에 가장 가까운 것
-      const openPriceAt9 = altCandles.length > 9
-        ? altCandles[altCandles.length - 9].open  // 대략 9시간 전 시가
-        : altCandles[0].open
+      // 당일 KST 09:00 시가 — 캔들 배열에서 실제 09:00 캔들 검색
+      const kstToday9 = new Date(kstNow)
+      kstToday9.setHours(9, 0, 0, 0)
+      const utcToday9 = new Date(kstToday9.getTime() - kstOffset) // KST 09:00 → UTC
+
+      let openPriceAt9 = altCandles[0].open
+      for (const c of altCandles) {
+        if (c.openTime >= utcToday9) {
+          openPriceAt9 = c.open
+          break
+        }
+      }
 
       const result = computeDetectionScore({
         symbol,

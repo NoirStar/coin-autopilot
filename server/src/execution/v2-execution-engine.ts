@@ -269,14 +269,18 @@ export async function reconcilePositions(): Promise<void> {
       })
     } else {
       // 미실현 손익만 갱신
+      // 숏 포지션: 최저가가 peak (최대 수익 지점), 롱 포지션: 최고가가 peak
+      const dbPeak = Number(dbPos.peak_price ?? 0)
+      const isShort = dbPos.side === 'short'
+      const newPeak = isShort
+        ? (dbPeak === 0 ? exchangePos.markPrice : Math.min(dbPeak, exchangePos.markPrice))
+        : Math.max(dbPeak, exchangePos.markPrice)
+
       await supabase
         .from('v2_live_positions')
         .update({
           unrealized_pnl: exchangePos.unrealizedPnl,
-          peak_price: Math.max(
-            Number(dbPos.peak_price ?? 0),
-            exchangePos.markPrice,
-          ),
+          peak_price: newPeak,
         })
         .eq('id', dbPos.id)
     }
@@ -328,10 +332,11 @@ export async function reconcilePositions(): Promise<void> {
 export async function closePosition(
   positionId: string,
   reason: string,
+  partialRatio: number = 1.0,
 ): Promise<boolean> {
   if (!guardLiveTrading('closePosition')) return false
 
-  console.log(`[V2실전] 포지션 ${positionId} 청산 시작 (사유: ${reason})`)
+  console.log(`[V2실전] 포지션 ${positionId} 청산 시작 (사유: ${reason}, 비율: ${partialRatio})`)
 
   // DB에서 포지션 조회
   const { data: position, error: posErr } = await supabase
@@ -348,7 +353,8 @@ export async function closePosition(
 
   const assetKey = position.asset_key as string
   const side = position.side as PositionSide
-  const qty = Number(position.current_qty)
+  const totalQty = Number(position.current_qty)
+  const closeQty = totalQty * partialRatio
 
   // 심볼 추출 (예: BTC-USDT-SWAP → BTC)
   const symbol = assetKey.split('-')[0]
@@ -357,7 +363,7 @@ export async function closePosition(
   try {
     // 시장가 청산 (reduce-only)
     const result = await withRetry(
-      () => createMarketOrder(symbol, closeSide, qty, true),
+      () => createMarketOrder(symbol, closeSide, closeQty, true),
       `${symbol} 청산`,
     )
 
@@ -371,7 +377,7 @@ export async function closePosition(
       side: closeSide,
       positionSide: side,
       orderType: 'market',
-      requestedQty: qty,
+      requestedQty: closeQty,
       requestedPrice: null,
       exchangeOrderId: result.id,
       status: 'filled',
@@ -379,27 +385,39 @@ export async function closePosition(
 
     // v2_live_fills에 체결 기록
     if (orderId) {
-      await saveLiveFill(orderId, qty, exitPrice, 0, result.id)
+      await saveLiveFill(orderId, closeQty, exitPrice, result.fee ?? 0, result.id)
     }
 
     // v2_live_positions 상태 업데이트
     const entryPrice = Number(position.entry_price)
     const pnlMultiplier = side === 'long' ? 1 : -1
-    const realizedPnl = (exitPrice - entryPrice) * qty * pnlMultiplier
+    const realizedPnl = (exitPrice - entryPrice) * closeQty * pnlMultiplier
 
-    await supabase
-      .from('v2_live_positions')
-      .update({
-        status: 'closed',
-        exit_time: new Date().toISOString(),
-        exit_reason: reason,
-        current_qty: 0,
-        realized_pnl: Number(position.realized_pnl ?? 0) + realizedPnl,
-        unrealized_pnl: 0,
-      })
-      .eq('id', positionId)
+    if (partialRatio >= 1.0) {
+      // 전량 청산
+      await supabase
+        .from('v2_live_positions')
+        .update({
+          status: 'closed',
+          exit_time: new Date().toISOString(),
+          exit_reason: reason,
+          current_qty: 0,
+          realized_pnl: Number(position.realized_pnl ?? 0) + realizedPnl,
+          unrealized_pnl: 0,
+        })
+        .eq('id', positionId)
+    } else {
+      // 부분 청산: 수량 감소, realized_pnl 누적
+      await supabase
+        .from('v2_live_positions')
+        .update({
+          current_qty: totalQty - closeQty,
+          realized_pnl: Number(position.realized_pnl ?? 0) + realizedPnl,
+        })
+        .eq('id', positionId)
+    }
 
-    console.log(`[V2실전] 포지션 ${positionId} 청산 완료: ${symbol} ${side} → 수익 $${realizedPnl.toFixed(2)}`)
+    console.log(`[V2실전] 포지션 ${positionId} 청산 완료: ${symbol} ${side} ${partialRatio < 1 ? `${(partialRatio * 100).toFixed(0)}%` : '전량'} → 수익 $${realizedPnl.toFixed(2)}`)
     return true
   } catch (err) {
     console.error(`[V2실전] 포지션 ${positionId} 청산 실패 (재시도 소진):`, err)
@@ -685,10 +703,10 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
 
     // v2_live_fills 기록
     if (orderId) {
-      await saveLiveFill(orderId, amount, entryPrice, 0, result.id)
+      await saveLiveFill(orderId, amount, entryPrice, result.fee ?? 0, result.id)
     }
 
-    // v2_live_positions 기록
+    // v2_live_positions 기록 (strategy_id로 소유 전략 추적)
     await supabase.from('v2_live_positions').insert({
       asset_key: assetKey,
       exchange: 'okx',
@@ -698,6 +716,7 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
       peak_price: entryPrice,
       leverage,
       margin_mode: DEFAULT_MARGIN_MODE,
+      strategy_id: strategyDbId,
       status: 'open',
     })
 
@@ -715,13 +734,13 @@ async function handleLiveSwitch(decision: Record<string, unknown>): Promise<void
 
   console.log(`[V2실전] 전략 교체: ${fromStrategyId} → ${toStrategyId}`)
 
-  // 기존 전략의 오픈 포지션 청산
+  // 기존 전략의 오픈 포지션만 청산 (strategy_id 기준)
   if (fromStrategyId) {
-    // 슬롯 기반으로 해당 전략의 포지션 찾기
     const { data: openPositions } = await supabase
       .from('v2_live_positions')
       .select('id')
       .eq('status', 'open')
+      .eq('strategy_id', fromStrategyId)
 
     if (openPositions) {
       for (const pos of openPositions) {
@@ -739,16 +758,19 @@ async function handleLiveSwitch(decision: Record<string, unknown>): Promise<void
   }
 }
 
-/** 전략 퇴역 → 해당 전략의 오픈 포지션 청산 */
+/** 전략 퇴역 → 해당 전략의 오픈 포지션만 청산 */
 async function handleLiveRetire(decision: Record<string, unknown>): Promise<void> {
   const strategyId = decision.from_strategy_id as string | null
   console.log(`[V2실전] 전략 퇴역: ${strategyId}`)
 
-  // 모든 오픈 포지션 청산 (퇴역 시)
+  if (!strategyId) return
+
+  // 해당 전략의 오픈 포지션만 청산
   const { data: openPositions } = await supabase
     .from('v2_live_positions')
     .select('id')
     .eq('status', 'open')
+    .eq('strategy_id', strategyId)
 
   if (openPositions) {
     for (const pos of openPositions) {

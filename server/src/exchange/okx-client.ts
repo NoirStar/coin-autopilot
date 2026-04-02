@@ -1,5 +1,5 @@
 import ccxt from 'ccxt'
-import type { Candle } from '../strategy/strategy-base.js'
+import type { Candle } from '../core/types.js'
 
 /**
  * OKX 선물 거래소 클라이언트
@@ -162,6 +162,7 @@ export interface OrderResult {
   type: 'market' | 'limit'
   amount: number
   price: number | null
+  fee: number
   status: string
   timestamp: Date
 }
@@ -205,6 +206,9 @@ export async function createMarketOrder(
 
   const order = await okx.createOrder(pair, 'market', side, amount, undefined, params)
 
+  const feeInfo = order.fee as { cost?: number } | undefined
+  const feeCost = feeInfo?.cost ? Math.abs(parseFloat(String(feeInfo.cost))) : 0
+
   return {
     id: String(order.id),
     symbol,
@@ -212,6 +216,7 @@ export async function createMarketOrder(
     type: 'market',
     amount: parseFloat(String(order.amount ?? amount)),
     price: order.average ? parseFloat(String(order.average)) : null,
+    fee: feeCost,
     status: String(order.status ?? 'unknown'),
     timestamp: new Date(order.timestamp ?? Date.now()),
   }
@@ -233,6 +238,9 @@ export async function createLimitOrder(
 
   const order = await okx.createOrder(pair, 'limit', side, amount, price, params)
 
+  const limitFeeInfo = order.fee as { cost?: number } | undefined
+  const limitFeeCost = limitFeeInfo?.cost ? Math.abs(parseFloat(String(limitFeeInfo.cost))) : 0
+
   return {
     id: String(order.id),
     symbol,
@@ -240,6 +248,7 @@ export async function createLimitOrder(
     type: 'limit',
     amount: parseFloat(String(order.amount ?? amount)),
     price,
+    fee: limitFeeCost,
     status: String(order.status ?? 'unknown'),
     timestamp: new Date(order.timestamp ?? Date.now()),
   }
@@ -295,16 +304,20 @@ export async function fetchOpenOrders(symbol?: string): Promise<OrderResult[]> {
 
   const orders = await okx.fetchOpenOrders(pair)
 
-  return orders.map((o) => ({
-    id: String(o.id),
-    symbol: String(o.symbol ?? '').replace('/USDT:USDT', ''),
-    side: o.side as 'buy' | 'sell',
-    type: (o.type ?? 'market') as 'market' | 'limit',
-    amount: parseFloat(String(o.amount ?? 0)),
-    price: o.price ? parseFloat(String(o.price)) : null,
-    status: String(o.status ?? 'unknown'),
-    timestamp: new Date(o.timestamp ?? Date.now()),
-  }))
+  return orders.map((o) => {
+    const oFee = o.fee as { cost?: number } | undefined
+    return {
+      id: String(o.id),
+      symbol: String(o.symbol ?? '').replace('/USDT:USDT', ''),
+      side: o.side as 'buy' | 'sell',
+      type: (o.type ?? 'market') as 'market' | 'limit',
+      amount: parseFloat(String(o.amount ?? 0)),
+      price: o.price ? parseFloat(String(o.price)) : null,
+      fee: oFee?.cost ? Math.abs(parseFloat(String(oFee.cost))) : 0,
+      status: String(o.status ?? 'unknown'),
+      timestamp: new Date(o.timestamp ?? Date.now()),
+    }
+  })
 }
 
 // ============================================================

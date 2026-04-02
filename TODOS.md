@@ -70,3 +70,11 @@
 - V1 페이지 5개, 서버 라우트 5개, BtcCandleChart, PLAN.md 삭제
 - V2 접두사 제거 (DashboardPage, ResearchPage, ComparisonPage)
 - 라우팅/사이드바/API 클라이언트 정리 완료
+
+## P11 — DB 인덱스 검증
+- **뭔**: v2_research_runs(created_at), v2_candles(asset_key + timeframe + open_time) 인덱스 성능 확인
+- **왜**: 데이터 수천 건 쌓이면 JOIN 성능 저하 가능
+- **해결**: Supabase 대시보드에서 EXPLAIN ANALYZE로 쿼리 플랜 확인
+- **노력**: S (CC: ~15분)
+- **의존**: 데이터 수집 1개월 이상 운영 후
+- **출처**: /plan-eng-review 2026-04-02

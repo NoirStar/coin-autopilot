@@ -5,7 +5,7 @@
  * 가격 추세와 OBV 추세의 기울기 부호가 반대이면 다이버전스
  */
 
-import type { Candle } from '../strategy/strategy-base.js'
+import type { Candle } from '../core/types.js'
 
 /** OBV 계산 */
 export function calculateOBV(candles: Candle[]): number[] {

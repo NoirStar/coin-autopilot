@@ -1,46 +1,54 @@
 import cron from 'node-cron'
-import { generateSignals } from '../services/signal-generator.js'
-import { runPaperTradingCycle } from '../services/paper-trading-engine.js'
-import { runExecutionCycle } from '../services/execution-engine.js'
 import { supabase } from '../services/database.js'
+import { runResearchLoop } from '../research/v2-research-loop.js'
+import { runOrchestratorCycle } from '../orchestrator/v2-orchestrator.js'
+import { runPaperTradingCycle } from '../paper/v2-paper-engine.js'
+import { reconcilePositions } from '../execution/v2-execution-engine.js'
+import { runRiskCheck } from '../risk/v2-risk-manager.js'
 import { runFullScan, cleanOldCache } from '../routes/detection.js'
+import { collectLatestCandles } from '../data/v2-candle-collector.js'
 
 /**
  * 크론 작업 시작
  *
- * 4시간마다 실행: 캔들 수집 → 지표 → 레짐 → 시그널 → 가상매매
- * UTC 기준: 0시, 4시, 8시, 12시, 16시, 20시
+ * 4시간마다: 캔들 수집 → 연구 루프 → 오케스트레이터 → 가상매매 → 실전 조정 → 리스크 체크
+ * 1시간마다: 알트코인 탐지 스캔
+ * 6시간마다: Supabase 헬스체크
+ * 매일 0시: 캐시 정리
  */
-let signalFailCount = 0
+let cycleFailCount = 0
 
 export function startCronJobs(): void {
-  // 4시간마다 시그널 생성 + 가상매매
+  // 4시간마다 메인 파이프라인
   cron.schedule('0 0,4,8,12,16,20 * * *', async () => {
-    console.log(`[크론] 시그널 생성 시작: ${new Date().toISOString()}`)
+    console.log(`[크론] ═══ 4H 파이프라인 시작: ${new Date().toISOString()} ═══`)
     try {
-      await generateSignals()
-      signalFailCount = 0
-    } catch (err) {
-      signalFailCount++
-      console.error(`[크론] 시그널 생성 실패 (연속 ${signalFailCount}회):`, err)
-      if (signalFailCount >= 2) {
-        console.error(`[크론] 경고: 시그널 생성 연속 ${signalFailCount}회 실패! 데이터 파이프라인 점검 필요`)
-      }
-    }
+      // 1. 캔들 수집 (업비트 + OKX, 4H 타임프레임)
+      await collectLatestCandles('upbit', ['BTC', 'ETH', 'XRP', 'SOL', 'DOGE'], '4h')
+      await collectLatestCandles('okx', ['BTC', 'ETH'], '4h')
 
-    // 시그널 생성 후 가상매매 사이클 실행
-    try {
+      // 2. 연구 루프 (백테스트 → 승격 평가)
+      await runResearchLoop()
+
+      // 3. 오케스트레이터 (레짐 판정 → 전략 배치/교체)
+      await runOrchestratorCycle()
+
+      // 4. 가상매매 사이클
       await runPaperTradingCycle()
-    } catch (err) {
-      console.error('[크론] 가상매매 사이클 오류:', err)
-    }
 
-    // 실전매매 사이클 (LIVE_TRADING=true 환경변수로 활성화)
-    if (process.env.LIVE_TRADING === 'true') {
-      try {
-        await runExecutionCycle({ enabled: true })
-      } catch (err) {
-        console.error('[크론] 실전매매 사이클 오류:', err)
+      // 5. 실전 포지션 조정 (거래소 ↔ DB 동기화)
+      await reconcilePositions()
+
+      // 6. 리스크 체크 (일일 손실 한도, 서킷 브레이커)
+      await runRiskCheck()
+
+      cycleFailCount = 0
+      console.log(`[크론] ═══ 4H 파이프라인 완료 ═══`)
+    } catch (err) {
+      cycleFailCount++
+      console.error(`[크론] 4H 파이프라인 실패 (연속 ${cycleFailCount}회):`, err)
+      if (cycleFailCount >= 2) {
+        console.error(`[크론] 경고: 파이프라인 연속 ${cycleFailCount}회 실패! 점검 필요`)
       }
     }
   })
@@ -48,7 +56,7 @@ export function startCronJobs(): void {
   // 6시간마다 Supabase 헬스체크 (7일 미사용 정지 방지)
   cron.schedule('0 */6 * * *', async () => {
     try {
-      const { error } = await supabase.from('regime_states').select('id').limit(1)
+      const { error } = await supabase.from('v2_regime_snapshots').select('id').limit(1)
       if (error) console.warn('[헬스체크] Supabase 연결 문제:', error.message)
       else console.log('[헬스체크] Supabase OK')
     } catch (err) {
@@ -72,5 +80,5 @@ export function startCronJobs(): void {
     await cleanOldCache()
   })
 
-  console.log('[크론] 스케줄 등록 완료 (4시간 시그널 + 1시간 탐지 + 일일 캐시 정리)')
+  console.log('[크론] 스케줄 등록 완료 (4H 파이프라인 + 1H 탐지 + 일일 캐시 정리)')
 }

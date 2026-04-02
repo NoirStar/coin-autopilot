@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { scoreMultipleCoins, computeDetectionScore } from '../detector/composite-scorer.js'
-import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap } from '../data/candle-collector.js'
+import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap } from '../data/v2-candle-collector.js'
 import { supabase } from '../services/database.js'
 import { notifyStrongBuySignals } from '../services/telegram-notifier.js'
-import type { Candle } from '../strategy/strategy-base.js'
+import type { Candle } from '../core/types.js'
 import type { OrderbookSnapshot } from '../detector/orderbook-imbalance.js'
 
 export const detectionRoutes = new Hono()

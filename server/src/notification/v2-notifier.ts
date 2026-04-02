@@ -275,7 +275,8 @@ export async function sendDailyReport(): Promise<void> {
       .eq('status', 'active')
 
     const strategyLines = (slots ?? []).map((s) => {
-      const strategy = s.v2_strategies as { strategy_id: string; name: string } | null
+      const strategyData = s.v2_strategies as unknown as { strategy_id: string; name: string } | { strategy_id: string; name: string }[] | null
+      const strategy = Array.isArray(strategyData) ? strategyData[0] : strategyData
       const name = strategy?.name ?? strategy?.strategy_id ?? '미배정'
       return `  ${s.asset_key} — ${name} (${s.allocation_pct}%)`
     })

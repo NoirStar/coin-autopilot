@@ -278,8 +278,12 @@ async function processSession(
       ? rawExitPrice * (1 - slippage)
       : rawExitPrice * (1 + slippage)
 
+    // 부분 청산 비율 (기본 1.0 = 전량)
+    const exitRatio = exit.partialExitRatio ?? 1.0
+    const exitQty = pos.current_qty * exitRatio
+
     const { rawPnlPct } = calculatePnlPct(pos.entry_price, exitPrice, pos.side)
-    const realizedPnl = pos.current_qty * pos.entry_price * rawPnlPct
+    const realizedPnl = exitQty * pos.entry_price * rawPnlPct
     const slippageBps = slippage * 10_000
 
     // 주문 생성 → 체결 생성 → 포지션 업데이트
@@ -293,7 +297,7 @@ async function processSession(
         side: exitSide,
         position_side: pos.side,
         order_type: 'market',
-        requested_qty: pos.current_qty,
+        requested_qty: exitQty,
         requested_price: rawExitPrice,
         status: 'filled',
         submitted_at: new Date().toISOString(),
@@ -303,29 +307,41 @@ async function processSession(
       .single()
 
     if (order) {
-      // 체결 기록
       await supabase
         .from('v2_paper_fills')
         .insert({
           order_id: order.id,
-          fill_qty: pos.current_qty,
+          fill_qty: exitQty,
           fill_price: exitPrice,
           fill_fee: 0,
           slippage_bps: slippageBps,
         })
     }
 
-    // 포지션 종료
-    await supabase
-      .from('v2_paper_positions')
-      .update({
-        status: 'closed',
-        realized_pnl: Math.round(realizedPnl * 100) / 100,
-        unrealized_pnl: 0,
-        exit_time: new Date().toISOString(),
-        exit_reason: exit.reason,
-      })
-      .eq('id', pos.id)
+    if (exitRatio >= 1.0) {
+      // 전량 청산
+      await supabase
+        .from('v2_paper_positions')
+        .update({
+          status: 'closed',
+          realized_pnl: Math.round((Number(pos.realized_pnl ?? 0) + realizedPnl) * 100) / 100,
+          unrealized_pnl: 0,
+          current_qty: 0,
+          exit_time: new Date().toISOString(),
+          exit_reason: exit.reason,
+        })
+        .eq('id', pos.id)
+    } else {
+      // 부분 청산: 수량 감소, realized_pnl 누적
+      const remainingQty = pos.current_qty - exitQty
+      await supabase
+        .from('v2_paper_positions')
+        .update({
+          current_qty: remainingQty,
+          realized_pnl: Math.round((Number(pos.realized_pnl ?? 0) + realizedPnl) * 100) / 100,
+        })
+        .eq('id', pos.id)
+    }
 
     console.log(
       `[V2 가상매매] 세션 ${sessionId}: ${exit.symbol} ${exit.reason} ` +

@@ -130,11 +130,14 @@ export function runBacktest(
       const symbolCandles = allCandles.get(exit.symbol)
       if (!symbolCandles || symbolCandles.length <= i + 1) continue
 
+      // 부분 청산 비율 (기본 1.0 = 전량)
+      const exitRatio = exit.partialExitRatio ?? 1.0
+
       // 다음 캔들 시가에 청산
       const rawExitPrice = symbolCandles[i + 1].open
       const exitPrice = pos.side === 'long'
-        ? rawExitPrice * (1 - cfg.slippagePct)  // 롱 청산 = 매도, 불리하게
-        : rawExitPrice * (1 + cfg.slippagePct)  // 숏 청산 = 매수, 불리하게
+        ? rawExitPrice * (1 - cfg.slippagePct)
+        : rawExitPrice * (1 + cfg.slippagePct)
 
       // PnL 계산 (레버리지 반영)
       const rawPnlPct = pos.side === 'long'
@@ -142,10 +145,11 @@ export function runBacktest(
         : (pos.entryPrice - exitPrice) / pos.entryPrice
 
       const leveragedPnlPct = rawPnlPct * pos.leverage
+      const exitAllocation = pos.allocation.mul(exitRatio)
       const netPnlPct = leveragedPnlPct - cfg.feeRate * 2 * pos.leverage
 
-      // 에쿼티 업데이트: 원금 + (원금 * 레버리지 PnL)
-      equity = equity.add(pos.allocation.mul(1 + netPnlPct))
+      // 에쿼티 업데이트: 청산 비율만큼
+      equity = equity.add(exitAllocation.mul(1 + netPnlPct))
 
       trades.push({
         symbol: exit.symbol,
@@ -156,10 +160,15 @@ export function runBacktest(
         exitTime: symbolCandles[i + 1].openTime,
         pnlPct: Math.round(netPnlPct * 10000) / 100,
         reason: exit.reason,
-        fees: pos.allocation.mul(cfg.feeRate * 2 * pos.leverage).toNumber(),
+        fees: exitAllocation.mul(cfg.feeRate * 2 * pos.leverage).toNumber(),
       })
 
-      openPositions.delete(exit.symbol)
+      if (exitRatio >= 1.0) {
+        openPositions.delete(exit.symbol)
+      } else {
+        // 부분 청산: 잔여 allocation 갱신
+        pos.allocation = pos.allocation.mul(1 - exitRatio)
+      }
     }
 
     // 진입 평가

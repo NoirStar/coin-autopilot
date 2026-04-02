@@ -14,7 +14,7 @@
  * - RSI 과매도 반등:      0.15  (신규)
  */
 
-import type { Candle } from '../strategy/strategy-base.js'
+import type { Candle } from '../core/types.js'
 import { detectVolumeAnomaly } from './volume-zscore.js'
 import { detectBtcAdjustedPump } from './btc-adjusted-pump.js'
 import { detectOrderbookImbalance, type OrderbookSnapshot } from './orderbook-imbalance.js'

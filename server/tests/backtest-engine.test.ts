@@ -1,6 +1,23 @@
-import { describe, it, expect } from 'vitest'
-import { runBacktest } from '../src/services/backtest-engine.js'
-import { BtcEmaCrossoverStrategy } from '../src/strategy/btc-ema-crossover.js'
+import { describe, it, expect, vi } from 'vitest'
+
+// Supabase mock (v2-backtest-engine → v2-regime-detector → database.ts)
+vi.mock('../src/services/database.js', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        order: vi.fn(() => ({
+          limit: vi.fn(() => ({
+            single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+          })),
+        })),
+        eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      })),
+      insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    })),
+  },
+}))
+
+import { runBacktest } from '../src/research/v2-backtest-engine.js'
 import type {
   Strategy,
   StrategyConfig,
@@ -9,7 +26,7 @@ import type {
   Candle,
   CandleMap,
   RegimeState,
-} from '../src/strategy/strategy-base.js'
+} from '../src/core/types.js'
 
 // ---------------------------------------------------------------------------
 // 테스트 헬퍼

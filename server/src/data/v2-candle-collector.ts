@@ -1,8 +1,8 @@
 import type { Candle, Timeframe, Exchange } from '../core/types.js'
 import { supabase } from '../services/database.js'
+import { fetchOkxCandles as fetchOkxCandlesCCXT } from '../exchange/okx-client.js'
 
 const UPBIT_API = 'https://api.upbit.com/v1'
-const OKX_API = 'https://www.okx.com/api/v5'
 
 /** 타임프레임 → 업비트 분봉 단위 */
 const TIMEFRAME_MINUTES: Partial<Record<Timeframe, number>> = {
@@ -163,35 +163,16 @@ async function fetchUpbitCandles(
 }
 
 /**
- * OKX 캔들 수집
- * @param instId OKX instId (BTC-USDT 등)
+ * OKX 캔들 수집 — CCXT 래퍼 사용 (okx-client.ts 통일)
  */
 async function fetchOkxCandles(
   instId: string,
   timeframe: Timeframe,
   limit: number = 100,
-  after?: string
 ): Promise<Candle[]> {
-  const bar = OKX_BAR[timeframe] ?? '4H'
-  const url = new URL(`${OKX_API}/market/candles`)
-  url.searchParams.set('instId', instId)
-  url.searchParams.set('bar', bar)
-  url.searchParams.set('limit', String(Math.min(limit, 100)))
-  if (after) url.searchParams.set('after', after)
-
-  const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(`OKX API 오류: ${res.status} ${await res.text()}`)
-
-  const json = await res.json() as { data: string[][] }
-
-  return json.data.map((d) => ({
-    openTime: new Date(parseInt(d[0])),
-    open: parseFloat(d[1]),
-    high: parseFloat(d[2]),
-    low: parseFloat(d[3]),
-    close: parseFloat(d[4]),
-    volume: parseFloat(d[5]),
-  })).reverse()
+  const symbol = instId.split('-')[0] // BTC-USDT → BTC
+  const tfMap: Record<string, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' }
+  return fetchOkxCandlesCCXT(symbol, tfMap[timeframe] ?? '4h', limit)
 }
 
 // ─── DB 저장/조회 (v2_candles 테이블) ───────────────────────
@@ -278,19 +259,18 @@ export async function backfillCandles(
     }
   } else if (exchange === 'okx') {
     const instId = assetKeyToOkxInstId(assetKey)
-    let after: string | undefined
     let remaining = totalCandles
 
     while (remaining > 0) {
-      const batch = await fetchOkxCandles(instId, timeframe, 100, after)
+      const batch = await fetchOkxCandles(instId, timeframe, Math.min(remaining, 100))
       if (batch.length === 0) break
 
       const saved = await saveCandlesToDb(exchange, assetKey, timeframe, batch)
       totalSaved += saved
       remaining -= batch.length
 
-      after = String(batch[0].openTime.getTime())
       await sleep(100)
+      if (batch.length < 100) break // 데이터 끝
     }
   }
 
