@@ -11,6 +11,7 @@ import { portfolioRoutes } from './routes/portfolio.js'
 import { settingsRoutes } from './routes/settings.js'
 import { signalRoutes } from './routes/signals.js'
 import { detectionRoutes } from './routes/detection.js'
+import v2ApiRoutes from './routes/v2-api.js'
 import { startCronJobs } from './core/cron.js'
 import { authMiddleware } from './core/auth.js'
 
@@ -35,6 +36,7 @@ app.route('/api/dashboard', dashboardRoutes)
 app.route('/api/signals', signalRoutes)
 app.route('/api/backtest', backtestRoutes)
 app.route('/api/detection', detectionRoutes)
+app.route('/api/v2', v2ApiRoutes)
 
 // 인증 필요 API (strategy GET /는 별도로 비인증 허용)
 app.route('/api/strategy', strategyRoutes)

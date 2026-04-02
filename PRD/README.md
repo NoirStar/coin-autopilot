@@ -59,6 +59,32 @@
 
 새 문서를 만들 때는 [FEATURE_TEMPLATE.md](/root/work/coin-autopilot/PRD/FEATURE_TEMPLATE.md) 템플릿을 복사해서 시작한다.
 
+## 구현 제약
+
+클로드코드 handoff 시 기본 제약은 아래와 같다.
+
+- 서버 구동 금지
+- 외부 API 호출 금지
+- 실제 거래소/브로커 연결 금지
+- 실제 네트워크 의존 검증 금지
+- 코드 구현과 빌드 확인까지만 허용
+
+즉:
+
+- 구조 구현
+- 타입/상태 모델 구현
+- 테이블/DTO/API 계약 구현
+- UI 구현
+- 빌드 통과
+
+까지를 목표로 하고,
+
+- 개발 서버 실행
+- 실데이터 수집 테스트
+- 외부 서비스 연동 검증
+
+은 이후 단계에서 별도로 수행한다.
+
 ## 현재 문서 구성
 
 ### 제품 방향
@@ -103,13 +129,34 @@
 - [12_SCHEMA_AND_API_CONTRACT.md](/root/work/coin-autopilot/PRD/12_SCHEMA_AND_API_CONTRACT.md): 구현 계약 문서
 - [13_IMPLEMENTATION_ROADMAP.md](/root/work/coin-autopilot/PRD/13_IMPLEMENTATION_ROADMAP.md): 구현 순서/마일스톤 문서
 
+## V2 구현 현황 (2026-04-03)
+
+V2 클린 재구축이 완료되었다. PRD 기준 Phase 0~7 전체 구현.
+
+| Phase | 상태 | 산출물 |
+|-------|------|--------|
+| 0. 계약 고정 | ✅ | `core/types.ts`, `20260402_v2_schema.sql` (28 테이블) |
+| 1. 데이터 파이프라인 | ✅ | `v2-candle-collector.ts`, `v2-regime-detector.ts` |
+| 2a. 전략 카탈로그 | ✅ | 6개 전략 V2 이식, `v2-registry.ts`, `atr-stop.ts` |
+| 2b. 연구 루프 | ✅ | `v2-backtest-engine.ts`, `v2-research-loop.ts` |
+| 3. 페이퍼트레이딩 | ✅ | `v2-paper-engine.ts` |
+| 4. 오케스트레이터 | ✅ | `v2-orchestrator.ts` (레짐별 롱/숏, 상위 N 배분) |
+| 5. 대시보드 | ✅ | `v2-api.ts` (14 엔드포인트), 3개 프론트 페이지 |
+| 6. 알림 | ✅ | `v2-notifier.ts` (텔레그램/디스코드/인앱) |
+| 7. 실전 매매 | ✅ | `v2-execution-engine.ts`, `v2-risk-manager.ts` |
+
+리뷰 현황:
+- CEO Review: CLEAR (7개 확장 수용)
+- Design Review: CLEAR (3/10 → 8/10)
+- Eng Review: CLEAR
+
 ## 현재 결론
 
 - 이 PRD 묶음은 `고정 전략 앱`이 아니라 `전략 추가 가능 구조`를 전제로 한다.
 - 전략은 메타데이터와 검증 경로만 맞추면 연구 루프에 편입할 수 있다.
 - 연구 루프 결과에 따라 파라미터와 우선순위가 계속 조정될 수 있다.
-- 초기 V2는 `백테스트 -> 페이퍼트레이딩 -> 승인 기반 운용` 흐름이 중심이다.
-- 실전 자동매매는 구조를 준비하되, V2 핵심 범위는 아니다.
+- V2는 오케스트레이터 + 연구 루프가 핵심. "어떤 전략을 언제 신뢰할지 자동 판단하는 시스템".
+- 한국주식(Stage 2), 멀티유저(Stage 3)는 이연.
 
 ## 남은 오픈 질문
 

@@ -30,7 +30,8 @@
       "Bash(export PATH=\"$BUN_INSTALL/bin:$PATH\" B=~/.claude/skills/gstack/browse/dist/browse $B screenshot /tmp/design-review/screenshots/detection.png)",
       "Bash(export PATH=\"$BUN_INSTALL/bin:$PATH\" B=~/.claude/skills/gstack/browse/dist/browse $B goto \"https://coin-autopilot.vercel.app/operator/dashboard\")",
       "Bash(export PATH=\"$BUN_INSTALL/bin:$PATH\" B=~/.claude/skills/gstack/browse/dist/browse $B screenshot /tmp/design-review/screenshots/dashboard.png)",
-      "Bash(export PATH=\"$BUN_INSTALL/bin:$PATH\" B=~/.claude/skills/gstack/browse/dist/browse $B goto \"https://coin-autopilot.vercel.app/signals\")"
+      "Bash(export PATH=\"$BUN_INSTALL/bin:$PATH\" B=~/.claude/skills/gstack/browse/dist/browse $B goto \"https://coin-autopilot.vercel.app/signals\")",
+      "Skill(plan-design-review)"
     ]
   }
 }

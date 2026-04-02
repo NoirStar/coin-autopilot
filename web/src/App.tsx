@@ -9,6 +9,9 @@ import { PortfolioPage } from '@/pages/PortfolioPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SignalsPage } from '@/pages/SignalsPage'
 import { DetectionPage } from '@/pages/DetectionPage'
+import { V2ResearchPage } from '@/pages/V2ResearchPage'
+import { V2ComparisonPage } from '@/pages/V2ComparisonPage'
+import { V2DashboardPage } from '@/pages/V2DashboardPage'
 
 export default function App() {
   return (
@@ -28,6 +31,9 @@ export default function App() {
         <Route path="/operator/paper-trading" element={<AuthGuard><PaperTradingPage /></AuthGuard>} />
         <Route path="/operator/portfolio" element={<AuthGuard><PortfolioPage /></AuthGuard>} />
         <Route path="/operator/settings" element={<AuthGuard><SettingsPage /></AuthGuard>} />
+        <Route path="/operator/research" element={<AuthGuard><V2ResearchPage /></AuthGuard>} />
+        <Route path="/operator/comparison" element={<AuthGuard><V2ComparisonPage /></AuthGuard>} />
+        <Route path="/operator/v2" element={<AuthGuard><V2DashboardPage /></AuthGuard>} />
       </Route>
 
       {/* 이전 경로 리다이렉트 */}

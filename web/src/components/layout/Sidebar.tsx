@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Lock,
   BarChart3,
+  GitCompareArrows,
+  Microscope,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -41,6 +43,8 @@ const categories: NavCategory[] = [
       { to: '/operator/strategy', icon: Brain, label: '전략 관리' },
       { to: '/operator/backtest', icon: FlaskConical, label: '백테스팅' },
       { to: '/operator/paper-trading', icon: PlayCircle, label: '가상매매' },
+      { to: '/operator/research', icon: Microscope, label: '연구 큐' },
+      { to: '/operator/comparison', icon: GitCompareArrows, label: '전략 비교' },
       { to: '/operator/portfolio', icon: Wallet, label: '포트폴리오' },
       { to: '/operator/settings', icon: Settings, label: '설정' },
     ],
