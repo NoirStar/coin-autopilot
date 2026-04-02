@@ -98,7 +98,7 @@ function fmtDate(d: string | null): string {
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────
 
-export function V2ResearchPage() {
+export function ResearchPage() {
   const runsQuery = useQuery<{ data: ResearchRun[] }>({
     queryKey: ['v2-research-runs'],
     queryFn: () => fetch(`${getApiBase()}/api/v2/research/runs`).then((r) => r.json()),

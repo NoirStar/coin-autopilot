@@ -79,7 +79,7 @@ function MetricBar({ value, max, color }: { value: number; max: number; color: s
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────
 
-export function V2ComparisonPage() {
+export function ComparisonPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const query = useQuery<{ data: StrategyComparison[] }>({

@@ -4,13 +4,12 @@ import { LogIn, LogOut, User, Menu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { LoginModal } from '@/components/auth/LoginModal'
 import { supabase } from '@/lib/supabase'
-import { api } from '@/services/api'
 
 export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { user, loading, signOut } = useAuth()
   const [loginOpen, setLoginOpen] = useState(false)
 
-  // BTC 레짐 실시간 조회
+  // BTC 레짐 + 가격 (Supabase 직접 조회)
   const { data: regime } = useQuery({
     queryKey: ['header-regime'],
     queryFn: async () => {
@@ -26,15 +25,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
     staleTime: 30_000,
   })
 
-  // 실시간 BTC 가격 (업비트 ticker)
-  const { data: btcData } = useQuery({
-    queryKey: ['header-btc-price'],
-    queryFn: () => api.getBtcPrice(),
-    refetchInterval: 10_000,
-    staleTime: 5_000,
-  })
-
-  const btcPrice = btcData?.price
+  const btcPrice = regime?.btc_close
   const regimeState = regime?.regime
 
   return (

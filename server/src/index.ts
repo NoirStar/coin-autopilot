@@ -3,13 +3,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 
-import { dashboardRoutes } from './routes/dashboard.js'
-import { strategyRoutes } from './routes/strategy.js'
-import { backtestRoutes } from './routes/backtest.js'
-import { paperTradingRoutes } from './routes/paper-trading.js'
 import { portfolioRoutes } from './routes/portfolio.js'
 import { settingsRoutes } from './routes/settings.js'
-import { signalRoutes } from './routes/signals.js'
 import { detectionRoutes } from './routes/detection.js'
 import v2ApiRoutes from './routes/v2-api.js'
 import { startCronJobs } from './core/cron.js'
@@ -31,19 +26,13 @@ app.use('*', logger())
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', uptime: process.uptime() }))
 
-// 공개 API (인증 불필요)
-app.route('/api/dashboard', dashboardRoutes)
-app.route('/api/signals', signalRoutes)
-app.route('/api/backtest', backtestRoutes)
+// 공개 API
 app.route('/api/detection', detectionRoutes)
 app.route('/api/v2', v2ApiRoutes)
 
-// 인증 필요 API (strategy GET /는 별도로 비인증 허용)
-app.route('/api/strategy', strategyRoutes)
-app.use('/api/paper-trading/*', authMiddleware)
+// 인증 필요 API
 app.use('/api/portfolio/*', authMiddleware)
 app.use('/api/settings/*', authMiddleware)
-app.route('/api/paper-trading', paperTradingRoutes)
 app.route('/api/portfolio', portfolioRoutes)
 app.route('/api/settings', settingsRoutes)
 

@@ -2,12 +2,8 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
-  Brain,
-  FlaskConical,
-  PlayCircle,
   Wallet,
   Settings,
-  Signal,
   Search,
   ChevronDown,
   ChevronRight,
@@ -30,19 +26,15 @@ const categories: NavCategory[] = [
     label: '시장 분석',
     icon: BarChart3,
     items: [
-      { to: '/signals', icon: Signal, label: '매매 시그널' },
+      { to: '/', icon: LayoutDashboard, label: '운영실 홈' },
       { to: '/detection', icon: Search, label: '코인 분석' },
     ],
   },
   {
     label: '자동매매',
-    icon: Brain,
+    icon: BarChart3,
     requiresAuth: true,
     items: [
-      { to: '/operator/dashboard', icon: LayoutDashboard, label: '대시보드' },
-      { to: '/operator/strategy', icon: Brain, label: '전략 관리' },
-      { to: '/operator/backtest', icon: FlaskConical, label: '백테스팅' },
-      { to: '/operator/paper-trading', icon: PlayCircle, label: '가상매매' },
       { to: '/operator/research', icon: Microscope, label: '연구 큐' },
       { to: '/operator/comparison', icon: GitCompareArrows, label: '전략 비교' },
       { to: '/operator/portfolio', icon: Wallet, label: '포트폴리오' },
