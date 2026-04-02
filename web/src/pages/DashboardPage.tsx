@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   Shield, Activity, ChevronRight, Layers, AlertTriangle,
-  Inbox, RefreshCw, Briefcase, TrendingUp, Microscope,
+  Inbox, RefreshCw, Briefcase, Microscope,
   Zap, Radio, Clock, Eye, EyeOff,
 } from 'lucide-react'
 import { getApiBase } from '../services/api'
