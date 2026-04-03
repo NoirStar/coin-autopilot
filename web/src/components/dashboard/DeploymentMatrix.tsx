@@ -25,17 +25,16 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
   const navigate = useNavigate()
 
   return (
-    <div className="flex-1 min-w-0">
-      {/* 헤더 */}
-      <div className="grid grid-cols-[80px_80px_70px_50px] lg:grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase border-b border-border-subtle">
+    <div className="flex-1 min-w-0 overflow-y-auto">
+      {/* 데스크톱 테이블 헤더 */}
+      <div className="hidden sm:grid grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2.5 font-mono text-[10px] font-semibold text-text-muted tracking-widest uppercase border-b border-border bg-surface">
         <span>STRAT</span>
         <span>ASSET</span>
         <span>STATE</span>
         <span className="text-right">EDGE</span>
-        <span className="pl-4 hidden lg:block">RATIONALE</span>
+        <span className="pl-4">RATIONALE</span>
       </div>
 
-      {/* 행 */}
       {slots.map((slot) => {
         const style = getStateStyle(slot)
         return (
@@ -44,8 +43,8 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
             onClick={() => navigate(`/strategy/${slot.id}`)}
             className={`border-b border-border-subtle border-l-2 ${style.borderClass} hover:bg-surface-hover transition-colors duration-100 cursor-pointer`}
           >
-            {/* 메인 행 */}
-            <div className="grid grid-cols-[80px_80px_70px_50px] lg:grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 items-center">
+            {/* 데스크톱: 그리드 행 */}
+            <div className="hidden sm:grid grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 items-center">
               <span className="font-mono font-semibold text-[13px] text-text-primary truncate">
                 {slot.strategy.shortName}
               </span>
@@ -53,7 +52,7 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
                 {slot.asset}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`} />
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dotClass}`} />
                 <span className={`text-[12px] font-medium ${
                   slot.tradeMode === 'live' ? 'text-profit' : 'text-text-muted'
                 }`}>
@@ -69,13 +68,45 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
               }`}>
                 {slot.edgeScore ?? '—'}
               </span>
-              <span className="pl-4 text-[12px] text-text-secondary truncate hidden lg:block">
+              <span className="pl-4 text-[12px] text-text-secondary truncate">
                 {slot.rationale}
               </span>
             </div>
 
-            {/* 보조 행 (상세) */}
-            <div className="px-4 pb-2 pl-8 font-mono text-[11px] text-text-muted">
+            {/* 모바일: 카드형 */}
+            <div className="sm:hidden px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-semibold text-[13px] text-text-primary">
+                    {slot.strategy.shortName}
+                  </span>
+                  <span className="text-[12px] text-text-muted">{slot.asset}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1">
+                    <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`} />
+                    <span className={`text-[11px] font-medium ${
+                      slot.tradeMode === 'live' ? 'text-profit' : 'text-text-muted'
+                    }`}>
+                      {style.label}
+                    </span>
+                  </span>
+                  {slot.edgeScore !== null && (
+                    <span className={`font-mono font-semibold text-[13px] ${
+                      slot.edgeScore >= 70 ? 'text-profit' : 'text-text-secondary'
+                    }`}>
+                      {slot.edgeScore}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-1 text-[11px] text-text-muted truncate">
+                {slot.rationale}
+              </div>
+            </div>
+
+            {/* 보조 행 — 데스크톱만 */}
+            <div className="hidden sm:block px-4 pb-2 pl-8 font-mono text-[11px] text-text-muted">
               {slot.rationaleDetail}
             </div>
           </div>
@@ -83,8 +114,9 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
       })}
 
       {slots.length === 0 && (
-        <div className="flex items-center justify-center py-12 text-[13px] text-text-muted border border-dashed border-border rounded-md m-4">
-          배치된 전략이 없습니다
+        <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+          <span className="text-[13px] text-text-secondary">배치된 전략이 없습니다</span>
+          <span className="text-[12px] text-text-muted mt-1">연구 루프에서 전략이 검증되면 여기에 표시됩니다</span>
         </div>
       )}
     </div>

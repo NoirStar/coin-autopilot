@@ -45,7 +45,8 @@
       "Bash(mv web/src/pages/V2ResearchPage.tsx web/src/pages/ResearchPage.tsx)",
       "Bash(mv web/src/pages/V2ComparisonPage.tsx web/src/pages/ComparisonPage.tsx)",
       "Bash(git add:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(kill %1)"
     ]
   }
 }

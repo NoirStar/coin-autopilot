@@ -3,7 +3,7 @@ import type { SystemStatus, ConnectionStatus } from '@/types/orchestration'
 
 const StatusDot = ({ status }: { status: ConnectionStatus }) => (
   <span
-    className={`inline-block w-1.5 h-1.5 rounded-full ${
+    className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
       status === 'connected' ? 'bg-profit' : status === 'error' ? 'bg-loss' : 'bg-text-faint'
     }`}
   />
@@ -11,11 +11,7 @@ const StatusDot = ({ status }: { status: ConnectionStatus }) => (
 
 const formatTime = (date: Date): string => {
   const pad = (n: number) => String(n).padStart(2, '0')
-  const m = date.getMonth() + 1
-  const d = date.getDate()
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  const day = days[date.getDay()]
-  return `${pad(m)}월 ${pad(d)}일 ${day} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 const formatElapsed = (isoString: string): string => {
@@ -38,24 +34,24 @@ export const SystemStrip = ({ status }: SystemStripProps) => {
   }, [])
 
   return (
-    <div className="flex items-center gap-4 px-4 h-7 bg-surface border-b border-border-subtle font-mono text-[11px] text-text-muted">
+    <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 h-7 bg-surface border-b border-border-subtle font-mono text-[11px] text-text-muted overflow-x-auto whitespace-nowrap">
       <span className="flex items-center gap-1">
         SYS <StatusDot status={status.server} />
       </span>
       <span className="flex items-center gap-1">
         DB <StatusDot status={status.database} />
       </span>
-      <span>
+      <span className="hidden sm:inline">
         수집 <span className="text-text-secondary">{formatElapsed(status.lastCollectedAt)}</span>
       </span>
-      <span className="border-l border-border pl-3 flex items-center gap-3">
+      <span className="hidden md:inline border-l border-border pl-3 flex items-center gap-3">
         {Object.entries(status.exchanges).map(([name, st]) => (
           <span key={name} className="flex items-center gap-1">
             {name} <StatusDot status={st} />
           </span>
         ))}
       </span>
-      <span className="ml-auto text-text-secondary">{formatTime(now)}</span>
+      <span className="ml-auto text-text-secondary shrink-0">{formatTime(now)}</span>
     </div>
   )
 }

@@ -12,7 +12,7 @@ export const OperatorQueue = ({ items, onApprove, onReject, onDismiss }: Operato
   return (
     <div className="w-full lg:w-[280px] shrink-0 border-t lg:border-t-0 lg:border-l border-border-subtle flex flex-col">
       {/* 헤더 */}
-      <div className="px-4 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase border-b border-border-subtle">
+      <div className="px-4 py-2.5 font-mono text-[10px] font-semibold text-text-muted tracking-widest uppercase border-b border-border bg-surface">
         PENDING ({items.length})
       </div>
 
