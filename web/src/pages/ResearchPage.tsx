@@ -170,7 +170,7 @@ export const ResearchPage = () => {
                 </thead>
                 <tbody>
                   {candidates.map((c) => {
-                    const promo = promotionLabels[c.promotion_status] ?? promotionLabels.none
+                    const promo = promotionLabels[c.promotion_status] ?? promotionLabels.none ?? { label: '', bg: '', color: '' }
                     return (
                       <tr key={c.id} className="border-b border-border-subtle hover:bg-surface-hover transition-colors duration-100">
                         <td className="px-3 py-2 text-[13px] font-medium text-text-primary">{c.strategy_name}</td>
@@ -188,7 +188,7 @@ export const ResearchPage = () => {
                           {c.win_rate.toFixed(1)}%
                         </td>
                         <td className="px-3 py-2">
-                          {promo.label && (
+                          {promo?.label && (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${promo.bg} ${promo.color}`}>
                               {promo.label}
                             </span>

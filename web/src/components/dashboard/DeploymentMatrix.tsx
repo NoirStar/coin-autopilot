@@ -8,11 +8,13 @@ const stateStyles: Record<string, { dotClass: string; borderClass: string; label
   stopped: { dotClass: 'bg-loss', borderClass: 'border-l-loss', label: 'STOPPED' },
 }
 
+const defaultStyle = { dotClass: 'bg-text-faint', borderClass: 'border-l-text-faint', label: 'PAPER' }
+
 const getStateStyle = (slot: AssetSlot) => {
-  if (slot.state === 'stopped') return stateStyles.stopped
-  if (slot.state === 'pending_approval') return stateStyles.pending
-  if (slot.tradeMode === 'live') return stateStyles.live
-  return stateStyles.paper
+  if (slot.state === 'stopped') return stateStyles.stopped ?? defaultStyle
+  if (slot.state === 'pending_approval') return stateStyles.pending ?? defaultStyle
+  if (slot.tradeMode === 'live') return stateStyles.live ?? defaultStyle
+  return stateStyles.paper ?? defaultStyle
 }
 
 interface DeploymentMatrixProps {

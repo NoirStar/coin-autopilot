@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { QueueItem, Approval, RiskAlert } from '@/types/orchestration'
+import type { QueueItem } from '@/types/orchestration'
 import { mockQueueItems } from '@/mocks/dashboard-data'
 
 interface ApprovalState {

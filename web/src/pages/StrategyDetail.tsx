@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Activity, BarChart3, Clock, Shield } from 'lucide-react'
 import { mockAssetSlots, mockDecisions } from '@/mocks/dashboard-data'
 import { formatPercent } from '@/lib/utils'
-import type { AssetSlot } from '@/types/orchestration'
 
 const modeLabels: Record<string, string> = {
   auto: '자동',

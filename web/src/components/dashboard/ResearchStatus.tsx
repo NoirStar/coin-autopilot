@@ -38,8 +38,6 @@ export const ResearchStatus = ({ summary }: ResearchStatusProps) => {
 const ResearchRunRow = ({ run }: { run: ResearchRun }) => {
   const winRateColor =
     run.winRate !== null && run.winRate >= 55 ? 'text-profit' : run.winRate !== null && run.winRate < 45 ? 'text-loss' : 'text-text-secondary'
-  const returnColor =
-    run.totalReturn !== null && run.totalReturn > 0 ? 'text-profit' : run.totalReturn !== null && run.totalReturn < 0 ? 'text-loss' : 'text-text-secondary'
   const mddColor = 'text-loss'
 
   return (

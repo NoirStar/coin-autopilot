@@ -4,12 +4,10 @@ import {
   LayoutDashboard,
   Wallet,
   Settings,
-  Search,
   ChevronDown,
   ChevronRight,
   Lock,
   FlaskConical,
-  Shield,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 

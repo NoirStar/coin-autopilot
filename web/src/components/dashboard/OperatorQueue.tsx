@@ -9,8 +9,6 @@ interface OperatorQueueProps {
 }
 
 export const OperatorQueue = ({ items, onApprove, onReject, onDismiss }: OperatorQueueProps) => {
-  const pendingCount = items.filter((i) => i.kind === 'approval').length
-
   return (
     <div className="w-full lg:w-[280px] shrink-0 border-t lg:border-t-0 lg:border-l border-border-subtle flex flex-col">
       {/* 헤더 */}
