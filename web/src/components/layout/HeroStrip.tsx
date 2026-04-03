@@ -1,8 +1,10 @@
 import type { HeroSummary } from '@/types/orchestration'
 import { formatKRW, formatPercent } from '@/lib/utils'
 
+const riskFallback = { text: '안전', color: 'text-profit', bg: 'bg-profit/10' } as const
+
 const riskLabels: Record<string, { text: string; color: string; bg: string }> = {
-  normal: { text: '안전', color: 'text-profit', bg: 'bg-profit/10' },
+  normal: riskFallback,
   caution: { text: '주의', color: 'text-warning', bg: 'bg-warning/10' },
   warning: { text: '경고', color: 'text-warning', bg: 'bg-warning/10' },
   critical: { text: '위험', color: 'text-loss', bg: 'bg-loss/10' },
@@ -15,7 +17,7 @@ interface HeroStripProps {
 export const HeroStrip = ({ summary }: HeroStripProps) => {
   const pnlColor = summary.todayPnl >= 0 ? 'text-profit' : 'text-loss'
   const pnlSign = summary.todayPnl >= 0 ? '+' : ''
-  const risk = riskLabels[summary.riskLevel] ?? riskLabels.normal
+  const risk = riskLabels[summary.riskLevel] ?? riskFallback
 
   return (
     <div className="bg-surface px-4 sm:px-5 py-4 sm:py-5 border-b border-border">
