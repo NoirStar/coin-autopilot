@@ -78,7 +78,7 @@ BTC 흐름 기반 현물/선물 암호화폐 자동매매 플랫폼.
 - **Risk-Off**: BTC < EMA200 또는 ATR% >= 6.5 또는 RSI <= 45 → 숏 전략 우선
 - **Neutral**: 경계 구간 → Risk-Off로 폴백 (보수적)
 
-## V2 서버 모듈
+## 서버 모듈
 
 ```
 server/src/
@@ -91,10 +91,10 @@ server/src/
   execution/      # OKX 실전 매매
   risk/           # 서킷 브레이커, 일일 손실 한도
   notification/   # 텔레그램, 디스코드, 인앱 알림
-  routes/         # V2 API (14개 엔드포인트)
+  routes/         # API (14개 엔드포인트)
 ```
 
-## V2 대시보드
+## 운영 대시보드
 
 - **운영실 홈**: 에퀴티 커브(Proof Chart) + 레짐 밴드 + 커맨드 레일
 - **연구 큐**: 자동 백테스트 진행 현황 + 후보 랭킹

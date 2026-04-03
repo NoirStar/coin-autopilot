@@ -1,7 +1,7 @@
 # Design System — Coin Autopilot
 
 ## Product Context
-- **What this is:** BTC 흐름 기반 자동매매 플랫폼 (OKX 선물 + 업비트 알트 탐지 + 공개 시그널 페이지)
+- **What this is:** 자산별 전략 오케스트레이션 기반 자동매매 플랫폼 (운영실 대시보드 + 연구 루프 + 공개 시그널 페이지)
 - **Who it's for:** 한국 개인 트레이더 (업비트/OKX)
 - **Space/industry:** 암호화폐 트레이딩 툴 (TradingView, Bybit, Bitget, 3Commas 등)
 - **Project type:** 데이터 밀도 높은 트레이딩 대시보드 + 공개 시그널 페이지
@@ -33,7 +33,7 @@
   - hero: 48px — 랜딩 히어로 (사용 드뭄)
 
 ### 한글 타이포 규칙
-- **최소 폰트 사이즈: 11px** — 10px 이하 한글 텍스트 전면 금지
+- **최소 폰트 사이즈: 12px** — 11px 이하 한글 텍스트 전면 금지
 - **uppercase + letter-spacing 확대는 영문 전용** (RESET, FLOW, PnL 등)
 - 한글 레이블은 12px, 600 weight, 일반 letter-spacing 사용
 - 한영 혼용 시 영문 부분만 uppercase 적용, 한글은 그대로
@@ -185,7 +185,7 @@
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-03-28 | Terminal Craft v2 디자인 시스템 생성 | /design-consultation 리서치 + Codex + Claude subagent 3자 합의. zinc + 크림 골드 방향 확정. |
+| 2026-03-28 | Terminal Craft 디자인 시스템 생성 | /design-consultation 리서치 + Codex + Claude subagent 3자 합의. zinc + 크림 골드 방향 확정. |
 | 2026-03-28 | 크림 골드 액센트 (#E8D5B0) 채택 | 트레이딩 카테고리에서 골드를 쓰는 플랫폼이 거의 없음. 3곳 제한 사용으로 브랜드 시그널. |
 | 2026-03-28 | 1px 격자선 레이아웃 채택 | 라운드 코너 카드 그리드 대신 Bloomberg 스타일 구조 노출. 데이터 테이블/리스트에 적용. |
 | 2026-03-28 | profit 색상 #4ADE80으로 변경 | 이전 #2dd4a8(틸 톤)에서 선명한 그린으로. 형광기 없이 가독성 확보. |

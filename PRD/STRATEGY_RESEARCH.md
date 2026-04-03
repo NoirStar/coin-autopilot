@@ -10,36 +10,36 @@
 - 자산군별 전략 적용 범위와 구현 난이도
 - 추가로 들어오는 전략 조사 데이터를 누적 기록
 
-기존 구현 현황 분석은 [CURRENT_IMPLEMENTATION_AUDIT.md](/root/work/coin-autopilot/PRD/CURRENT_IMPLEMENTATION_AUDIT.md)를 참고하고, 제품 방향은 [FEATURE_SPEC_V2.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC_V2.md)를 기준으로 본 문서를 계속 확장한다.
+제품 방향은 [FEATURE_SPEC.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC.md)를 기준으로 본 문서를 계속 확장한다.
 
 ## 상태 태그
 
-- `legacy_implemented`: 기존 프로젝트에 이미 구현되어 있음
+- `implemented`: 현재 코드베이스에 구현되어 있음
 - `research_candidate`: 리서치로 확보했지만 아직 구현되지 않음
 - `paper_first`: 우선 페이퍼트레이딩부터 검증 권장
 - `needs_market_data`: 체결/호가/파생 데이터 등 추가 수집이 필요함
 - `high_risk`: 비용, 슬리피지, 상장폐지, 청산 위험이 큼
 - `orchestration_signal`: 오케스트레이터의 판단 입력으로도 사용 가능
 
-## 1. 기존 프로젝트 구현 전략
+## 1. 현재 확인된 전략
 
 아래는 현재 코드베이스에서 확인된 전략들이다.
 
 | strategy_id | 이름 | 자산군 | 거래소 | 방향 | 상태 | 메모 |
 |---|---|---|---|---|---|---|
-| `alt_mean_reversion` | Alt Mean Reversion | 암호화폐 알트 현물 | Upbit | Long only | `legacy_implemented` | 기존 업비트 알트 전략. V2에서는 유동성/경보 필터 결합 필요 |
-| `btc_ema_crossover` | BTC EMA Crossover | BTC 선물 | OKX | Long/Short | `legacy_implemented` | 4H 기반 EMA 추세 전략 |
-| `btc_bollinger_reversion` | BTC Bollinger Reversion | BTC 선물 | OKX | Long/Short | `legacy_implemented` | 평균회귀 성격 |
-| `btc_macd_momentum` | BTC MACD Momentum | BTC 선물 | OKX | Long/Short | `legacy_implemented` | 1H 모멘텀 전략 |
-| `btc_donchian_breakout` | BTC Donchian Breakout | BTC 선물 | OKX | Long/Short | `legacy_implemented` | 추세 돌파형 |
-| `alt_detection` | Alt Detection Strategy | 암호화폐 알트 스캔 | Upbit | 탐지 | `legacy_implemented` | 직접 매매 전략보다 탐지 엔진 성격이 강함 |
-| `btc_regime_filter` | BTC Regime Filter | 시장 필터 | BTC | 필터 | `legacy_implemented`, `orchestration_signal` | 기존 앱의 핵심 시장 상태 판별기 |
+| `alt_mean_reversion` | Alt Mean Reversion | 암호화폐 알트 현물 | Upbit | Long only | `implemented` | 유동성/경보 필터 결합 필요 |
+| `btc_ema_crossover` | BTC EMA Crossover | BTC 선물 | OKX | Long/Short | `implemented` | 4H 기반 EMA 추세 전략 |
+| `btc_bollinger_reversion` | BTC Bollinger Reversion | BTC 선물 | OKX | Long/Short | `implemented` | 평균회귀 성격 |
+| `btc_macd_momentum` | BTC MACD Momentum | BTC 선물 | OKX | Long/Short | `implemented` | 1H 모멘텀 전략 |
+| `btc_donchian_breakout` | BTC Donchian Breakout | BTC 선물 | OKX | Long/Short | `implemented` | 추세 돌파형 |
+| `alt_detection` | Alt Detection Strategy | 암호화폐 알트 스캔 | Upbit | 탐지 | `implemented` | 직접 매매 전략보다 탐지 엔진 성격이 강함 |
+| `btc_regime_filter` | BTC Regime Filter | 시장 필터 | BTC | 필터 | `implemented`, `orchestration_signal` | 시장 상태 판별기 |
 
-## 2. 기존 전략의 V2 해석
+## 2. 전략 후보 해석
 
-현재 구현 전략을 V2 관점에서 다시 보면 다음과 같다.
+현재 확인된 전략을 현재 제품 관점에서 다시 보면 다음과 같다.
 
-| 기존 전략 | V2에서의 역할 | 비고 |
+| 현재 전략 | 현재 제품에서의 역할 | 비고 |
 |---|---|---|
 | `btc_ema_crossover` | 선물 추세 후보 전략 | 유지 가치 높음 |
 | `btc_donchian_breakout` | 선물 추세 후보 전략 | 유지 가치 높음 |
@@ -47,7 +47,7 @@
 | `btc_bollinger_reversion` | 선물 평균회귀 후보 전략 | 국면 제한 필요 |
 | `alt_mean_reversion` | 알트 눌림/평균회귀 계열의 출발점 | 유동성/경보 필터 결합 필요 |
 | `alt_detection` | 오케스트레이터 입력용 탐지 모듈 | 직접 매매보다 관측/랭킹 엔진 쪽으로 재정의 필요 |
-| `btc_regime_filter` | 단일 BTC 레짐 필터 | V2에서는 멀티자산 시장 구조 엔진으로 확장 필요 |
+| `btc_regime_filter` | 단일 BTC 레짐 필터 | 멀티자산 시장 구조 엔진으로 확장 필요 |
 
 ## 3. 리서치 입력 001
 
@@ -65,7 +65,7 @@
 | 전략 키 | 전략명 | 분류 | 상태 | 우선순위 | 메모 |
 |---|---|---|---|---|---|
 | `btc_ema_dual_cross_atr` | EMA 듀얼크로스 + ATR 트레일 | 추세추종 | `research_candidate`, `paper_first` | 1 | 기존 `btc_ema_crossover`의 확장형으로 흡수 가능 |
-| `btc_donchian_breakout_v2` | Donchian 돌파 + 변동성 필터 | 추세추종 | `research_candidate`, `paper_first` | 2 | 기존 `btc_donchian_breakout`과 연결 가능 |
+| `btc_donchian_breakout_vol_filter` | Donchian 돌파 + 변동성 필터 | 추세추종 | `research_candidate`, `paper_first` | 2 | 기존 `btc_donchian_breakout`과 연결 가능 |
 | `btc_tsmom_vol_scaled` | TSMOM + 변동성 스케일링 | 중기 모멘텀 | `research_candidate`, `paper_first` | 3 | 자동 연구 루프에서 매우 유력 |
 | `btc_funding_extreme_reversal` | 펀딩 극단 컨트라리언 | 파생 특화 평균회귀 | `research_candidate`, `paper_first`, `needs_market_data`, `orchestration_signal` | 4 | 펀딩, 프리미엄 인덱스 필요 |
 | `btc_bollinger_squeeze_breakout` | 볼린저 스퀴즈 돌파 | 변동성 돌파 | `research_candidate`, `paper_first` | 5 | 비용 민감 |
@@ -77,7 +77,7 @@
 
 | 전략 키 | 전략명 | 분류 | 상태 | 우선순위 | 메모 |
 |---|---|---|---|---|---|
-| `alt_liquidity_ema_trend` | 유동성 필터 + EMA 추세추종 | 롱 온리 추세 | `research_candidate`, `paper_first` | 1 | V2 알트 1순위 후보 |
+| `alt_liquidity_ema_trend` | 유동성 필터 + EMA 추세추종 | 롱 온리 추세 | `research_candidate`, `paper_first` | 1 | 알트 1순위 후보 |
 | `alt_cross_sectional_momentum` | 크로스섹션 모멘텀 로테이션 | 상대강도 | `research_candidate`, `paper_first`, `orchestration_signal` | 2 | 자산별 전략 배치와 잘 맞음 |
 | `alt_trend_pullback` | 추세 내 눌림매수 | 추세 속 평균회귀 | `research_candidate`, `paper_first` | 3 | 기존 `alt_mean_reversion` 확장 방향 |
 | `alt_warning_risk_filter` | 경보/유의 기반 회피 로직 | 리스크 필터 | `research_candidate`, `paper_first`, `orchestration_signal` | 4 | 업비트 특화 핵심 |
@@ -192,14 +192,14 @@
 - 변동성 완화/확대
 - 수급 주체 프록시
 
-## 6. V2 1차 자동 연구 루프 후보
+## 6. 1차 자동 연구 루프 후보
 
-V2에서는 모든 전략을 한 번에 구현하지 않고, 자동 연구 루프에 먼저 태울 후보를 좁혀서 시작하는 것이 현실적이다.
+초기 단계에서는 모든 전략을 한 번에 구현하지 않고, 자동 연구 루프에 먼저 태울 후보를 좁혀서 시작하는 것이 현실적이다.
 
 ### 6.1 BTC 선물
 
 1. `btc_ema_crossover` 또는 `btc_ema_dual_cross_atr`
-2. `btc_donchian_breakout_v2`
+2. `btc_donchian_breakout_vol_filter`
 3. `btc_tsmom_vol_scaled`
 4. `btc_funding_extreme_reversal`
 

@@ -4,6 +4,9 @@
 
 이 폴더는 `coin-autopilot`의 제품 요구사항 문서(PRD)와 기능 명세서를 모아두는 공간이다.
 
+- 이 PRD 묶음은 새 프로젝트 기준 문서다.
+- 기존 버전명이나 단계명을 현재 문서 기준으로 사용하지 않는다.
+
 - 제품 방향
 - 기능 명세
 - 데이터 구조
@@ -39,9 +42,8 @@
 
 ## 현재 참조 문서
 
-- 제품 방향 초안: [FEATURE_SPEC_V2.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC_V2.md)
+- 제품 방향 초안: [FEATURE_SPEC.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC.md)
 - 전략 리서치 문서: [STRATEGY_RESEARCH.md](/root/work/coin-autopilot/PRD/STRATEGY_RESEARCH.md)
-- 현재 구현 분석: [CURRENT_IMPLEMENTATION_AUDIT.md](/root/work/coin-autopilot/PRD/CURRENT_IMPLEMENTATION_AUDIT.md)
 
 ## 구현 Handoff 읽기 순서
 
@@ -90,7 +92,7 @@
 ### 제품 방향
 
 - [01_PRODUCT_VISION.md](/root/work/coin-autopilot/PRD/01_PRODUCT_VISION.md)
-- [FEATURE_SPEC_V2.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC_V2.md)
+- [FEATURE_SPEC.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC.md)
 
 ### 전략 / 연구
 
@@ -119,31 +121,28 @@
 ### 로드맵 / 참고
 
 - [13_IMPLEMENTATION_ROADMAP.md](/root/work/coin-autopilot/PRD/13_IMPLEMENTATION_ROADMAP.md)
-- [CURRENT_IMPLEMENTATION_AUDIT.md](/root/work/coin-autopilot/PRD/CURRENT_IMPLEMENTATION_AUDIT.md)
-
-- [CURRENT_IMPLEMENTATION_AUDIT.md](/root/work/coin-autopilot/PRD/CURRENT_IMPLEMENTATION_AUDIT.md): 현재 코드 구현 분석
-- [FEATURE_SPEC_V2.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC_V2.md): 대화 기반 제품/기능 초안
+- [FEATURE_SPEC.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC.md): 대화 기반 제품/기능 초안
 - [STRATEGY_RESEARCH.md](/root/work/coin-autopilot/PRD/STRATEGY_RESEARCH.md): 전략 리서치 누적 문서
 - [01_PRODUCT_VISION.md](/root/work/coin-autopilot/PRD/01_PRODUCT_VISION.md): 정리된 제품 비전 문서
 - [11_USER_PLATFORM_SPEC.md](/root/work/coin-autopilot/PRD/11_USER_PLATFORM_SPEC.md): 장기 멀티유저/로그인/전략 선택 플랫폼 명세
 - [12_SCHEMA_AND_API_CONTRACT.md](/root/work/coin-autopilot/PRD/12_SCHEMA_AND_API_CONTRACT.md): 구현 계약 문서
 - [13_IMPLEMENTATION_ROADMAP.md](/root/work/coin-autopilot/PRD/13_IMPLEMENTATION_ROADMAP.md): 구현 순서/마일스톤 문서
 
-## V2 구현 현황 (2026-04-03)
+## 현재 구현 현황 (2026-04-03)
 
-V2 클린 재구축이 완료되었다. PRD 기준 Phase 0~7 전체 구현.
+현재 코드베이스에는 PRD 기준 Phase 0~7에 대응하는 구현이 존재한다.
 
 | Phase | 상태 | 산출물 |
 |-------|------|--------|
-| 0. 계약 고정 | ✅ | `core/types.ts`, `20260402_v2_schema.sql` (28 테이블) |
-| 1. 데이터 파이프라인 | ✅ | `v2-candle-collector.ts`, `v2-regime-detector.ts` |
-| 2a. 전략 카탈로그 | ✅ | 6개 전략 V2 이식, `v2-registry.ts`, `atr-stop.ts` |
-| 2b. 연구 루프 | ✅ | `v2-backtest-engine.ts`, `v2-research-loop.ts` |
-| 3. 페이퍼트레이딩 | ✅ | `v2-paper-engine.ts` |
-| 4. 오케스트레이터 | ✅ | `v2-orchestrator.ts` (레짐별 롱/숏, 상위 N 배분) |
-| 5. 대시보드 | ✅ | `v2-api.ts` (14 엔드포인트), 3개 프론트 페이지 |
-| 6. 알림 | ✅ | `v2-notifier.ts` (텔레그램/디스코드/인앱) |
-| 7. 실전 매매 | ✅ | `v2-execution-engine.ts`, `v2-risk-manager.ts` |
+| 0. 계약 고정 | ✅ | 스키마, 타입, API 계약 |
+| 1. 데이터 파이프라인 | ✅ | 캔들 수집, 시장 상태 판별 |
+| 2a. 전략 카탈로그 | ✅ | 전략 등록 구조, 공통 메타데이터 |
+| 2b. 연구 루프 | ✅ | 자동 백테스트, 결과 저장, 승격 후보 생성 |
+| 3. 페이퍼트레이딩 | ✅ | 세션, 주문, 체결, 포지션 시뮬레이션 |
+| 4. 오케스트레이터 | ✅ | 레짐별 롱/숏, 상위 N 배분 |
+| 5. 대시보드 | ✅ | 운영 API, 프론트 페이지 |
+| 6. 알림 | ✅ | 텔레그램, 디스코드, 인앱 알림 |
+| 7. 실전 매매 | ✅ | 실행 엔진, 리스크 관리 |
 
 리뷰 현황:
 - CEO Review: CLEAR (7개 확장 수용)
@@ -155,7 +154,7 @@ V2 클린 재구축이 완료되었다. PRD 기준 Phase 0~7 전체 구현.
 - 이 PRD 묶음은 `고정 전략 앱`이 아니라 `전략 추가 가능 구조`를 전제로 한다.
 - 전략은 메타데이터와 검증 경로만 맞추면 연구 루프에 편입할 수 있다.
 - 연구 루프 결과에 따라 파라미터와 우선순위가 계속 조정될 수 있다.
-- V2는 오케스트레이터 + 연구 루프가 핵심. "어떤 전략을 언제 신뢰할지 자동 판단하는 시스템".
+- 이 프로젝트의 핵심은 오케스트레이터 + 연구 루프다. "어떤 전략을 언제 신뢰할지 자동 판단하는 시스템".
 - 한국주식(Stage 2), 멀티유저(Stage 3)는 이연.
 
 ## 남은 오픈 질문

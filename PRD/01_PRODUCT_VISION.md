@@ -65,7 +65,7 @@
 - 장기적으로 멀티유저 플랫폼으로 확장 가능해야 한다.
   - 계정, 전략 선택, 성과 데이터, 알림 설정은 사용자 단위로 분리 가능해야 한다.
 
-## 7. V2 범위
+## 7. 현재 범위
 
 ### 포함
 
@@ -171,6 +171,5 @@
 
 ## 14. 참고 문서
 
-- 제품 초안: [FEATURE_SPEC_V2.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC_V2.md)
+- 제품 초안: [FEATURE_SPEC.md](/root/work/coin-autopilot/PRD/FEATURE_SPEC.md)
 - 전략 리서치: [STRATEGY_RESEARCH.md](/root/work/coin-autopilot/PRD/STRATEGY_RESEARCH.md)
-- 현재 구현 분석: [CURRENT_IMPLEMENTATION_AUDIT.md](/root/work/coin-autopilot/PRD/CURRENT_IMPLEMENTATION_AUDIT.md)
