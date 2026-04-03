@@ -26,8 +26,14 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
 
   return (
     <div className="flex-1 min-w-0 overflow-y-auto">
-      {/* 데스크톱 테이블 헤더 */}
-      <div className="hidden sm:grid grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2.5 font-mono text-[10px] font-semibold text-text-muted tracking-widest uppercase border-b border-border bg-surface">
+      {/* 섹션 헤더 — 한국어 + 영문 */}
+      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between">
+        <span className="text-[12px] font-semibold text-text-secondary">전략 배치 현황</span>
+        <span className="font-mono text-[10px] text-text-faint">{slots.length}개 자산</span>
+      </div>
+
+      {/* 데스크톱 테이블 컬럼 헤더 */}
+      <div className="hidden sm:grid grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase border-b border-border-subtle">
         <span>STRAT</span>
         <span>ASSET</span>
         <span>STATE</span>
