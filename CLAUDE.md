@@ -1,94 +1,79 @@
 # CLAUDE.md — Coin Autopilot 메인 가이드
 
-> 이 파일은 프로젝트 전체의 메인 가이드. 각 디렉토리별 세부 가이드는 해당 디렉토리의 CLAUDE.md를 참조.
+> 프로젝트 루트 기준 작업 가이드. 제품 기준은 `PRD/`, `PLAN.md`, `DESIGN.md`, `HANDOFF.md`를 따른다.
 
 ## 프로젝트 개요
 
-멀티자산 전략 오케스트레이션 자동매매 플랫폼. 암호화폐(Upbit/OKX) + 한국주식 대상. 자산별 전략 배치, 자동 연구 루프, 페이퍼트레이딩, 실전 매매를 하나의 시스템으로 통합.
+Coin Autopilot은 전략 추가 가능 구조를 전제로 한 자동매매 오케스트레이션 플랫폼이다.
+핵심은 "어떤 전략을 언제 신뢰할지 자동으로 판단하는 시스템"이며, 연구 루프와 오케스트레이터가 중심이다.
+
+현재 우선순위:
+
+- 암호화폐 중심 운영 화면 완성
+- 서버 orchestration API 연결
+- mock 제거 및 실시간 반영
+
+장기 확장:
+
+- 한국주식
+- 멀티유저/로그인 플랫폼화
 
 ## 응답 규칙
 
-- **모든 응답은 한글**로 작성
-- 커밋 메시지, 주석, 문서 모두 한글
-- 코드 변수명/함수명은 영어
+- 모든 응답은 한글
+- 커밋 메시지, 주석, 문서도 기본적으로 한글
+- 변수명, 함수명, 타입명은 영어
 
-## 보안 & 외부 요청 금지
+## 외부 요청 / 실행 제약
 
-- **사용자 허락없이 외부 API 호출, HTTP 요청, 웹훅 등 절대 금지** (작업 중 실행하지 않음)
-- 코드는 작성만 하고, 실제 동작은 GitHub push 후 Vercel 배포에서만 실행
-- API 키, 시크릿은 코드에 하드코딩 금지 — 환경변수(`process.env`)로만 참조
-- 테스트 시 외부 서비스는 반드시 mock 처리
+- 사용자 허락 없이 외부 API 호출, HTTP 요청, 웹훅 호출 금지
+- 실제 거래소/브로커 연결 금지
+- 네트워크 의존 검증 금지
+- 코드 구현과 타입/빌드 확인까지 우선
+- 외부 서비스 테스트가 필요하면 mock으로 대체
 
 ## 기술 스택
 
-```
-Backend:   Node.js + Hono (VPS, 24시간 실행)
-Database:  Supabase (PostgreSQL)
-Schedule:  node-cron (VPS)
-Frontend:  Vercel (React + Vite)
+```text
+Backend:   Node.js + Hono
+Database:  Supabase PostgreSQL
+Schedule:  node-cron
+Frontend:  React + Vite + Tailwind CSS + Zustand
 ```
 
 ## 코드 원칙
 
-- 컴포넌트: 함수형 + 화살표 함수
-- 상태: Zustand (전역), React state (로컬)
-- 스타일: Tailwind CSS 유틸리티 클래스 — CSS 파일 최소화
-- 타입: strict mode, `any` 사용 금지
-- 에러 처리: try-catch + 사용자 친화적 메시지
-- 테스트: Vitest + React Testing Library
+- 컴포넌트는 함수형
+- 전역 상태는 Zustand 우선
+- 스타일은 Tailwind CSS와 토큰 기반
+- 타입은 strict 유지, `any` 금지
+- 에러 처리는 사용자 친화적 메시지 포함
+- 테스트는 Vitest 기반
 
-## gstack
+## 디자인 작업 규칙
 
-- 모든 웹 브라우징은 `/browse` 스킬을 사용. `mcp__claude-in-chrome__*` 도구는 절대 사용 금지.
-- 사용 가능한 스킬 목록:
-  - `/office-hours` — 아이디어 브레인스토밍, YC 오피스아워
-  - `/plan-ceo-review` — CEO/창업자 모드 플랜 리뷰
-  - `/plan-eng-review` — 엔지니어링 매니저 모드 플랜 리뷰
-  - `/plan-design-review` — 디자인 관점 플랜 리뷰
-  - `/design-consultation` — 디자인 시스템 컨설팅
-  - `/review` — PR 코드 리뷰
-  - `/ship` — PR 생성 및 배포 워크플로우
-  - `/land-and-deploy` — PR 머지 및 배포 검증
-  - `/canary` — 배포 후 카나리 모니터링
-  - `/benchmark` — 성능 벤치마크
-  - `/browse` — 헤드리스 브라우저 QA/테스트
-  - `/qa` — QA 테스트 + 버그 수정
-  - `/qa-only` — QA 테스트 (리포트만)
-  - `/design-review` — 비주얼 디자인 QA
-  - `/setup-browser-cookies` — 브라우저 쿠키 임포트
-  - `/setup-deploy` — 배포 설정 구성
-  - `/retro` — 주간 엔지니어링 회고
-  - `/investigate` — 체계적 디버깅/근본원인 분석
-  - `/document-release` — 배포 후 문서 업데이트
-  - `/codex` — OpenAI Codex 세컨드 오피니언
-  - `/cso` — 보안 감사
-  - `/autoplan` — 자동 리뷰 파이프라인
-  - `/careful` — 위험 명령어 안전 가드
-  - `/freeze` — 디렉토리 범위 편집 제한
-  - `/guard` — 전체 안전 모드
-  - `/unfreeze` — freeze 해제
-  - `/gstack-upgrade` — gstack 업그레이드
-
-## 디자인 시스템
-
-DESIGN.md를 반드시 읽은 후 UI/비주얼 작업 진행.
-폰트, 색상, 스페이싱, 미학 방향 모두 DESIGN.md에 정의됨.
-사용자 승인 없이 DESIGN.md와 다른 디자인 결정 금지.
-QA 모드에서 DESIGN.md와 불일치하는 코드는 플래그 처리.
+UI 작업 전 `DESIGN.md`를 반드시 읽는다.
 
 핵심 규칙:
-- opacity 트릭 금지 (`text-muted-foreground/30` 등). 실제 색상 토큰만 사용
-- glass-panel, cosmic-surface, backdrop-filter, cosmic-bg, noise-overlay 사용 금지
-- 장식적 그라데이션, 파티클, 글로우 효과 금지
+
+- opacity 트릭 금지
+- glass, cosmic, glow 계열 장식 금지
 - 이모지 금지, Lucide 아이콘만 사용
-- 최소 폰트 사이즈 11px — 10px 이하 한글 텍스트 금지
-- uppercase + letter-spacing 확대는 영문 전용. 한글 레이블은 12px 600 weight 일반 spacing
-- 액센트(#E8D5B0 크림 골드)는 3곳만: 전략 인디케이터, 시그널 히어로, 브랜드마크
+- 한글 최소 12px 규칙 준수
+- 액센트 컬러 사용 범위 제한
+- 대시보드 정보구조는 `System Strip`, `Hero Strip`, `Deployment Matrix`, `Operator Queue`, `Decision Ledger` 중심
 
-## 서브 가이드 참조
+## 문서 우선순위
 
-| 경로 | 내용 |
-|------|------|
-| `src/CLAUDE.md` | 프론트엔드 컴포넌트, 서비스, 스토어 규칙 |
-| `supabase/CLAUDE.md` | DB 스키마, RLS 정책, 마이그레이션 규칙 |
-| `api/CLAUDE.md` | Serverless 함수, 크론 수집 로직 규칙 |
+문서 간 충돌 시 아래 순서로 판단한다.
+
+1. `PRD/`
+2. `PLAN.md`
+3. `DESIGN.md`
+4. `HANDOFF.md`
+5. 그 외 보조 문서
+
+## 참고
+
+- 현재 루트 기준으로 별도 하위 `CLAUDE.md`는 없다
+- 낡은 문서가 보이면 삭제보다 현재 기준 문서에 맞게 갱신을 우선한다
