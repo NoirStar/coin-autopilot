@@ -1,5 +1,4 @@
 import type { MarketCondition } from '@/types/orchestration'
-import { TrendingUp, TrendingDown } from 'lucide-react'
 
 const volLabels: Record<string, { text: string; color: string }> = {
   low: { text: '낮음', color: 'text-profit' },
