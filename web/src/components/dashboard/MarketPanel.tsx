@@ -1,16 +1,10 @@
 import type { MarketCondition } from '@/types/orchestration'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 
 const volLabels: Record<string, { text: string; color: string }> = {
   low: { text: '낮음', color: 'text-profit' },
   medium: { text: '보통', color: 'text-text-secondary' },
   high: { text: '높음', color: 'text-warning' },
-}
-
-const trendIcons = {
-  up: TrendingUp,
-  flat: Minus,
-  down: TrendingDown,
 }
 
 const trendLabels: Record<string, { text: string; color: string }> = {
@@ -37,7 +31,8 @@ interface MarketPanelProps {
 }
 
 export const MarketPanel = ({ market }: MarketPanelProps) => {
-  const vol = volLabels[market.crypto.volatility] ?? volLabels.medium
+  const volFallback = { text: '보통', color: 'text-text-secondary' }
+  const vol = volLabels[market.crypto.volatility] ?? volFallback
 
   return (
     <div className="flex-1 min-w-0 border-t lg:border-t-0 lg:border-l border-border-subtle overflow-y-auto">
