@@ -8,36 +8,36 @@ import {
   ChevronDown,
   ChevronRight,
   Lock,
-  BarChart3,
-  GitCompareArrows,
-  Microscope,
+  FlaskConical,
+  Shield,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 interface NavCategory {
   label: string
-  icon: typeof BarChart3
-  items: { to: string; icon: typeof BarChart3; label: string }[]
+  items: { to: string; icon: typeof LayoutDashboard; label: string }[]
   requiresAuth?: boolean
 }
 
 const categories: NavCategory[] = [
   {
-    label: '시장 분석',
-    icon: BarChart3,
+    label: '대시보드',
     items: [
-      { to: '/', icon: LayoutDashboard, label: '운영실 홈' },
-      { to: '/detection', icon: Search, label: '코인 분석' },
+      { to: '/', icon: LayoutDashboard, label: '트레이딩 대시보드' },
     ],
   },
   {
-    label: '자동매매',
-    icon: BarChart3,
+    label: '운용',
     requiresAuth: true,
     items: [
-      { to: '/operator/research', icon: Microscope, label: '연구 큐' },
-      { to: '/operator/comparison', icon: GitCompareArrows, label: '전략 비교' },
+      { to: '/operator/research', icon: FlaskConical, label: '연구 & 백테스트' },
       { to: '/operator/portfolio', icon: Wallet, label: '포트폴리오' },
+    ],
+  },
+  {
+    label: '시스템',
+    requiresAuth: true,
+    items: [
       { to: '/operator/settings', icon: Settings, label: '설정' },
     ],
   },
@@ -47,11 +47,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth()
   const location = useLocation()
 
-  // 현재 경로가 속한 카테고리는 기본 열림
   const getDefaultOpen = () => {
     const open: Record<string, boolean> = {}
     for (const cat of categories) {
-      const hasActive = cat.items.some((item) => location.pathname.startsWith(item.to))
+      const hasActive = cat.items.some(
+        (item) => item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)
+      )
       open[cat.label] = hasActive || !cat.requiresAuth
     }
     return open
@@ -70,13 +71,13 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <span className="h-2 w-2 rounded-full bg-accent" />
         <div>
           <h1 className="text-[13px] font-semibold tracking-tight">Coin Autopilot</h1>
-          <p className="text-[12px] text-text-muted">BTC 기반 자동매매</p>
+          <p className="text-[11px] text-text-muted font-mono">noirstar.cloud</p>
         </div>
       </div>
 
       <div className="mx-4 h-px bg-border-subtle" />
 
-      {/* 2단계 아코디언 네비게이션 */}
+      {/* 네비게이션 */}
       <nav className="flex-1 space-y-1 px-3 py-3">
         {categories.map((cat) => {
           const isOpen = openSections[cat.label] ?? false
@@ -84,7 +85,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
           return (
             <div key={cat.label}>
-              {/* 카테고리 헤더 */}
               <button
                 type="button"
                 onClick={() => toggleSection(cat.label)}
@@ -99,7 +99,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 {isLocked && <Lock className="ml-auto h-3 w-3 text-text-faint" />}
               </button>
 
-              {/* 하위 항목 */}
               {isOpen && (
                 <div className="ml-2 space-y-0.5">
                   {cat.items.map((item) => (
@@ -107,10 +106,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       key={item.to}
                       to={item.to}
                       onClick={onNavigate}
+                      end={item.to === '/'}
                       className={({ isActive }) =>
-                        `flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
+                        `flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors duration-100 ${
                           isActive
-                            ? 'bg-[var(--accent-bg)] text-text-primary'
+                            ? 'bg-surface-hover text-text-primary border-l-2 border-text-secondary'
                             : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
                         }`
                       }
@@ -125,17 +125,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           )
         })}
       </nav>
-
-      {/* 에이전트 상태 */}
-      <div className="mx-3 mb-3">
-        <div className="card-surface rounded-md px-3 py-2.5">
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-profit status-active" />
-            <span className="text-[12px] font-medium text-text-primary">서버 연결됨</span>
-          </div>
-          <p className="mt-0.5 pl-3.5 text-[12px] text-text-muted">4H 주기 자동 실행</p>
-        </div>
-      </div>
     </aside>
   )
 }

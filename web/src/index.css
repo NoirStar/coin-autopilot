@@ -38,11 +38,11 @@
   --surface-hover: #18181B;
   --border-subtle: #1C1C1F;
 
-  /* Text hierarchy — NO opacity tricks */
+  /* Text hierarchy — NO opacity tricks. DESIGN.md v2 기준 */
   --text-primary: #FAFAFA;
   --text-secondary: #A1A1AA;
-  --text-muted: #8B8B95;
-  --text-faint: #71717A;
+  --text-muted: #71717A;
+  --text-faint: #52525B;
 
   /* Semantic */
   --profit: #4ADE80;
