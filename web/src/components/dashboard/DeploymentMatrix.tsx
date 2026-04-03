@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import type { AssetSlot } from '@/types/orchestration'
 
 const stateStyles: Record<string, { dotClass: string; borderClass: string; label: string }> = {
@@ -19,15 +20,17 @@ interface DeploymentMatrixProps {
 }
 
 export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
+  const navigate = useNavigate()
+
   return (
     <div className="flex-1 min-w-0">
       {/* 헤더 */}
-      <div className="grid grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase border-b border-border-subtle">
+      <div className="grid grid-cols-[80px_80px_70px_50px] lg:grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase border-b border-border-subtle">
         <span>STRAT</span>
         <span>ASSET</span>
         <span>STATE</span>
         <span className="text-right">EDGE</span>
-        <span className="pl-4">RATIONALE</span>
+        <span className="pl-4 hidden lg:block">RATIONALE</span>
       </div>
 
       {/* 행 */}
@@ -36,10 +39,11 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
         return (
           <div
             key={slot.id}
-            className={`border-b border-border-subtle border-l-2 ${style.borderClass} hover:bg-surface-hover transition-colors duration-100`}
+            onClick={() => navigate(`/strategy/${slot.id}`)}
+            className={`border-b border-border-subtle border-l-2 ${style.borderClass} hover:bg-surface-hover transition-colors duration-100 cursor-pointer`}
           >
             {/* 메인 행 */}
-            <div className="grid grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 items-center">
+            <div className="grid grid-cols-[80px_80px_70px_50px] lg:grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 items-center">
               <span className="font-mono font-semibold text-[13px] text-text-primary truncate">
                 {slot.strategy.shortName}
               </span>
@@ -63,7 +67,7 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
               }`}>
                 {slot.edgeScore ?? '—'}
               </span>
-              <span className="pl-4 text-[12px] text-text-secondary truncate">
+              <span className="pl-4 text-[12px] text-text-secondary truncate hidden lg:block">
                 {slot.rationale}
               </span>
             </div>

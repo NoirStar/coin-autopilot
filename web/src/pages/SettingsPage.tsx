@@ -80,18 +80,21 @@ export function SettingsPage() {
   }, [settings, setUpbitConfigured, setOkxConfigured])
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">설정</h2>
-        <p className="text-[13px] text-text-muted">API 키, 리스크 파라미터, 알림을 관리합니다</p>
+    <div className="flex flex-col h-full">
+      <div className="px-6 py-4 border-b border-border-subtle">
+        <h1 className="text-[20px] font-bold text-text-primary">설정</h1>
+        <p className="text-[13px] text-text-muted mt-1">API 키, 리스크 파라미터, 알림을 관리합니다</p>
       </div>
+
+      <div className="flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-2xl space-y-6 px-6 py-5">
 
       {/* 서버 상태 */}
       {agentStatus && (
         <div className="card-surface rounded-md p-4">
           <div className="flex items-center gap-2">
             <Server className="h-3.5 w-3.5 text-text-faint" />
-            <h3 className="data-table-header">서버 상태</h3>
+            <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">서버 상태</h3>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatusItem
@@ -127,6 +130,8 @@ export function SettingsPage() {
       {/* 위험 영역 */}
       <DangerZone />
     </div>
+    </div>
+    </div>
   )
 }
 
@@ -161,7 +166,7 @@ function ApiKeySection({ settings, isLoading }: { settings: UserSettings | undef
     <div className="card-surface rounded-md p-5">
       <div className="flex items-center gap-2">
         <Key className="h-3.5 w-3.5 text-text-faint" />
-        <h3 className="data-table-header">API 키 관리</h3>
+        <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">API 키 관리</h3>
       </div>
       <div className="mt-4 space-y-3">
         <ApiKeyCard
@@ -428,7 +433,7 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="h-3.5 w-3.5 text-text-faint" />
-          <h3 className="data-table-header">리스크 파라미터</h3>
+          <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">리스크 파라미터</h3>
         </div>
         {toast && (
           <span className="flex items-center gap-1 text-[12px] text-profit">
@@ -540,7 +545,7 @@ function AlertSection({ settings, isLoading }: { settings: UserSettings | undefi
     <div className="card-surface rounded-md p-5">
       <div className="flex items-center gap-2">
         <Bell className="h-3.5 w-3.5 text-text-faint" />
-        <h3 className="data-table-header">알림 설정</h3>
+        <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">알림 설정</h3>
       </div>
 
       <div className="mt-4 space-y-3">

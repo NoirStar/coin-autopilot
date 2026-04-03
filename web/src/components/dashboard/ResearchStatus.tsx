@@ -12,7 +12,7 @@ interface ResearchStatusProps {
 
 export const ResearchStatus = ({ summary }: ResearchStatusProps) => {
   return (
-    <div className="flex-1 min-w-0 border-l border-border-subtle">
+    <div className="flex-1 min-w-0 border-t lg:border-t-0 lg:border-l border-border-subtle">
       <div className="px-4 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase border-b border-border-subtle">
         RESEARCH
       </div>

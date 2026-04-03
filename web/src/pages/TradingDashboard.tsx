@@ -4,51 +4,38 @@ import { DeploymentMatrix } from '@/components/dashboard/DeploymentMatrix'
 import { OperatorQueue } from '@/components/dashboard/OperatorQueue'
 import { DecisionLedger } from '@/components/dashboard/DecisionLedger'
 import { ResearchStatus } from '@/components/dashboard/ResearchStatus'
-import {
-  mockSystemStatus,
-  mockHeroSummary,
-  mockAssetSlots,
-  mockQueueItems,
-  mockDecisions,
-  mockResearchSummary,
-} from '@/mocks/dashboard-data'
+import { useOrchestrationStore } from '@/stores/orchestration-store'
+import { useApprovalStore } from '@/stores/approval-store'
+import { useResearchStore } from '@/stores/research-store'
 
 export const TradingDashboard = () => {
-  const handleApprove = (id: string) => {
-    console.log('승인:', id)
-  }
-
-  const handleReject = (id: string) => {
-    console.log('거부:', id)
-  }
-
-  const handleDismiss = (id: string) => {
-    console.log('확인:', id)
-  }
+  const { systemStatus, heroSummary, assetSlots, decisions } = useOrchestrationStore()
+  const { queueItems, approveItem, rejectItem, dismissItem } = useApprovalStore()
+  const { summary: researchSummary } = useResearchStore()
 
   return (
     <div className="flex flex-col h-full">
       {/* System Strip */}
-      <SystemStrip status={mockSystemStatus} />
+      <SystemStrip status={systemStatus} />
 
       {/* Hero Strip */}
-      <HeroStrip summary={mockHeroSummary} />
+      <HeroStrip summary={heroSummary} />
 
-      {/* 본체: Deployment Matrix (65%) + Operator Queue (35%) */}
-      <div className="flex flex-1 min-h-0 border-b border-border-subtle">
-        <DeploymentMatrix slots={mockAssetSlots} />
+      {/* 본체: 데스크톱=가로 비대칭 / 모바일=세로 스택 */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 border-b border-border-subtle">
+        <DeploymentMatrix slots={assetSlots} />
         <OperatorQueue
-          items={mockQueueItems}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onDismiss={handleDismiss}
+          items={queueItems}
+          onApprove={approveItem}
+          onReject={rejectItem}
+          onDismiss={dismissItem}
         />
       </div>
 
-      {/* 하단: Decision Ledger (50%) + Research Status (50%) */}
-      <div className="flex border-t border-border-subtle h-[180px] shrink-0">
-        <DecisionLedger decisions={mockDecisions} />
-        <ResearchStatus summary={mockResearchSummary} />
+      {/* 하단: 데스크톱=가로 분할 / 모바일=세로 스택 */}
+      <div className="flex flex-col lg:flex-row border-t border-border-subtle lg:h-[180px] shrink-0">
+        <DecisionLedger decisions={decisions} />
+        <ResearchStatus summary={researchSummary} />
       </div>
     </div>
   )

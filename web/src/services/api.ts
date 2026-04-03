@@ -95,4 +95,11 @@ export const api = {
     request('/api/settings/api-keys', { method: 'PUT', body: JSON.stringify(data) }),
   deleteApiKeys: (exchange: string) =>
     request(`/api/settings/api-keys/${exchange}`, { method: 'DELETE' }),
+
+  // Research (연구 루프)
+  getResearchRuns: () => request('/api/v2/research/runs'),
+  getResearchCandidates: () => request('/api/v2/research/candidates'),
+
+  // 범용 request (새 페이지에서 직접 경로 지정)
+  request: <T>(path: string, options?: RequestInit) => request<T>(path, options),
 }

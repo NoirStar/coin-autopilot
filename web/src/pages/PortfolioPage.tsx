@@ -76,11 +76,13 @@ export function PortfolioPage() {
   const totalPages = Math.ceil(totalTrades / pageSize)
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">포트폴리오</h2>
-        <p className="text-[13px] text-text-muted">거래소별 잔고와 거래 내역을 확인합니다</p>
+    <div className="flex flex-col h-full">
+      <div className="px-6 py-4 border-b border-border-subtle">
+        <h1 className="text-[20px] font-bold text-text-primary">포트폴리오</h1>
+        <p className="text-[13px] text-text-muted mt-1">거래소별 잔고와 거래 내역</p>
       </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
       {/* 거래소 잔고 */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -111,7 +113,7 @@ export function PortfolioPage() {
       {/* 거래 내역 */}
       <div className="card-surface rounded-md p-5">
         <div className="flex items-center justify-between">
-          <h3 className="data-table-header">거래 내역</h3>
+          <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">TRADES</h3>
           <div className="flex items-center gap-2">
             <select
               value={exchangeFilter}
@@ -242,6 +244,7 @@ export function PortfolioPage() {
           </>
         )}
       </div>
+      </div>
     </div>
   )
 }
@@ -275,7 +278,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
       <div className="card-surface rounded-md p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="data-table-header">{name} ({type})</h3>
+            <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">{name} ({type})</h3>
           </div>
           <span className="rounded-full bg-muted px-2 py-0.5 text-[12px] text-text-muted">미설정</span>
         </div>
@@ -297,7 +300,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
   return (
     <div className="card-surface rounded-md p-4">
       <div className="flex items-center justify-between">
-        <h3 className="data-table-header">{name} ({type})</h3>
+        <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">{name} ({type})</h3>
         <span className="flex items-center gap-1 text-[12px] text-profit">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />
           연결됨

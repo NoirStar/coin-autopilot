@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { TradingDashboard } from '@/pages/TradingDashboard'
+import { StrategyDetail } from '@/pages/StrategyDetail'
 import { PortfolioPage } from '@/pages/PortfolioPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { ResearchPage } from '@/pages/ResearchPage'
@@ -12,6 +13,9 @@ export default function App() {
       <Route element={<AppLayout />}>
         {/* 메인: 트레이딩 대시보드 (PRD 07 기준) */}
         <Route path="/" element={<TradingDashboard />} />
+
+        {/* 전략 상세 */}
+        <Route path="/strategy/:slotId" element={<StrategyDetail />} />
 
         {/* 운용자 페이지 */}
         <Route path="/operator" element={<AuthGuard><TradingDashboard /></AuthGuard>} />

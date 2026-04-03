@@ -12,7 +12,7 @@ export const OperatorQueue = ({ items, onApprove, onReject, onDismiss }: Operato
   const pendingCount = items.filter((i) => i.kind === 'approval').length
 
   return (
-    <div className="w-[280px] shrink-0 border-l border-border-subtle flex flex-col">
+    <div className="w-full lg:w-[280px] shrink-0 border-t lg:border-t-0 lg:border-l border-border-subtle flex flex-col">
       {/* 헤더 */}
       <div className="px-4 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase border-b border-border-subtle">
         PENDING ({items.length})
