@@ -142,6 +142,42 @@ export type QueueItem =
   | { kind: 'approval'; data: Approval }
   | { kind: 'risk'; data: RiskAlert }
 
+// ── 포지션 목록 (Position Panel) ──
+export interface ActivePosition {
+  id: string
+  asset: string
+  venue: Venue
+  strategy: string
+  tradeMode: TradeMode
+  side: PositionSide
+  entryPrice: number
+  currentPrice: number
+  stopLoss: number
+  takeProfit: number
+  qty: number
+  unrealizedPnl: number
+  unrealizedPnlPct: number
+  holdingSince: string
+}
+
+// ── 시장 상황 (Market Panel) ──
+export interface MarketCondition {
+  crypto: {
+    volatility: 'low' | 'medium' | 'high'
+    fundingRate: number
+    openInterest: number
+    longShortRatio: number
+    kimchiPremium: number
+    updatedAt: string
+  }
+  krStock: {
+    trend: 'up' | 'flat' | 'down'
+    volume: number
+    volumeChange: number
+    updatedAt: string
+  } | null
+}
+
 // ── 포트폴리오 ──
 export interface PortfolioSummary {
   totalEquityKrw: number

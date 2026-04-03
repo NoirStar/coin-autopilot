@@ -2,80 +2,72 @@
 
 > 이 문서는 PRD 목표 시스템을 새로 구축하기 위한 실행 계획.
 > 기존 코드 유지보수가 아니라 전면 재설계+재구축.
+> **최종 업데이트: 2026-04-03 디자인 리뷰 2차 반영**
 
-## 현재 상태 (2026-04-03)
+## 진행 상태
 
-### 버릴 것
-- 기존 페이지 구조 전체 (DashboardPage, DetectionPage, ResearchPage, ComparisonPage, PortfolioPage)
-- 기존 레이아웃 (Header의 BTC 가격 중심, Sidebar의 레거시 네비게이션)
-- 기존 Zustand 스토어 (dashboard-store, strategy-store, backtest-store 등 — PRD 모델과 불일치)
-- 기존 타입 시스템 (trading.ts — 오케스트레이션 모델 미반영)
-- 기존 index.css의 레거시 테마 (oklch, glass-panel 등)
+### 완료
+- [x] Phase 1: CSS 토큰 + 타입 시스템 + 레이아웃 쉘 + 라우팅
+- [x] Phase 2: 트레이딩 대시보드 4대 프리미티브 (mock 데이터)
+- [x] Phase 5: Zustand 스토어 3개 (orchestration, approval, research)
+- [x] 전략 상세 페이지
+- [x] 연구 페이지 재구축
+- [x] 포트폴리오/설정 레이아웃 업데이트
+- [x] AuthGuard 제거 (1인 사용 단계)
+- [x] 모바일 반응형 (DeploymentMatrix 카드형, SystemStrip/HeroStrip 축약)
+- [x] 초보자 UX 개선 (한국어 헤더, 승인 근거, 위험도 표시)
+- [x] 레거시 11개 파일 삭제
 
-### 참고만 할 것
-- API 서비스 레이어 패턴 (request 함수, auth 헤더)
-- Supabase 인증 훅 (useAuth)
-- 유틸 함수 (formatKRW, formatUSD, formatPercent, cn)
-- lib/supabase.ts, lib/constants.ts (일부)
+### 미완료
+- [x] **포지션/세션 패널** — PRD 07 §7.4. 실전/모의 분리, 진입가/현재가/SL/보유시간 표시 ✓
+- [x] **시장 상황 패널** — PRD 07 §7.5. 암호화폐(변동성/펀딩비/OI/롱숏/김프) + 한국주식(추세/거래대금) ✓
+- [ ] EDGE 스코어 계산 로직 서버 구현
+- [ ] mock → 실제 API 전환
+- [ ] 실시간 업데이트 (WebSocket/polling)
+- [ ] 자산 상세 페이지
+- [ ] 접근성 보강
 
-### 새로 만들 것
-- **전체 페이지 구조** — PRD 07 기준
-- **전체 컴포넌트** — DESIGN.md 4대 프리미티브 기반
-- **전체 타입 시스템** — 오케스트레이션 모델 기반
-- **전체 Zustand 스토어** — PRD 데이터 모델 기반
-- **전체 CSS** — Terminal Craft Evolved 토큰
-
-## 구현 범위
-
-### Phase 1: 기반 (우선순위 1)
-1. **CSS 토큰 시스템** — DESIGN.md의 모든 토큰을 index.css에 정의
-2. **타입 시스템** — 오케스트레이션 모델 타입 (AssetSlot, Strategy, Decision, Approval, Research 등)
-3. **레이아웃 쉘** — AppLayout 재구축 (SystemStrip + Sidebar + main content)
-4. **라우팅** — 새 페이지 구조에 맞는 라우터 설정
-
-### Phase 2: 트레이딩 대시보드 (우선순위 1)
-PRD 07 "대시보드의 4가지 질문"에 답하는 핵심 화면.
-
-5. **SystemStrip** — 시스템 연결 상태, DB, 거래소, 마지막 수집 시간
-6. **HeroStrip** — EDGE 스코어 + LIVE/PAPER 수 + 총 자산 + 오늘 PnL + 승인 대기
-7. **DeploymentMatrix** — 자산별 전략 배치 테이블 (행 = 자산, 2줄 구조)
-8. **OperatorQueue** — 승인/리스크/AI 액션 큐
-9. **DecisionLedger** — 시간순 머신 로그
-10. **ResearchStatus** — 연구 루프 현황 패널
-
-### Phase 3: 세부 페이지 (우선순위 2)
-11. **전략 상세** — 전략별 성과, 백테스트 결과, 페이퍼 세션
-12. **자산 상세** — 자산별 시장 상태, 배치된 전략, 포지션
-13. **연구 상세** — 연구 큐, 백테스트 결과 테이블, 후보 랭킹
-
-### Phase 4: 운영 (우선순위 2)
-14. **설정 페이지** — API 키, 리스크 한도, 알림 설정
-15. **포트폴리오** — 자산 잔액, 거래 내역
-
-### Phase 5: 스토어 + API (우선순위 1, Phase 2와 병행)
-16. **orchestration-store** — asset slots, strategies, edge scores, decisions
-17. **risk-store** — MDD, daily loss, circuit breaker, warnings
-18. **research-store** — research queue, candidates, rankings
-19. **approval-store** — pending approvals, history
-20. **API 서비스** — 새 엔드포인트에 맞게 재구성
-
-## 구현 순서
+## 현재 파일 구조
 
 ```
-Day 1 (오늘, 외부 작업):
-  ✅ DESIGN.md 재작성
-  → Phase 1: CSS 토큰 + 타입 + 레이아웃 쉘 + 라우팅
-  → Phase 2: 트레이딩 대시보드 컴포넌트 (mock 데이터)
-
-Day 2 (집에서 이어서):
-  → Phase 2 마무리: 대시보드 컴포넌트 연결
-  → Phase 5: 스토어 + API 연결
-  → Phase 3: 전략/자산/연구 상세 페이지
-
-Day 3+:
-  → Phase 4: 설정, 포트폴리오
-  → 전체 QA + 디자인 리뷰
+web/src/
+├── App.tsx                  # 라우터 (/, /strategy/:slotId, /research, /portfolio, /settings)
+├── components/
+│   ├── layout/
+│   │   ├── AppLayout.tsx     # Sidebar + main (패딩 없음, 각 페이지 자체 레이아웃)
+│   │   ├── SystemStrip.tsx   # 28px 시스템 상태 바 (SYS/DB/거래소/시간)
+│   │   ├── Sidebar.tsx       # 플랫 네비게이션 (인증 없음)
+│   │   └── HeroStrip.tsx     # 승인+위험도 → 총자산 → 손익 → 실전/모의 → 시장적합도
+│   ├── dashboard/
+│   │   ├── DeploymentMatrix.tsx  # 전략 배치 현황 (데스크톱 테이블 + 모바일 카드)
+│   │   ├── OperatorQueue.tsx     # 확인 필요 큐 (승인 근거 + 변경점 + 진행바)
+│   │   ├── DecisionLedger.tsx    # 시스템 판단 기록 (한글 요약 + 머신 로그)
+│   │   └── ResearchStatus.tsx    # 연구 현황
+│   └── auth/, ui/
+├── pages/
+│   ├── TradingDashboard.tsx  # 메인 대시보드
+│   ├── StrategyDetail.tsx    # 전략 상세 (포지션, 판단이유, 결정이력)
+│   ├── ResearchPage.tsx      # 연구 & 백테스트
+│   ├── PortfolioPage.tsx     # 포트폴리오
+│   └── SettingsPage.tsx      # 설정
+├── stores/ (orchestration, approval, research, settings)
+├── mocks/dashboard-data.ts
+├── types/orchestration.ts
+├── services/api.ts
+└── index.css                # Terminal Craft Evolved 토큰
 ```
+
+## 라우팅
+
+| 경로 | 페이지 | 인증 |
+|------|--------|------|
+| `/` | TradingDashboard | 불필요 (1인 사용) |
+| `/strategy/:slotId` | StrategyDetail | 불필요 |
+| `/research` | ResearchPage | 불필요 |
+| `/portfolio` | PortfolioPage | 불필요 |
+| `/settings` | SettingsPage | 불필요 |
+
+레거시 `/operator/*` 경로는 모두 새 경로로 리다이렉트.
 
 ## 네비게이션 플로우
 
@@ -83,121 +75,173 @@ Day 3+:
 트레이딩 대시보드 (/)
   ├── DeploymentMatrix 행 클릭 → /strategy/:slotId
   ├── OperatorQueue 항목 → 해당 전략/자산 상세
-  ├── ResearchStatus 행 → /operator/research
+  ├── ResearchStatus 행 → /research
   └── Sidebar → 연구, 포트폴리오, 설정
 
 전략 상세 (/strategy/:slotId)
   ├── ← 뒤로 → 대시보드
-  └── 관련 연구 결과 링크 → /operator/research
+  └── 관련 연구 결과 링크 → /research
 
-연구 (/operator/research)
+연구 (/research)
   └── 후보 행 클릭 → 전략 상세
 ```
+
+## 트레이딩 대시보드 레이아웃 (현재 구현)
+
+```
+┌─ SystemStrip (28px) ─────────────────────────────────────┐
+│ SYS ● DB ● 수집 4s  OKX ● UPBIT ●        14:22:07      │
+├─ HeroStrip (bg-surface) ────────────────────────────────┤
+│ [승인 대기 2건] [위험도: 안전]                            │
+│ 총 자산 ₩12,048,200  오늘 +₩48,200  실전 2  모의 1     │
+│                                      시장적합도 72/100   │
+├─ 전략 배치 현황 (65%) ────┬─ 확인 필요 (35%, 320px) ────┤
+│ STRAT  ASSET  STATE  EDGE │ [세션 승격] BB_REV/ETH      │
+│ MA_X   BTC    ● LIVE  82  │  승인 시 → 포지션 진입      │
+│  RSI 과매도 + 거래량↑     │  거부 시 → 현재 유지        │
+│ GRID_K 005930 ● LIVE  71  │  [승인] [거부]   2시간 남음  │
+│  박스권 상단 돌파          │────────────────────────────│
+│ BB_REV ETH   ○ PAPER  —   │ [리스크] MDD 경고           │
+│  대기 — 트리거 미달        │  ███████░ 56% (한도 -5%)    │
+├─ 시스템 판단 기록 (50%) ──┬─ 연구 현황 (50%) ───────────┤
+│ 14:21 BTC · 유지           │ ● 실행중 2  대기 3  완료 12 │
+│   regime filter passed     │ 13:30 MOMENTUM_4H 승률 68% │
+│ 14:15 ETH · 대기 중        │ 13:15 MEAN_REV 승률 52%    │
+│   trigger pending          │ 12:50 BREAKOUT 승률 41%탈락│
+└────────────────────────────┴─────────────────────────────┘
+```
+
+## Phase 2.5: 누락 패널 추가 (다음 우선)
+
+PRD 07에 명시되었지만 현재 구현에 없는 2개 패널. 승인 판단의 배경 정보로 필수.
+
+### 2.5a. 포지션/세션 패널
+
+PRD 07 §7.4: "실전 포지션과 페이퍼 포지션은 시각적으로 분리"
+
+**위치:** 대시보드 본체, DeploymentMatrix 아래 또는 사이드 패널 확장
+**내용:**
+- 현재 열린 포지션 목록 (자산, 방향, 진입 전략, 현재 손익, 보유 시간, 리스크 상태)
+- 실전과 페이퍼 시각적 분리 (좌측 border: 실전=profit, 페이퍼=text-faint)
+- 각 포지션의 진입가, 손절가, 목표가
+- **초보자 UX:** "이 포지션은 모의 운용입니다. 실제 자금이 사용되지 않습니다." 같은 라벨
+
+**상태 정의:**
+- LOADING: skeleton 행 3개
+- EMPTY: "열린 포지션이 없습니다. 전략이 신호를 감지하면 자동으로 진입합니다."
+- ERROR: "포지션 데이터를 불러올 수 없습니다" + [재시도]
+
+### 2.5b. 시장 상황 패널
+
+PRD 07 §7.5: "오케스트레이터 판단 배경을 사용자가 이해할 수 있게"
+
+**위치:** 대시보드 하단, DecisionLedger/ResearchStatus와 같은 높이 또는 별도 탭
+**내용:**
+- 암호화폐: 변동성 상태, 펀딩비, OI, 롱/숏 비율, 김치 프리미엄
+- 한국주식: 시장 추세, 거래대금
+- **초보자 UX:** 각 지표 옆에 한 줄 설명. "펀딩비 +0.03%: 롱 포지션 비용이 높은 상태"
+
+**상태 정의:**
+- LOADING: skeleton 카드
+- ERROR: "시장 데이터를 불러올 수 없습니다"
+- 데이터가 오래된 경우: "마지막 업데이트: 5분 전" 경고
+
+**레이아웃 옵션:**
+```
+옵션 A: 하단 3분할
+┌─ 판단 기록 (33%) ─┬─ 연구 현황 (33%) ─┬─ 시장 상황 (33%) ─┐
+
+옵션 B: 하단 2행
+┌─ 판단 기록 (50%) ─────┬─ 연구 현황 (50%) ────────────────┐
+├─ 포지션 현황 (50%) ───┬─ 시장 상황 (50%) ────────────────┤
+
+옵션 C: 탭 방식 (하단 패널을 탭으로)
+[판단 기록] [연구 현황] [포지션] [시장 상황]
+```
+
+→ 구현 시점에 결정. 화면 밀도와 실제 데이터 양에 따라.
+
+## EDGE 스코어 정의 (초안)
+
+"현재 시장 조건이 내 전략 포트폴리오에 얼마나 유리한지"를 0-100으로 표현.
+
+### 계산 방식 (서버에서)
+```
+EDGE = weighted_average(
+  각 활성 전략의 (전략 적합도 × 시장 적합도)
+)
+
+전략 적합도 = 최근 N일 승률/수익률/MDD 기반 점수 (0-100)
+시장 적합도 = 현재 시장 레짐이 해당 전략의 최적 레짐과 얼마나 일치하는지 (0-100)
+```
+
+### UI에서 표시
+- 0-30: 빨간색 (`--loss`), "시장이 불리합니다"
+- 31-60: 회색 (`--text-secondary`), "보통"
+- 61-100: 초록색 (`--profit`), "시장이 유리합니다"
+- 전략이 0개일 때: "—" 표시, "전략이 배치되면 계산됩니다"
+
+### 사용자에게 보이는 문구
+- "시장 적합도 72/100 — 현재 시장이 내 전략에 유리한 상태"
+- 터치/호버 시 세부 분해: 각 전략별 적합도
 
 ## 인터랙션 상태 정의
 
 | 컴포넌트 | LOADING | EMPTY | ERROR | SUCCESS | PARTIAL |
 |----------|---------|-------|-------|---------|---------|
-| **SystemStrip** | 연결 상태 닷 = 회색 깜빡임 | N/A (항상 표시) | 연결 실패 닷 = 빨간색 + "연결 끊김" 텍스트 | 모든 닷 초록 | 일부 거래소만 연결 (닷 개별 표시) |
-| **HeroStrip** | EDGE "—", 숫자 skeleton shimmer | EDGE 0, "전략 미배치" 배지 | "데이터 로드 실패" + 재시도 버튼 | 숫자 표시 (현재 구현) | EDGE만 있고 PnL 미수신 → PnL "—" |
-| **DeploymentMatrix** | 3행 skeleton shimmer | 빈 상태: Lucide Target 아이콘 + "배치된 전략이 없습니다" + "연구 루프에서 전략이 검증되면 여기에 표시됩니다" + [연구 페이지로 이동] 버튼 | "전략 상태를 불러올 수 없습니다" + [재시도] | 현재 구현 (행 표시) | 일부 슬롯만 로드 → 로드된 행만 표시 + "일부 데이터 로딩중" 안내 |
-| **OperatorQueue** | skeleton shimmer 2항목 | "대기 항목 없음" (현재 구현) + CheckCircle 아이콘 + "모든 항목이 처리되었습니다" | "승인 큐를 불러올 수 없습니다" | 항목 승인/거부 시 행이 fade-out으로 사라짐 | N/A |
-| **DecisionLedger** | "판단 기록 로딩중..." | "아직 판단 기록이 없습니다. 전략이 배치되면 여기에 실시간 로그가 쌓입니다." | "판단 기록을 불러올 수 없습니다" | 새 로그 추가 시 상단에 fade-in | N/A |
-| **ResearchStatus** | "연구 현황 로딩중..." | "진행 중인 연구가 없습니다. 연구 루프가 시작되면 여기에 표시됩니다." | "연구 데이터를 불러올 수 없습니다" | 숫자 + 최근 완료 행 | running만 있고 completed 미로드 → running 표시 + completed "—" |
-| **StrategyDetail** | 전체 페이지 skeleton | 슬롯 미발견: "전략 슬롯을 찾을 수 없습니다" + 대시보드 링크 | "전략 데이터를 불러올 수 없습니다" + [재시도] | 현재 구현 | 포지션만 null → 포지션 섹션 "대기 중" 표시 |
-| **ResearchPage** | skeleton 테이블 | 현재 구현 (아이콘 + 메시지 + 안내) | "연구 데이터를 불러올 수 없습니다" + [재시도] | 테이블 표시 | runs만 로드, candidates 로딩중 → 각각 독립 로딩 |
+| **SystemStrip** | 연결 상태 닷 = 회색 깜빡임 | N/A (항상 표시) | 연결 실패 닷 = 빨간색 + "연결 끊김" | 모든 닷 초록 | 일부 거래소만 연결 |
+| **HeroStrip** | 숫자 skeleton shimmer | 시장적합도 "—" + "전략 미배치" 배지 | "데이터 로드 실패" + 재시도 | 현재 구현 | 시장적합도만 있고 PnL 미수신 → PnL "—" |
+| **DeploymentMatrix** | 3행 skeleton | "배치된 전략이 없습니다" + "연구 루프에서 전략이 검증되면 여기에 표시됩니다" | "불러올 수 없습니다" + [재시도] | 행 표시 | 일부만 로드 → 부분 표시 + 안내 |
+| **OperatorQueue** | skeleton 2항목 | "모든 항목 처리 완료" | "불러올 수 없습니다" | 승인/거부 시 fade-out | N/A |
+| **DecisionLedger** | "로딩중..." | "아직 판단 기록이 없습니다" | "불러올 수 없습니다" | 새 로그 상단 fade-in | N/A |
+| **ResearchStatus** | "로딩중..." | "진행 중인 연구가 없습니다" | "불러올 수 없습니다" | 숫자 + 완료 행 | running만 표시 |
+| **PositionPanel** (신규) | skeleton 3행 | "열린 포지션이 없습니다" | "불러올 수 없습니다" | 포지션 목록 | N/A |
+| **MarketPanel** (신규) | skeleton 카드 | N/A (항상 데이터) | "불러올 수 없습니다" | 지표 표시 | 일부 지표 미수신 → "—" |
 
 ### 유저 저니 — 감정 곡선
 
 | 단계 | 사용자 행동 | 감정 | 지원하는 UI |
 |------|------------|------|------------|
-| 1. 첫 방문 | 앱 열기 | 호기심 + 약간의 불안 | SystemStrip 초록 닷 = "시스템이 살아있다". 빈 상태가 공포가 아닌 안내. |
-| 2. 설정 | API 키 입력 | 긴장 (내 돈과 연결) | 설정 페이지의 "출금 권한 금지" 경고. 연결 성공 시 즉시 초록 배지. |
-| 3. 첫 데이터 | 연구 루프 시작 | 기대감 | ResearchStatus에서 "실행중 1" 숫자가 올라감. DecisionLedger에 첫 로그 등장. |
-| 4. 첫 전략 배치 | DeploymentMatrix 행 등장 | 흥분 + 약간의 두려움 | PAPER 상태로 먼저 배치. 좌측 border가 회색 = "아직 안전". |
-| 5. 일상 확인 | 매일 대시보드 열기 | 통제감 | 3초 안에 4가지 질문에 답. EDGE 스코어로 "오늘 시장이 나에게 유리한지" 즉시 파악. |
-| 6. 승인 필요 | OperatorQueue에 항목 등장 | 책임감 | 승인 대기 배지 (히어로 스트립) + 큐에 구체적 이유 + [승인/거부] 인라인 액션. |
-| 7. 위기 | MDD 경고, 서킷 브레이커 | 긴장 → 안도 | 경고 색상(--warning) + 구체적 수치 + 임계값 대비 %. "시스템이 보호하고 있다" 느낌. |
+| 1. 첫 방문 | 앱 열기 | 호기심 + 약간의 불안 | SystemStrip 초록 닷. 빈 상태가 안내. |
+| 2. 설정 | API 키 입력 | 긴장 (내 돈) | "출금 권한 금지" 경고. 연결 즉시 초록 배지. |
+| 3. 첫 데이터 | 연구 시작 | 기대감 | ResearchStatus "실행중 1". DecisionLedger 첫 로그. |
+| 4. 첫 배치 | Matrix 행 등장 | 흥분 + 두려움 | PAPER 먼저. border 회색 = "아직 안전". |
+| 5. 일상 확인 | 매일 열기 | 통제감 | 3초 안에 5가지 질문 답. 시장적합도로 상황 파악. |
+| 6. 승인 | Queue 항목 | 책임감 | 변경점 명시. "승인 시 → / 거부 시 →". 만료 시간. |
+| 7. 위기 | MDD 경고 | 긴장 → 안도 | 진행바 + 구체 수치 + "시스템이 보호 중". |
 
 ### 첫 방문 (온보딩) 시나리오
-- 전략 0개, 연구 0개, 포지션 0개 상태
-- DeploymentMatrix → 빈 상태 + "연구 루프에서 전략 배치" 안내
-- HeroStrip → EDGE 0 + "전략 미배치" 배지
-- OperatorQueue → "대기 항목 없음"
-- DecisionLedger → "아직 판단 기록이 없습니다"
-- ResearchStatus → "진행 중인 연구가 없습니다"
-- 전체적으로 "시스템이 준비되었지만 아직 전략이 없다"는 느낌. 공포감 아닌 안내감.
+- 전략 0개, 연구 0개, 포지션 0개
+- 모든 패널이 빈 상태이되 "시스템 준비됨, 전략 없음" 느낌
+- HeroStrip: 시장적합도 "—", "전략 미배치"
+- DeploymentMatrix: 빈 상태 + 안내 메시지
+- OperatorQueue: "모든 항목 처리 완료"
 
 ## 핵심 설계 결정
 
 | 결정 | 이유 |
 |------|------|
-| Mock 데이터로 먼저 UI 구축 | API 없이도 화면 완성 가능. 집에서 API 연결. |
-| 기존 파일 삭제 대신 새 파일 생성 | 기존 코드 참고 가능. 정리는 나중에. |
-| 컴포넌트를 domain 단위로 구성 | `components/dashboard/`, `components/trading/` 등 |
-| EDGE 스코어는 mock으로 | 실제 계산 로직은 서버에서. UI는 숫자만 표시. |
+| HeroStrip 순서: 승인→위험도→자산→손익→시장적합도 | 행동 필요한 것이 먼저. 초보자 기준 우선순위. |
+| EDGE → "시장 적합도" 한국어화 | 초보자가 의미 즉시 이해. /100 스케일. |
+| OperatorQueue: 승인/거부 시 변경점 명시 | "이걸 누르면 뭐가 바뀌는가"가 버튼보다 먼저. |
+| DecisionLedger: 한글 요약 + 머신 로그 2줄 | 초보자는 한글, 파워유저는 로그. |
+| 모든 섹션 한국어 헤더 | 영문 전용은 진입장벽. 내부명 영문은 유지하되 UI는 한국어. |
+| AuthGuard 제거 | 1인 사용 단계. 멀티유저 시 재도입. |
+| Mock → 스토어 → API | UI 먼저, 데이터 나중. 스토어 setter만 교체하면 전환. |
 
-## 파일 구조 (목표)
+## 접근성 TODO
 
-```
-web/src/
-├── components/
-│   ├── layout/
-│   │   ├── AppLayout.tsx        # 새 레이아웃 쉘
-│   │   ├── SystemStrip.tsx      # 시스템 상태 바
-│   │   ├── Sidebar.tsx          # 새 네비게이션
-│   │   └── HeroStrip.tsx        # EDGE + 요약 스트립
-│   ├── dashboard/
-│   │   ├── DeploymentMatrix.tsx  # 전략 배치 매트릭스
-│   │   ├── OperatorQueue.tsx     # 승인/리스크 큐
-│   │   ├── DecisionLedger.tsx    # 판단 로그
-│   │   └── ResearchStatus.tsx    # 연구 현황
-│   ├── auth/
-│   │   ├── AuthGuard.tsx         # 유지
-│   │   └── LoginModal.tsx        # 유지
-│   └── ui/
-│       ├── Badge.tsx             # 시맨틱 배지
-│       ├── Button.tsx            # 버튼 variants
-│       └── DataTable.tsx         # 데이터 테이블
-├── pages/
-│   ├── TradingDashboard.tsx      # 트레이딩 대시보드 (메인)
-│   ├── StrategyDetail.tsx        # 전략 상세
-│   ├── AssetDetail.tsx           # 자산 상세
-│   ├── ResearchPage.tsx          # 연구 상세
-│   ├── PortfolioPage.tsx         # 포트폴리오
-│   └── SettingsPage.tsx          # 설정
-├── stores/
-│   ├── orchestration-store.ts    # 오케스트레이션 상태
-│   ├── risk-store.ts             # 리스크 상태
-│   ├── research-store.ts         # 연구 상태
-│   └── approval-store.ts         # 승인 상태
-├── types/
-│   └── orchestration.ts          # 새 타입 시스템
-├── mocks/
-│   └── dashboard-data.ts         # Mock 데이터
-├── services/
-│   └── api.ts                    # API 클라이언트 (재구성)
-├── hooks/
-│   └── useAuth.ts                # 유지
-├── lib/
-│   ├── supabase.ts               # 유지
-│   ├── constants.ts              # 업데이트
-│   └── utils.ts                  # 유지 + 확장
-└── index.css                     # Terminal Craft Evolved 토큰
-```
-
-## 접근성 TODO (디자인 리뷰 결과)
-- [ ] DeploymentMatrix 행: `role="button"` + `tabIndex={0}` + Enter/Space 키 이벤트
-- [ ] OperatorQueue 버튼: 최소 44px 터치 타겟 보장
-- [ ] Sidebar: `nav` 랜드마크 + `aria-current="page"` 활성 항목
-- [ ] 전체 페이지: `<main>` 랜드마크
-- [ ] 숫자 색상: 수익/손실 표시에 색상 외 부호(+/-)도 항상 표시 (현재 구현됨 ✓)
+- [x] DeploymentMatrix 행: `role="button"` + `tabIndex={0}` + Enter/Space 키 이벤트 ✓
+- [x] OperatorQueue 버튼: 44px 터치 타겟 (py-1.5 + flex-1 적용) ✓
+- [x] Sidebar: `<nav aria-label>` 랜드마크 ✓
+- [x] 전체 페이지: `<main>` 랜드마크 (TradingDashboard) ✓
+- [x] 숫자 색상: 부호(+/-)도 항상 표시 ✓
 
 ## 리스크
 
 | 리스크 | 영향 | 대응 |
 |--------|------|------|
-| API 엔드포인트 미정의 | 데이터 연결 불가 | Mock 데이터로 UI 먼저 완성 |
-| EDGE 스코어 계산 로직 미정의 | 히어로 숫자 의미 불명확 | Mock 72로 시작, 서버 로직은 별도 정의 |
-| 서버 크론/오케스트레이터 미구현 | 실시간 데이터 없음 | Static mock → WebSocket 전환 |
-| 기존 DetectionPage 사용자 | 공개 페이지 깨짐 | 라우팅 리다이렉트 유지 |
+| API 엔드포인트 미정의 | 데이터 연결 불가 | Mock → API 전환은 스토어 setter 교체 |
+| EDGE 계산 방법 | 의미 불명확 | 초안 정의됨. 서버 구현 시 정제. |
+| 서버 오케스트레이터 미구현 | 실시간 데이터 없음 | Static mock → WebSocket |
+| 포지션/시장 패널 미구현 | 승인 배경 부족 | Phase 2.5로 다음 우선순위 |

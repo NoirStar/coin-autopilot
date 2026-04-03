@@ -27,8 +27,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="mx-4 h-px bg-border-subtle" />
 
-      {/* 네비게이션 — 플랫 구조, 인증 불필요 */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5">
+      <nav aria-label="메인 네비게이션" className="flex-1 px-3 py-3 space-y-0.5">
         {navItems.map((item) => (
           <NavLink
             key={item.to}

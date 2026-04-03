@@ -46,8 +46,11 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
         return (
           <div
             key={slot.id}
+            role="button"
+            tabIndex={0}
             onClick={() => navigate(`/strategy/${slot.id}`)}
-            className={`border-b border-border-subtle border-l-2 ${style.borderClass} hover:bg-surface-hover transition-colors duration-100 cursor-pointer`}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/strategy/${slot.id}`) } }}
+            className={`border-b border-border-subtle border-l-2 ${style.borderClass} hover:bg-surface-hover focus-visible:ring-1 focus-visible:ring-text-muted focus-visible:outline-none transition-colors duration-100 cursor-pointer`}
           >
             {/* 데스크톱: 그리드 행 */}
             <div className="hidden sm:grid grid-cols-[80px_100px_80px_60px_1fr] px-4 py-2 items-center">

@@ -8,6 +8,8 @@ import type {
   ResearchRun,
   ResearchSummary,
   QueueItem,
+  ActivePosition,
+  MarketCondition,
 } from '@/types/orchestration'
 
 // ── 시스템 상태 ──
@@ -288,6 +290,60 @@ export const mockResearchRuns: ResearchRun[] = [
     startedAt: new Date(Date.now() - 170 * 60 * 1000).toISOString(),
   },
 ]
+
+// ── 활성 포지션 ──
+export const mockPositions: ActivePosition[] = [
+  {
+    id: 'pos-1',
+    asset: 'BTC/USDT',
+    venue: 'okx_swap',
+    strategy: 'MA_X',
+    tradeMode: 'live',
+    side: 'long',
+    entryPrice: 47821,
+    currentPrice: 48200,
+    stopLoss: 46200,
+    takeProfit: 51000,
+    qty: 0.1,
+    unrealizedPnl: 37.9,
+    unrealizedPnlPct: 0.79,
+    holdingSince: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'pos-2',
+    asset: '005930',
+    venue: 'krx_stock',
+    strategy: 'GRID_K',
+    tradeMode: 'live',
+    side: 'long',
+    entryPrice: 62500,
+    currentPrice: 63100,
+    stopLoss: 61800,
+    takeProfit: 64200,
+    qty: 10,
+    unrealizedPnl: 6000,
+    unrealizedPnlPct: 0.96,
+    holdingSince: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+  },
+]
+
+// ── 시장 상황 ──
+export const mockMarketCondition: MarketCondition = {
+  crypto: {
+    volatility: 'medium',
+    fundingRate: 0.031,
+    openInterest: 28400000000,
+    longShortRatio: 1.12,
+    kimchiPremium: 1.8,
+    updatedAt: new Date(Date.now() - 30 * 1000).toISOString(),
+  },
+  krStock: {
+    trend: 'up',
+    volume: 12800000000000,
+    volumeChange: 14.2,
+    updatedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+  },
+}
 
 export const mockResearchSummary: ResearchSummary = {
   running: 2,
