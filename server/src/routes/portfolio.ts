@@ -83,10 +83,13 @@ portfolioRoutes.get('/balance', async (c) => {
       }
 
       // 코인 현재가 조회 → 평가금 계산
+      console.log(`[포트폴리오] 코인 계좌: ${coinAccounts.length}개`, coinAccounts.map((c) => `${c.currency}=${c.balance}`).join(', '))
       if (coinAccounts.length > 0) {
         const markets = coinAccounts.map((c) => `KRW-${c.currency}`).join(',')
+        console.log(`[포트폴리오] 현재가 조회: ${markets}`)
         try {
           const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${markets}`)
+          console.log(`[포트폴리오] 현재가 응답: ${tickerRes.status}`)
           if (tickerRes.ok) {
             const tickers = await tickerRes.json() as Array<{ market: string; trade_price: number }>
             const priceMap = new Map(tickers.map((t) => [t.market, t.trade_price]))
@@ -107,7 +110,23 @@ portfolioRoutes.get('/balance', async (c) => {
               })
             }
           }
-        } catch { /* 현재가 조회 실패 시 매입가 기준 */ }
+        } catch (tickerErr) {
+          console.warn('[포트폴리오] 현재가 조회 실패:', tickerErr instanceof Error ? tickerErr.message : tickerErr)
+        }
+
+        // 현재가 조회 실패해도 매입가 기준으로 표시
+        if (upbitHoldings.length === 0) {
+          for (const coin of coinAccounts) {
+            const evalKrw = coin.balance * coin.avgBuyPrice
+            upbitTotalKrw += evalKrw
+            upbitHoldings.push({
+              symbol: coin.currency,
+              qty: coin.balance,
+              entryPrice: coin.avgBuyPrice,
+              pnl: 0,
+            })
+          }
+        }
       }
 
       upbitTotalKrw += krwBalance
