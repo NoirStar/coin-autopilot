@@ -192,13 +192,13 @@ export function PortfolioPage() {
                           {trade.direction === 'long' ? '매수' : '매도'}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right font-mono-trading text-text-secondary">
+                      <td className="px-3 py-2 text-right font-mono tabular-nums text-text-secondary">
                         {trade.entry_price?.toLocaleString() ?? '—'}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono-trading text-text-secondary">
+                      <td className="px-3 py-2 text-right font-mono tabular-nums text-text-secondary">
                         {trade.exit_price?.toLocaleString() ?? '—'}
                       </td>
-                      <td className={`px-3 py-2 text-right font-mono-trading ${
+                      <td className={`px-3 py-2 text-right font-mono tabular-nums ${
                         (trade.pnl_pct ?? 0) >= 0 ? 'text-profit' : 'text-loss'
                       }`}>
                         {trade.pnl_pct != null ? formatPercent(trade.pnl_pct) : '—'}
@@ -222,7 +222,7 @@ export function PortfolioPage() {
                         {trade.direction === 'long' ? '매수' : '매도'}
                       </span>
                     </div>
-                    <span className={`font-mono-trading text-[12px] ${
+                    <span className={`font-mono tabular-nums text-[12px] ${
                       (trade.pnl_pct ?? 0) >= 0 ? 'text-profit' : 'text-loss'
                     }`}>
                       {trade.pnl_pct != null ? formatPercent(trade.pnl_pct) : '—'}
@@ -320,16 +320,16 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
           연결됨
         </span>
       </div>
-      <div className="mt-2 font-mono-trading text-[24px] font-bold text-text-primary">
-        {formatBalance(balance)}
+      <div className="mt-2 text-[24px] font-bold text-text-primary">
+        <span className="font-mono tabular-nums">{formatBalance(balance)}</span>
       </div>
       {positions.length > 0 ? (
         <div className="mt-3 space-y-1.5">
           {positions.map((pos, i) => (
             <div key={i} className="flex items-center justify-between text-[12px]">
               <span className="text-text-secondary">{pos.symbol}</span>
-              <span className="font-mono-trading text-text-muted">{pos.entryPrice.toLocaleString()}</span>
-              <span className={`font-mono-trading ${pos.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+              <span className="font-mono tabular-nums text-text-muted">{pos.entryPrice.toLocaleString()}</span>
+              <span className={`font-mono tabular-nums ${pos.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
                 {formatPercent(pos.pnl)}
               </span>
             </div>

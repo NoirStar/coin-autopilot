@@ -1,4 +1,6 @@
 import { Hono } from 'hono'
+import { createHmac } from 'crypto'
+import { randomUUID } from 'crypto'
 import { supabase } from '../services/database.js'
 
 export const portfolioRoutes = new Hono()
@@ -53,10 +55,22 @@ portfolioRoutes.get('/balance', async (c) => {
   const upbitConfigured = !!(process.env.UPBIT_ACCESS_KEY && process.env.UPBIT_SECRET_KEY)
   const okxConfigured = !!(process.env.OKX_API_KEY && process.env.OKX_SECRET_KEY)
 
+  // 업비트 실잔고 조회
+  let upbitKrw = 0
+  if (upbitConfigured) {
+    try {
+      const accounts = await fetchUpbitAccounts()
+      const krwAccount = accounts.find((a) => a.currency === 'KRW')
+      upbitKrw = Number(krwAccount?.balance ?? 0)
+    } catch (err) {
+      console.warn('[포트폴리오] 업비트 잔고 조회 실패:', err)
+    }
+  }
+
   return c.json({
     upbit: {
       configured: upbitConfigured,
-      krw: 0,
+      krw: Math.round(upbitKrw),
       positions: upbitPositions,
     },
     okx: {
@@ -151,3 +165,41 @@ portfolioRoutes.get('/trades', async (c) => {
     offset,
   })
 })
+
+// ─── 업비트 계좌 조회 ───────────────────────────────────────
+
+interface UpbitAccount {
+  currency: string
+  balance: string
+  locked: string
+  avg_buy_price: string
+}
+
+/** 업비트 계좌 잔고 조회 (JWT 인증) */
+async function fetchUpbitAccounts(): Promise<UpbitAccount[]> {
+  const accessKey = process.env.UPBIT_ACCESS_KEY ?? ''
+  const secretKey = process.env.UPBIT_SECRET_KEY ?? ''
+  if (!accessKey || !secretKey) return []
+
+  // JWT 토큰 생성 (업비트 인증 방식)
+  const payload = {
+    access_key: accessKey,
+    nonce: randomUUID(),
+  }
+  const jwtHeader = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+  const jwtPayload = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const signature = createHmac('sha256', secretKey)
+    .update(`${jwtHeader}.${jwtPayload}`)
+    .digest('base64url')
+  const token = `${jwtHeader}.${jwtPayload}.${signature}`
+
+  const res = await fetch('https://api.upbit.com/v1/accounts', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  if (!res.ok) {
+    throw new Error(`업비트 계좌 조회 실패: ${res.status}`)
+  }
+
+  return res.json() as Promise<UpbitAccount[]>
+}
