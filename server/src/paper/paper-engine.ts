@@ -552,7 +552,7 @@ async function updateSessionPerformance(
   await supabase
     .from('equity_snapshots')
     .insert({
-      source: `paper:${sessionId}`,
+      source: 'paper',
       total_equity: Math.round(currentEquity * 100) / 100,
       regime,
       active_strategies: [strategyId],

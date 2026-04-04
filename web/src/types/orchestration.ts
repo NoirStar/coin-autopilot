@@ -67,13 +67,17 @@ export interface SlotPosition {
 }
 
 // ── 히어로 요약 ──
-export interface HeroSummary {
-  edgeScore: number
-  liveCount: number
-  paperCount: number
+export interface HeroAccountSummary {
   totalEquity: number
   todayPnl: number
   todayPnlPct: number
+  count: number
+}
+
+export interface HeroSummary {
+  edgeScore: number
+  live: HeroAccountSummary & { active: boolean }
+  paper: HeroAccountSummary
   pendingApprovals: number
   riskLevel: RiskLevel
 }

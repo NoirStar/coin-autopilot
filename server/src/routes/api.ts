@@ -153,14 +153,42 @@ apiRoutes.get('/operator/home', async (c) => {
       (sum, pos) => sum + Number(pos.unrealized_pnl ?? 0), 0,
     )
 
-    // 총 자산 (에퀴티 스냅샷에서)
-    const { data: latestEquity } = await supabase
-      .from('equity_snapshots')
-      .select('total_equity')
-      .eq('source', 'live')
-      .order('recorded_at', { ascending: false })
-      .limit(1)
-      .single()
+    // 총 자산 (에퀴티 스냅샷에서 live + paper)
+    const [{ data: latestLiveEquity }, { data: latestPaperEquity }] = await Promise.all([
+      supabase
+        .from('equity_snapshots')
+        .select('total_equity, unrealized_pnl, realized_pnl')
+        .eq('source', 'live')
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single(),
+      supabase
+        .from('equity_snapshots')
+        .select('total_equity, unrealized_pnl, realized_pnl')
+        .eq('source', 'paper')
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single(),
+    ])
+
+    // paper 오늘 손익 계산
+    const { data: todayClosedPaper } = await supabase
+      .from('paper_positions')
+      .select('realized_pnl')
+      .eq('status', 'closed')
+      .gte('exit_time', todayStart.toISOString())
+
+    const paperRealizedPnl = (todayClosedPaper ?? []).reduce(
+      (sum, pos) => sum + Number(pos.realized_pnl ?? 0), 0,
+    )
+    const { data: openPaper } = await supabase
+      .from('paper_positions')
+      .select('unrealized_pnl')
+      .eq('status', 'open')
+
+    const paperUnrealizedPnl = (openPaper ?? []).reduce(
+      (sum, pos) => sum + Number(pos.unrealized_pnl ?? 0), 0,
+    )
 
     // 연구 상위 후보 메트릭 조회
     const topRunIds = (topCandidatesResult.data ?? []).map((r) => r.id)
@@ -203,16 +231,27 @@ apiRoutes.get('/operator/home', async (c) => {
         lastCollectedAt: regimeResult.data?.recorded_at ?? null,
       },
 
-      // 히어로 요약
+      // 히어로 요약 — live/paper 분리
       hero: {
-        totalEquity: Number(latestEquity?.total_equity ?? 0),
-        todayPnl: {
-          realized: Math.round(todayRealizedPnl * 100) / 100,
-          unrealized: Math.round(unrealizedPnl * 100) / 100,
-          total: Math.round((todayRealizedPnl + unrealizedPnl) * 100) / 100,
+        live: {
+          totalEquity: Number(latestLiveEquity?.total_equity ?? 0),
+          todayPnl: {
+            realized: Math.round(todayRealizedPnl * 100) / 100,
+            unrealized: Math.round(unrealizedPnl * 100) / 100,
+            total: Math.round((todayRealizedPnl + unrealizedPnl) * 100) / 100,
+          },
+          count: livePositionResult.count ?? 0,
+          active: process.env.LIVE_TRADING === 'true',
         },
-        liveCount: livePositionResult.count ?? 0,
-        paperCount: paperPositionResult.count ?? 0,
+        paper: {
+          totalEquity: Number(latestPaperEquity?.total_equity ?? 0),
+          todayPnl: {
+            realized: Math.round(paperRealizedPnl * 100) / 100,
+            unrealized: Math.round(paperUnrealizedPnl * 100) / 100,
+            total: Math.round((paperRealizedPnl + paperUnrealizedPnl) * 100) / 100,
+          },
+          count: paperPositionResult.count ?? 0,
+        },
         pendingApprovals,
         riskLevel,
         edgeScore: await calculateEdgeScore(),

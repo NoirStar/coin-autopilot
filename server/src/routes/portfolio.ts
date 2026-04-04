@@ -6,7 +6,7 @@ export const portfolioRoutes = new Hono()
 /** GET /api/portfolio/balance — 거래소 잔고 조회 (1인 사용, 무인증) */
 portfolioRoutes.get('/balance', async (c) => {
   // live_positions + paper_positions 기반 잔고 집계
-  const [liveResult, paperResult, equityResult] = await Promise.all([
+  const [liveResult, paperResult, liveEquityResult, paperEquityResult] = await Promise.all([
     supabase
       .from('live_positions')
       .select('asset_key, exchange, side, current_qty, entry_price, unrealized_pnl')
@@ -17,9 +17,18 @@ portfolioRoutes.get('/balance', async (c) => {
       .eq('status', 'open'),
     supabase
       .from('equity_snapshots')
-      .select('total_equity, source')
+      .select('total_equity')
+      .eq('source', 'live')
       .order('recorded_at', { ascending: false })
-      .limit(2),
+      .limit(1)
+      .single(),
+    supabase
+      .from('equity_snapshots')
+      .select('total_equity')
+      .eq('source', 'paper')
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .single(),
   ])
 
   const livePositions = (liveResult.data ?? []).map((p) => ({
@@ -37,8 +46,8 @@ portfolioRoutes.get('/balance', async (c) => {
   )
 
   // 에퀴티 스냅샷에서 잔고 추출
-  const liveEquity = equityResult.data?.find((e) => e.source === 'live')
-  const paperEquity = equityResult.data?.find((e) => e.source === 'paper')
+  const liveEquity = liveEquityResult.data
+  const paperEquity = paperEquityResult.data
 
   return c.json({
     upbit: {

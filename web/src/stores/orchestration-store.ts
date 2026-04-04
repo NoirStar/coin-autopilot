@@ -46,15 +46,23 @@ function mapSystemStatus(data: OperatorHomeResponse): SystemStatus {
 }
 
 function mapHeroSummary(data: OperatorHomeResponse): HeroSummary {
+  const live = data.hero.live
+  const paper = data.hero.paper
   return {
     edgeScore: data.hero.edgeScore ?? 0,
-    liveCount: data.hero.liveCount,
-    paperCount: data.hero.paperCount,
-    totalEquity: data.hero.totalEquity,
-    todayPnl: data.hero.todayPnl.total,
-    todayPnlPct: data.hero.totalEquity > 0
-      ? (data.hero.todayPnl.total / data.hero.totalEquity) * 100
-      : 0,
+    live: {
+      totalEquity: live.totalEquity,
+      todayPnl: live.todayPnl.total,
+      todayPnlPct: live.totalEquity > 0 ? (live.todayPnl.total / live.totalEquity) * 100 : 0,
+      count: live.count,
+      active: live.active,
+    },
+    paper: {
+      totalEquity: paper.totalEquity,
+      todayPnl: paper.todayPnl.total,
+      todayPnlPct: paper.totalEquity > 0 ? (paper.todayPnl.total / paper.totalEquity) * 100 : 0,
+      count: paper.count,
+    },
     pendingApprovals: data.hero.pendingApprovals,
     riskLevel: data.hero.riskLevel as RiskLevel,
   }
@@ -164,11 +172,8 @@ const emptySystemStatus: SystemStatus = {
 
 const emptyHeroSummary: HeroSummary = {
   edgeScore: 0,
-  liveCount: 0,
-  paperCount: 0,
-  totalEquity: 0,
-  todayPnl: 0,
-  todayPnlPct: 0,
+  live: { totalEquity: 0, todayPnl: 0, todayPnlPct: 0, count: 0, active: false },
+  paper: { totalEquity: 0, todayPnl: 0, todayPnlPct: 0, count: 0 },
   pendingApprovals: 0,
   riskLevel: 'normal',
 }

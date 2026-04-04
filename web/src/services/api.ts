@@ -141,10 +141,17 @@ export interface OperatorHomeResponse {
     lastCollectedAt: string | null
   }
   hero: {
-    totalEquity: number
-    todayPnl: { realized: number; unrealized: number; total: number }
-    liveCount: number
-    paperCount: number
+    live: {
+      totalEquity: number
+      todayPnl: { realized: number; unrealized: number; total: number }
+      count: number
+      active: boolean
+    }
+    paper: {
+      totalEquity: number
+      todayPnl: { realized: number; unrealized: number; total: number }
+      count: number
+    }
     pendingApprovals: number
     riskLevel: string
     edgeScore: number | null

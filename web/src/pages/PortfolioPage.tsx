@@ -22,6 +22,10 @@ interface BalanceResponse {
     usd: number
     positions: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }>
   }
+  paper: {
+    equity: number
+    positions: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }>
+  }
 }
 
 interface TradeRow {
@@ -85,7 +89,7 @@ export function PortfolioPage() {
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
       {/* 거래소 잔고 */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <ExchangeCard
           name="업비트"
           type="현물"
@@ -106,6 +110,16 @@ export function PortfolioPage() {
           positions={balance?.okx.positions ?? []}
           isLoading={balanceLoading}
           onGoToSettings={() => navigate('/settings')}
+          formatBalance={(v) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+        />
+        <ExchangeCard
+          name="모의 운용"
+          type="페이퍼"
+          currency="USDT"
+          configured={(balance?.paper.equity ?? 0) > 0 || (balance?.paper.positions ?? []).length > 0}
+          balance={balance?.paper.equity ?? 0}
+          positions={balance?.paper.positions ?? []}
+          isLoading={balanceLoading}
           formatBalance={(v) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
         />
       </div>
@@ -257,7 +271,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
   balance: number
   positions: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }>
   isLoading: boolean
-  onGoToSettings: () => void
+  onGoToSettings?: () => void
   formatBalance: (v: number) => string
 }) {
   if (isLoading) {

@@ -18,6 +18,103 @@ import { collectLatestCandles } from '../data/candle-collector.js'
  */
 let cycleFailCount = 0
 
+/**
+ * 에퀴티 스냅샷 저장
+ *
+ * - live: OKX 실잔고 조회 (LIVE_TRADING 시) 또는 DB live_positions 기준
+ * - paper: 모든 running paper_sessions 합산
+ */
+async function snapshotEquity(): Promise<void> {
+  try {
+    // ── live 에퀴티 ──
+    let liveEquity = 0
+    let liveUnrealized = 0
+    let liveRealized = 0
+
+    const isLive = process.env.LIVE_TRADING === 'true'
+    if (isLive) {
+      // OKX 실계좌 잔고 직접 조회
+      try {
+        const { fetchBalance } = await import('../exchange/okx-client.js')
+        const bal = await fetchBalance()
+        liveEquity = bal.total
+      } catch (err) {
+        console.warn('[스냅샷] OKX 잔고 조회 실패, DB 기반 폴백:', err)
+        isLive // fall through to DB fallback below
+      }
+    }
+
+    if (!isLive || liveEquity === 0) {
+      // DB 기반 live 포지션 합산
+      const { data: openLive } = await supabase
+        .from('live_positions')
+        .select('unrealized_pnl, realized_pnl')
+        .eq('status', 'open')
+
+      liveUnrealized = (openLive ?? []).reduce((s, p) => s + Number(p.unrealized_pnl ?? 0), 0)
+
+      const { data: closedToday } = await supabase
+        .from('live_positions')
+        .select('realized_pnl')
+        .eq('status', 'closed')
+        .gte('exit_time', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+
+      liveRealized = (closedToday ?? []).reduce((s, p) => s + Number(p.realized_pnl ?? 0), 0)
+      liveEquity = liveRealized + liveUnrealized
+    }
+
+    // 현재 레짐
+    const { data: regimeRow } = await supabase
+      .from('regime_snapshots')
+      .select('regime')
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    const regime = regimeRow?.regime ?? 'neutral'
+
+    await supabase.from('equity_snapshots').insert({
+      source: 'live',
+      total_equity: Math.round(liveEquity * 100) / 100,
+      regime,
+      unrealized_pnl: Math.round(liveUnrealized * 100) / 100,
+      realized_pnl: Math.round(liveRealized * 100) / 100,
+    })
+
+    // ── paper 에퀴티 (전체 세션 합산) ──
+    const { data: sessions } = await supabase
+      .from('paper_sessions')
+      .select('id, current_equity')
+      .eq('status', 'running')
+
+    if (sessions && sessions.length > 0) {
+      const paperTotal = sessions.reduce((s, sess) => s + Number(sess.current_equity ?? 0), 0)
+
+      // paper 포지션 미실현 합산
+      const sessionIds = sessions.map((s) => s.id)
+      const { data: paperOpen } = await supabase
+        .from('paper_positions')
+        .select('unrealized_pnl')
+        .eq('status', 'open')
+        .in('session_id', sessionIds)
+
+      const paperUnrealized = (paperOpen ?? []).reduce((s, p) => s + Number(p.unrealized_pnl ?? 0), 0)
+
+      await supabase.from('equity_snapshots').insert({
+        source: 'paper',
+        total_equity: Math.round(paperTotal * 100) / 100,
+        regime,
+        unrealized_pnl: Math.round(paperUnrealized * 100) / 100,
+        realized_pnl: 0,
+      })
+    }
+
+    console.log(`[스냅샷] 에퀴티 저장 완료 — live: ${liveEquity.toFixed(2)}, paper 세션: ${sessions?.length ?? 0}개`)
+  } catch (err) {
+    console.error('[스냅샷] 에퀴티 저장 실패:', err)
+  }
+}
+
 /** 메인 파이프라인 실행 (크론 + 서버 시작 시 공용) */
 async function runMainPipeline(): Promise<void> {
   console.log(`[크론] ═══ 4H 파이프라인 시작: ${new Date().toISOString()} ═══`)
@@ -39,6 +136,9 @@ async function runMainPipeline(): Promise<void> {
 
   // 6. 리스크 체크 (일일 손실 한도, 서킷 브레이커)
   await runRiskCheck()
+
+  // 7. 에퀴티 스냅샷 저장 (live + paper 합산)
+  await snapshotEquity()
 
   console.log(`[크론] ═══ 4H 파이프라인 완료 ═══`)
 }

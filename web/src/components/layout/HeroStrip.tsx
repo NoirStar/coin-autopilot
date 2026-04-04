@@ -15,18 +15,17 @@ interface HeroStripProps {
 }
 
 export const HeroStrip = ({ summary }: HeroStripProps) => {
-  const pnlColor = summary.todayPnl >= 0 ? 'text-profit' : 'text-loss'
-  const pnlSign = summary.todayPnl >= 0 ? '+' : ''
+  const { live, paper } = summary
   const risk = riskLabels[summary.riskLevel] ?? riskFallback
 
   return (
     <div className="bg-surface px-4 sm:px-5 py-4 sm:py-5 border-b border-border">
-      {/* 1행: 승인 필요 + 위험도 — 행동이 필요한 것이 가장 먼저 */}
+      {/* 1행: 승인 필요 + 위험도 */}
       {(summary.pendingApprovals > 0 || summary.riskLevel !== 'normal') && (
         <div className="flex items-center gap-3 mb-3">
           {summary.pendingApprovals > 0 && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold bg-warning/10 text-warning">
-              승인 대기 {summary.pendingApprovals}건
+              승인 대기 <span className="font-mono">{summary.pendingApprovals}</span>건
             </span>
           )}
           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold ${risk.bg} ${risk.color}`}>
@@ -35,29 +34,35 @@ export const HeroStrip = ({ summary }: HeroStripProps) => {
         </div>
       )}
 
-      {/* 2행: 핵심 지표 */}
+      {/* 2행: 실전 */}
       <div className="flex flex-wrap items-end gap-5 sm:gap-7 lg:gap-9">
-        {/* 총 자산 — "지금 돈이 어디에 들어가 있나"의 시작점 */}
-        <Stat label="총 자산" value={formatKRW(summary.totalEquity)} large />
-
-        {/* 오늘 손익 — 즉각적 관심사 */}
-        <Stat
-          label="오늘 손익"
-          value={`${pnlSign}${formatKRW(summary.todayPnl)}`}
-          valueColor={pnlColor}
-          sub={`${pnlSign}${formatPercent(summary.todayPnlPct)}`}
-          subColor={pnlColor}
-          large
+        <AccountBlock
+          mode="live"
+          label={live.active ? '실전' : '실전 (미활성)'}
+          equity={live.totalEquity}
+          pnl={live.todayPnl}
+          pnlPct={live.todayPnlPct}
+          count={live.count}
+          muted={!live.active}
         />
 
         {/* 구분선 */}
         <div className="hidden sm:block w-px h-9 bg-border-subtle" />
 
-        {/* 실행 상태 */}
-        <Stat label="실전 운용" value={`${summary.liveCount}개`} />
-        <Stat label="모의 운용" value={`${summary.paperCount}개`} />
+        <AccountBlock
+          mode="paper"
+          label="모의"
+          equity={paper.totalEquity}
+          pnl={paper.todayPnl}
+          pnlPct={paper.todayPnlPct}
+          count={paper.count}
+          muted={paper.count === 0 && paper.totalEquity === 0}
+        />
 
-        {/* EDGE — 설명 포함 */}
+        {/* 구분선 */}
+        <div className="hidden sm:block w-px h-9 bg-border-subtle" />
+
+        {/* EDGE */}
         <div className="hidden sm:block">
           <div className="text-[12px] font-semibold text-text-muted mb-0.5">
             시장 적합도
@@ -66,7 +71,7 @@ export const HeroStrip = ({ summary }: HeroStripProps) => {
             <span className="font-mono text-[20px] font-bold text-accent leading-none">
               {summary.edgeScore}
             </span>
-            <span className="text-[10px] text-text-faint">/100</span>
+            <span className="text-[12px] text-text-faint">/100</span>
           </div>
         </div>
       </div>
@@ -74,32 +79,54 @@ export const HeroStrip = ({ summary }: HeroStripProps) => {
   )
 }
 
-const Stat = ({
+const AccountBlock = ({
+  mode,
   label,
-  value,
-  valueColor = 'text-text-primary',
-  sub,
-  subColor,
-  large = false,
-  className = '',
+  equity,
+  pnl,
+  pnlPct,
+  count,
+  muted,
 }: {
+  mode: 'live' | 'paper'
   label: string
-  value: string
-  valueColor?: string
-  sub?: string
-  subColor?: string
-  large?: boolean
-  className?: string
-}) => (
-  <div className={className}>
-    <div className="text-[12px] font-semibold text-text-muted mb-0.5">{label}</div>
-    <div className={`font-mono font-semibold ${large ? 'text-[20px]' : 'text-[15px]'} ${valueColor}`}>
-      {value}
-      {sub && (
-        <span className={`ml-1.5 text-[11px] font-medium ${subColor ?? 'text-text-muted'}`}>
-          {sub}
-        </span>
-      )}
+  equity: number
+  pnl: number
+  pnlPct: number
+  count: number
+  muted: boolean
+}) => {
+  const pnlColor = pnl >= 0 ? 'text-profit' : 'text-loss'
+  const pnlSign = pnl >= 0 ? '+' : ''
+  const textMute = muted ? 'text-text-faint' : 'text-text-primary'
+  const isUsd = mode === 'paper'
+
+  return (
+    <div className="flex items-end gap-4 sm:gap-5">
+      {/* 자산 */}
+      <div>
+        <div className="text-[12px] font-semibold text-text-muted mb-0.5">{label} 자산</div>
+        <div className={`font-mono font-semibold text-[20px] ${textMute}`}>
+          {isUsd ? `$${equity.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : formatKRW(equity)}
+        </div>
+      </div>
+      {/* 손익 */}
+      <div>
+        <div className="text-[12px] font-semibold text-text-muted mb-0.5">오늘 손익</div>
+        <div className={`font-mono font-semibold text-[15px] ${muted ? 'text-text-faint' : pnlColor}`}>
+          {pnlSign}{isUsd ? `$${Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : formatKRW(pnl)}
+          <span className={`ml-1.5 text-[12px] font-medium ${muted ? 'text-text-faint' : pnlColor}`}>
+            {pnlSign}{formatPercent(pnlPct)}
+          </span>
+        </div>
+      </div>
+      {/* 포지션 수 */}
+      <div>
+        <div className="text-[12px] font-semibold text-text-muted mb-0.5">운용</div>
+        <div className={`font-mono font-semibold text-[15px] ${textMute}`}>
+          <span className="font-mono">{count}</span>개
+        </div>
+      </div>
     </div>
-  </div>
-)
+  )
+}
