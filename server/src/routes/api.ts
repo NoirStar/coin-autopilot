@@ -20,15 +20,11 @@ const apiRoutes = new Hono()
 let operatorHomeCache: { data: unknown; expiresAt: number } | null = null
 const CACHE_TTL_MS = 30_000
 
-// ─── GET /operator/home — 트레이딩 대시보드 집계 데이터 (HANDOFF.md §2) ──
-
-apiRoutes.get('/operator/home', async (c) => {
-  // 캐시 유효하면 DB 조회 생략
-  if (operatorHomeCache && Date.now() < operatorHomeCache.expiresAt) {
-    return c.json(operatorHomeCache.data)
-  }
-
-  try {
+/**
+ * operator/home 데이터 조립 (캐시 없이 DB에서 조회)
+ * 서버 시작 시 캐시 pre-seed용으로도 사용
+ */
+async function buildOperatorHomeData(): Promise<unknown> {
     const todayStart = new Date()
     todayStart.setUTCHours(0, 0, 0, 0)
 
@@ -333,10 +329,35 @@ apiRoutes.get('/operator/home', async (c) => {
       circuitBreaker: cb,
     }
 
-    // 캐시 저장
-    operatorHomeCache = { data: response, expiresAt: Date.now() + CACHE_TTL_MS }
+    return response
+}
 
-    return c.json(response)
+/**
+ * 서버 시작 시 캐시 pre-seed
+ * 백테스트 파이프라인 전에 호출하면 프론트엔드가 즉시 응답 받음
+ */
+export async function preSeedOperatorHomeCache(): Promise<void> {
+  try {
+    const data = await buildOperatorHomeData()
+    operatorHomeCache = { data, expiresAt: Date.now() + CACHE_TTL_MS }
+    console.log('[API] operator/home 캐시 pre-seed 완료')
+  } catch (err) {
+    console.warn('[API] operator/home 캐시 pre-seed 실패:', err instanceof Error ? err.message : err)
+  }
+}
+
+// ─── GET /operator/home — 트레이딩 대시보드 집계 데이터 (HANDOFF.md §2) ──
+
+apiRoutes.get('/operator/home', async (c) => {
+  // 캐시 유효하면 DB 조회 생략
+  if (operatorHomeCache && Date.now() < operatorHomeCache.expiresAt) {
+    return c.json(operatorHomeCache.data)
+  }
+
+  try {
+    const data = await buildOperatorHomeData()
+    operatorHomeCache = { data, expiresAt: Date.now() + CACHE_TTL_MS }
+    return c.json(data)
   } catch (err) {
     console.error('[API] 트레이딩 대시보드 데이터 조회 오류:', err)
     return c.json({ error: '대시보드 데이터 로드 실패' }, 500)

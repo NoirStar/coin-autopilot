@@ -7,6 +7,7 @@ import { reconcilePositions } from '../execution/execution-engine.js'
 import { runRiskCheck } from '../risk/risk-manager.js'
 import { runFullScan, cleanOldCache } from '../routes/detection.js'
 import { collectLatestCandles, backfillCandles } from '../data/candle-collector.js'
+import { preSeedOperatorHomeCache } from '../routes/api.js'
 
 /**
  * 크론 작업 시작
@@ -216,8 +217,11 @@ async function runMainPipeline(): Promise<void> {
 }
 
 export function startCronJobs(): void {
-  // 서버 시작 시 즉시 1회 실행 (비동기, 서버 응답 차단 안 함)
+  // 서버 시작 시 캐시 pre-seed → 파이프라인 실행
   setTimeout(async () => {
+    // 대시보드 캐시 먼저 채움 — 프론트엔드가 즉시 데이터를 받을 수 있도록
+    await preSeedOperatorHomeCache()
+
     console.log('[크론] 서버 시작 — 최초 파이프라인 실행')
     try {
       await runMainPipeline()

@@ -8,7 +8,7 @@ import type {
 import { VALIDATION_THRESHOLDS } from '../core/types.js'
 import { getAllStrategies } from '../strategy/registry.js'
 import { loadCandles } from '../data/candle-collector.js'
-import { runBacktest } from './backtest-engine.js'
+import { runBacktestInWorker } from './backtest-pool.js'
 import { supabase } from '../services/database.js'
 
 // ─── 상수 ──────────────────────────────────────────────────────
@@ -102,10 +102,8 @@ export async function runResearchLoop(): Promise<void> {
         continue
       }
 
-      // 3. 백테스트 실행 (이벤트 루프 양보 — API 응답 블로킹 방지)
-      await new Promise((r) => setImmediate(r))
-      const result = runBacktest(strategy, allCandles)
-      await new Promise((r) => setImmediate(r))
+      // 3. 백테스트 실행 (Worker Thread — 메인 이벤트 루프 비차단)
+      const result = await runBacktestInWorker(strategy.config.id, allCandles)
 
       // 4. 상태 → completed, metrics 저장
       await updateResearchRunCompleted(runId, result)
