@@ -34,7 +34,7 @@ export const PositionPanel = ({ positions }: PositionPanelProps) => {
         <div>
           {livePositions.length > 0 && (
             <>
-              <div className="px-4 py-1.5 text-[11px] font-semibold text-profit bg-profit/5 border-b border-border-subtle">
+              <div className="px-4 py-1.5 text-[12px] font-semibold text-profit bg-profit/5 border-b border-border-subtle">
                 실전 {livePositions.length}
               </div>
               {livePositions.map((pos) => (
@@ -44,7 +44,7 @@ export const PositionPanel = ({ positions }: PositionPanelProps) => {
           )}
           {paperPositions.length > 0 && (
             <>
-              <div className="px-4 py-1.5 text-[11px] font-semibold text-text-muted bg-surface border-b border-border-subtle">
+              <div className="px-4 py-1.5 text-[12px] font-semibold text-text-muted bg-surface border-b border-border-subtle">
                 모의 {paperPositions.length}
               </div>
               {paperPositions.map((pos) => (
@@ -68,7 +68,7 @@ const PositionRow = ({ position: pos }: { position: ActivePosition }) => {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-medium text-text-primary">{pos.asset}</span>
-          <span className={`text-[11px] font-semibold ${sideColor}`}>{sideLabel}</span>
+          <span className={`text-[12px] font-semibold ${sideColor}`}>{sideLabel}</span>
           <span className="text-[11px] text-text-faint">{pos.strategy}</span>
         </div>
         <span className={`font-mono text-[13px] font-semibold tabular-nums ${pnlColor}`}>

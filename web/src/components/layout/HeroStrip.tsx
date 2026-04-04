@@ -59,7 +59,7 @@ export const HeroStrip = ({ summary }: HeroStripProps) => {
 
         {/* EDGE — 설명 포함 */}
         <div className="hidden sm:block">
-          <div className="text-[11px] font-semibold text-text-muted mb-0.5">
+          <div className="text-[12px] font-semibold text-text-muted mb-0.5">
             시장 적합도
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -92,8 +92,8 @@ const Stat = ({
   className?: string
 }) => (
   <div className={className}>
-    <div className="text-[11px] font-semibold text-text-muted mb-0.5">{label}</div>
-    <div className={`font-mono font-semibold ${large ? 'text-[18px] sm:text-[20px]' : 'text-[15px]'} ${valueColor}`}>
+    <div className="text-[12px] font-semibold text-text-muted mb-0.5">{label}</div>
+    <div className={`font-mono font-semibold ${large ? 'text-[20px]' : 'text-[15px]'} ${valueColor}`}>
       {value}
       {sub && (
         <span className={`ml-1.5 text-[11px] font-medium ${subColor ?? 'text-text-muted'}`}>

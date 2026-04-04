@@ -48,7 +48,7 @@ export const TradingDashboard = () => {
     return (
       <main className="flex flex-col items-center justify-center h-full gap-3">
         <WifiOff className="w-8 h-8 text-text-faint" />
-        <span className="text-[14px] font-semibold text-text-secondary">서버 연결 실패</span>
+        <span className="text-[15px] font-semibold text-text-secondary">서버 연결 실패</span>
         <span className="text-[12px] text-text-muted max-w-sm text-center">{error}</span>
         <button
           onClick={fetchAll}
