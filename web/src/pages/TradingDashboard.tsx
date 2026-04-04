@@ -74,7 +74,7 @@ export const TradingDashboard = () => {
       <SystemStrip status={systemStatus} />
       <HeroStrip summary={heroSummary} />
 
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:max-h-[280px]">
         <DeploymentMatrix slots={assetSlots} />
         <OperatorQueue
           items={queueItems}
