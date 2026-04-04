@@ -6,7 +6,7 @@ import { runPaperTradingCycle } from '../paper/paper-engine.js'
 import { reconcilePositions } from '../execution/execution-engine.js'
 import { runRiskCheck } from '../risk/risk-manager.js'
 import { runFullScan, cleanOldCache } from '../routes/detection.js'
-import { collectLatestCandles } from '../data/candle-collector.js'
+import { collectLatestCandles, backfillCandles } from '../data/candle-collector.js'
 
 /**
  * 크론 작업 시작
@@ -114,10 +114,40 @@ async function snapshotEquity(): Promise<void> {
   }
 }
 
+/** BTC 캔들이 충분한지 확인하고, 부족하면 backfill */
+async function ensureMinimumCandles(): Promise<void> {
+  const MIN_CANDLES = 210 // EMA200 + 여유분
+
+  const { count } = await supabase
+    .from('candles')
+    .select('id', { count: 'exact', head: true })
+    .eq('asset_key', 'BTC-KRW')
+    .eq('timeframe', '4h')
+
+  if ((count ?? 0) < MIN_CANDLES) {
+    console.log(`[크론] BTC-KRW 4h 캔들 ${count ?? 0}개 — backfill 시작 (최소 ${MIN_CANDLES}개 필요)`)
+    // 업비트 BTC 6개월 + OKX BTC 6개월 병렬 수집
+    await Promise.all([
+      backfillCandles('upbit', 'BTC-KRW', '4h', 6),
+      backfillCandles('okx', 'BTC-USDT', '4h', 6),
+    ])
+    // 나머지 알트코인도 backfill
+    for (const key of ['ETH-KRW', 'XRP-KRW', 'SOL-KRW', 'DOGE-KRW']) {
+      await backfillCandles('upbit', key, '4h', 6)
+    }
+    await backfillCandles('okx', 'ETH-USDT', '4h', 6)
+    console.log('[크론] backfill 완료')
+  }
+}
+
 /** 메인 파이프라인 실행 (크론 + 서버 시작 시 공용) */
 async function runMainPipeline(): Promise<void> {
   console.log(`[크론] ═══ 4H 파이프라인 시작: ${new Date().toISOString()} ═══`)
-  // 1. 캔들 수집 (업비트 KRW 마켓 + OKX USDT 마켓, 4H 타임프레임)
+
+  // 0. 최초 실행 시 캔들 부족하면 자동 backfill
+  await ensureMinimumCandles()
+
+  // 1. 캔들 증분 수집 (업비트 KRW 마켓 + OKX USDT 마켓, 4H 타임프레임)
   await collectLatestCandles('upbit', ['BTC-KRW', 'ETH-KRW', 'XRP-KRW', 'SOL-KRW', 'DOGE-KRW'], '4h')
   await collectLatestCandles('okx', ['BTC-USDT', 'ETH-USDT'], '4h')
 
