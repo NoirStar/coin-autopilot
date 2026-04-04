@@ -7,7 +7,7 @@ import type {
   BacktestTrade,
   RegimeState,
 } from '../core/types.js'
-import { detectRegime } from '../data/v2-regime-detector.js'
+import { detectRegime } from '../data/regime-detector.js'
 
 // ─── 백테스트 설정 ─────────────────────────────────────────────
 

@@ -31,7 +31,7 @@
 - 범위가 크다. 암호화폐 + 한국주식 + 멀티유저 + AI 재분석까지 한 번에 가면 쉽게 흐려진다.
 - 검증 품질이 아직 충분히 강하지 않다. 현재 구현은 임계치 기반 승격이 중심이라 과최적화 리스크를 더 줄여야 한다.
 - 프론트와 서버 계약이 아직 맞물리지 않는다. 화면은 좋아졌지만 실제 운영 상태를 반영하지 못한다.
-- 인증 정책이 문서와 코드에서 어긋난다. UI는 1인 사용 무인증 방향인데 서버 `/api/v2/*`는 인증을 요구한다.
+- 인증 정책이 문서와 코드에서 어긋난다. UI는 1인 사용 무인증 방향인데 서버 `/api/*`는 인증을 요구한다.
 - 실전 readiness는 아직 낮다. 구조는 있지만 "신뢰 가능한 운영 제품" 단계는 아니다.
 
 ### 체감 점수
@@ -56,9 +56,9 @@
   - 등록 전략 순회
   - 캔들 로드
   - 백테스트 실행
-  - `v2_research_runs`, `v2_research_run_metrics` 저장
+  - `research_runs`, `research_run_metrics` 저장
   - 기준 통과 시 `paper_candidate` 승격
-  - 파일: `server/src/research/v2-research-loop.ts`
+  - 파일: `server/src/research/research-loop.ts`
 
 - 오케스트레이터 핵심도 있다.
   - 레짐 판정
@@ -66,17 +66,17 @@
   - go_flat 판단
   - 슬롯별 배치/교체 판단
   - 슬롯 상태 조회 API용 함수 존재
-  - 파일: `server/src/orchestrator/v2-orchestrator.ts`
+  - 파일: `server/src/orchestrator/orchestrator.ts`
 
 - V2 API도 이미 꽤 있다.
-  - `/api/v2/dashboard`
-  - `/api/v2/slots`
-  - `/api/v2/decisions`
-  - `/api/v2/research/runs`
-  - `/api/v2/research/candidates`
-  - `/api/v2/risk/status`
-  - `/api/v2/positions`
-  - 파일: `server/src/routes/v2-api.ts`
+  - `/api/dashboard`
+  - `/api/slots`
+  - `/api/decisions`
+  - `/api/research/runs`
+  - `/api/research/candidates`
+  - `/api/risk/status`
+  - `/api/positions`
+  - 파일: `server/src/routes/api.ts`
 
 ### 2. 프론트
 
@@ -136,7 +136,7 @@
 ### 2. 인증 정책이 충돌한다
 
 - 프론트 계획은 `1인 사용 단계`, `AuthGuard 제거`, `무인증 UX` 쪽이다
-- 그런데 서버는 `/api/v2/*` 전체에 `authMiddleware`를 걸고 있다
+- 그런데 서버는 API 전체에 `authMiddleware`를 걸고 있다
 - 파일: `server/src/index.ts`
 
 이 상태면:
@@ -147,7 +147,7 @@
 ### 3. ResearchPage는 "연결된 것처럼 보이지만" 계약이 아직 안 맞을 수 있다
 
 - `web/src/pages/ResearchPage.tsx`는 배열 형태를 기대하고 있다
-- `server/src/routes/v2-api.ts`는 `{ data: ..., rankedAt: ... }` 형태를 반환한다
+- `server/src/routes/api.ts`는 `{ data: ..., rankedAt: ... }` 형태를 반환한다
 - 즉 프론트에서 응답 unwrap / transform이 필요하다
 
 ## 지금 프로젝트를 어디까지 현실적으로 볼지
@@ -199,7 +199,7 @@
 추천 방향은 둘 중 하나:
 
 - 기존 endpoint들을 조합해서 프론트에서 가공
-- 또는 `GET /api/v2/operator/home` 같은 집계 endpoint를 새로 만든다
+- 또는 `GET /api/operator/home` 같은 집계 endpoint를 새로 만든다
 
 내 추천은 **집계 endpoint 1개 추가**다.
 이유:
@@ -221,7 +221,7 @@
 
 대상 파일:
 
-- `server/src/routes/v2-api.ts`
+- `server/src/routes/api.ts`
 - `web/src/types/orchestration.ts`
 
 ### 3. TradingDashboard를 실데이터로 전환
@@ -254,7 +254,7 @@
 대상 파일:
 
 - `web/src/pages/StrategyDetail.tsx`
-- `server/src/routes/v2-api.ts`
+- `server/src/routes/api.ts`
 
 ### 5. ResearchPage 계약 수정
 
@@ -320,7 +320,7 @@ WebSocket은 지금 바로 안 해도 된다. polling으로 먼저 끝내는 게
 우선순위대로:
 
 1. `server/src/index.ts`
-2. `server/src/routes/v2-api.ts`
+2. `server/src/routes/api.ts`
 3. `web/src/services/api.ts`
 4. `web/src/stores/orchestration-store.ts`
 5. `web/src/stores/approval-store.ts`

@@ -20,7 +20,7 @@ import { supabase } from '../services/database.js'
 const registry = new Map<string, Strategy>()
 
 /**
- * 서버 시작 시 v2_strategies DB와 레지스트리 동기화
+ * 서버 시작 시 strategies DB와 레지스트리 동기화
  *
  * - 레지스트리에 있지만 DB에 없는 전략 → DB에 등록
  * - DB에서 retired 상태인 전략 → 레지스트리에서 제거
@@ -31,7 +31,7 @@ export async function syncRegistryWithDb(): Promise<void> {
 
   // DB 전략 목록 조회
   const { data: dbStrategies, error } = await supabase
-    .from('v2_strategies')
+    .from('strategies')
     .select('id, strategy_id, status')
 
   if (error) {
@@ -46,7 +46,7 @@ export async function syncRegistryWithDb(): Promise<void> {
     const sid = strategy.config.id
     if (!dbMap.has(sid)) {
       const { error: insertErr } = await supabase
-        .from('v2_strategies')
+        .from('strategies')
         .insert({
           strategy_id: sid,
           name: strategy.config.name,

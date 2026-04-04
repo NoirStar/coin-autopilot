@@ -1,8 +1,8 @@
 import { supabase } from '../services/database.js'
 import { calculatePnlPct } from '../services/pnl-calculator.js'
-import { getStrategy, safeEvaluate, safeEvaluateExits } from '../strategy/v2-registry.js'
-import { detectRegime } from '../data/v2-regime-detector.js'
-import { loadCandles, fetchUpbitKrwSymbols } from '../data/v2-candle-collector.js'
+import { getStrategy, safeEvaluate, safeEvaluateExits } from '../strategy/registry.js'
+import { detectRegime } from '../data/regime-detector.js'
+import { loadCandles, fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import type {
   CandleMap,
   Candle,
@@ -39,7 +39,7 @@ interface PaperSessionRow {
   initial_capital: number
   current_equity: number
   current_drawdown: number
-  v2_strategies?: { strategy_id: string; exchange: string; timeframe: string }
+  strategies?: { strategy_id: string; exchange: string; timeframe: string }
 }
 
 interface PaperPositionRow {
@@ -60,7 +60,7 @@ interface PaperPositionRow {
 
 /**
  * 새 가상매매 세션 생성
- * @param strategyId v2_strategies.id (uuid)
+ * @param strategyId strategies.id (uuid)
  * @param initialCapital 초기 자본 (기본 10,000 USDT)
  */
 export async function createSession(
@@ -68,7 +68,7 @@ export async function createSession(
   initialCapital: number = 10_000,
 ): Promise<string | null> {
   const { data, error } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .insert({
       strategy_id: strategyId,
       status: 'running' satisfies SessionStatus,
@@ -94,7 +94,7 @@ export async function createSession(
  */
 export async function pauseSession(id: string): Promise<boolean> {
   const { error } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .update({ status: 'paused' satisfies SessionStatus })
     .eq('id', id)
     .eq('status', 'running')
@@ -113,7 +113,7 @@ export async function pauseSession(id: string): Promise<boolean> {
  */
 export async function resumeSession(id: string): Promise<boolean> {
   const { error } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .update({ status: 'running' satisfies SessionStatus })
     .eq('id', id)
     .eq('status', 'paused')
@@ -132,7 +132,7 @@ export async function resumeSession(id: string): Promise<boolean> {
  */
 export async function stopSession(id: string): Promise<boolean> {
   const { error } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .update({
       status: 'stopped' satisfies SessionStatus,
       ended_at: new Date().toISOString(),
@@ -159,8 +159,8 @@ export async function runPaperTradingCycle(): Promise<void> {
 
   // 활성 세션 조회 (running 상태만)
   const { data: sessions, error: sessErr } = await supabase
-    .from('v2_paper_sessions')
-    .select('*, v2_strategies(strategy_id, exchange, timeframe)')
+    .from('paper_sessions')
+    .select('*, strategies(strategy_id, exchange, timeframe)')
     .eq('status', 'running')
 
   if (sessErr || !sessions || sessions.length === 0) {
@@ -198,7 +198,7 @@ async function processSession(
   regime: RegimeState,
 ): Promise<void> {
   const sessionId = session.id
-  const strategyMeta = session.v2_strategies
+  const strategyMeta = session.strategies
   const strategyId = strategyMeta?.strategy_id ?? ''
 
   // V2 레지스트리에서 전략 조회
@@ -236,7 +236,7 @@ async function processSession(
 
   // ── 현재 오픈 포지션 조회 ──
   const { data: openPositions } = await supabase
-    .from('v2_paper_positions')
+    .from('paper_positions')
     .select('*')
     .eq('session_id', sessionId)
     .eq('status', 'open')
@@ -290,7 +290,7 @@ async function processSession(
     const exitSide = isLong ? 'sell' : 'buy'
 
     const { data: order } = await supabase
-      .from('v2_paper_orders')
+      .from('paper_orders')
       .insert({
         session_id: sessionId,
         asset_key: exit.symbol,
@@ -308,7 +308,7 @@ async function processSession(
 
     if (order) {
       await supabase
-        .from('v2_paper_fills')
+        .from('paper_fills')
         .insert({
           order_id: order.id,
           fill_qty: exitQty,
@@ -321,7 +321,7 @@ async function processSession(
     if (exitRatio >= 1.0) {
       // 전량 청산
       await supabase
-        .from('v2_paper_positions')
+        .from('paper_positions')
         .update({
           status: 'closed',
           realized_pnl: Math.round((Number(pos.realized_pnl ?? 0) + realizedPnl) * 100) / 100,
@@ -335,7 +335,7 @@ async function processSession(
       // 부분 청산: 수량 감소, realized_pnl 누적
       const remainingQty = pos.current_qty - exitQty
       await supabase
-        .from('v2_paper_positions')
+        .from('paper_positions')
         .update({
           current_qty: remainingQty,
           realized_pnl: Math.round((Number(pos.realized_pnl ?? 0) + realizedPnl) * 100) / 100,
@@ -369,7 +369,7 @@ async function processSession(
 
     if (newPeak !== oldPeak || unrealizedPnl !== pos.unrealized_pnl) {
       await supabase
-        .from('v2_paper_positions')
+        .from('paper_positions')
         .update({
           peak_price: newPeak,
           unrealized_pnl: Math.round(unrealizedPnl * 100) / 100,
@@ -411,7 +411,7 @@ async function processSession(
     // 주문 생성
     const entrySide = signal.direction === 'buy' ? 'buy' : 'sell'
     const { data: order } = await supabase
-      .from('v2_paper_orders')
+      .from('paper_orders')
       .insert({
         session_id: sessionId,
         asset_key: signal.symbol,
@@ -430,7 +430,7 @@ async function processSession(
     if (order) {
       // 체결 기록
       await supabase
-        .from('v2_paper_fills')
+        .from('paper_fills')
         .insert({
           order_id: order.id,
           fill_qty: quantity,
@@ -442,7 +442,7 @@ async function processSession(
 
     // 포지션 생성
     await supabase
-      .from('v2_paper_positions')
+      .from('paper_positions')
       .insert({
         session_id: sessionId,
         asset_key: signal.symbol,
@@ -475,14 +475,14 @@ async function updateSessionPerformance(
 ): Promise<void> {
   // 종료된 포지션 조회 (실현 손익)
   const { data: closedPositions } = await supabase
-    .from('v2_paper_positions')
+    .from('paper_positions')
     .select('entry_price, current_qty, realized_pnl, side')
     .eq('session_id', sessionId)
     .eq('status', 'closed')
 
   // 열린 포지션 조회 (미실현 손익)
   const { data: openPositions } = await supabase
-    .from('v2_paper_positions')
+    .from('paper_positions')
     .select('unrealized_pnl')
     .eq('session_id', sessionId)
     .eq('status', 'open')
@@ -496,7 +496,7 @@ async function updateSessionPerformance(
 
   // 세션 초기 자본 조회
   const { data: sessionData } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .select('initial_capital')
     .eq('id', sessionId)
     .single()
@@ -541,7 +541,7 @@ async function updateSessionPerformance(
 
   // 세션 성과 업데이트
   await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .update({
       current_equity: Math.round(currentEquity * 100) / 100,
       current_drawdown: Math.round(maxDD * 10_000) / 100, // 퍼센트 값
@@ -550,7 +550,7 @@ async function updateSessionPerformance(
 
   // 에퀴티 스냅샷 저장
   await supabase
-    .from('v2_equity_snapshots')
+    .from('equity_snapshots')
     .insert({
       source: `paper:${sessionId}`,
       total_equity: Math.round(currentEquity * 100) / 100,

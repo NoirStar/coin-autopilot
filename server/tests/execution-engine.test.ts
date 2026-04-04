@@ -41,14 +41,14 @@ vi.mock('../src/exchange/okx-client.js', () => ({
 describe('실전 매매 엔진', () => {
   it('LIVE_TRADING이 아니면 스킵', async () => {
     delete process.env.LIVE_TRADING
-    const { executeLiveDecision } = await import('../src/execution/v2-execution-engine.js')
+    const { executeLiveDecision } = await import('../src/execution/execution-engine.js')
     const result = await executeLiveDecision('test-id')
     expect(result).toBe(false)
   })
 
   it('closePosition에서 부분 청산 비율 지원', async () => {
     // 부분 청산 시그니처 확인
-    const mod = await import('../src/execution/v2-execution-engine.js')
+    const mod = await import('../src/execution/execution-engine.js')
     expect(typeof mod.closePosition).toBe('function')
     // closePosition(id, reason, partialRatio)
     expect(mod.closePosition.length).toBeGreaterThanOrEqual(2)

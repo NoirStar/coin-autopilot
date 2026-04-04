@@ -29,7 +29,7 @@ export default function App() {
       <Route path="/operator/settings" element={<Navigate to="/settings" replace />} />
       <Route path="/backtest" element={<Navigate to="/research" replace />} />
       <Route path="/paper-trading" element={<Navigate to="/" replace />} />
-      <Route path="/operator/v2" element={<Navigate to="/" replace />} />
+      <Route path="/operator/home" element={<Navigate to="/" replace />} />
       <Route path="/operator/strategy" element={<Navigate to="/research" replace />} />
       <Route path="/operator/backtest" element={<Navigate to="/research" replace />} />
       <Route path="/operator/paper-trading" element={<Navigate to="/" replace />} />

@@ -1,6 +1,73 @@
--- V2 스키마: PRD 12_SCHEMA_AND_API_CONTRACT 기준
--- 빈 DB에서 시작. 기존 테이블은 건드리지 않음 (별도 정리 예정)
+-- Coin Autopilot 스키마
+-- 기존 객체를 모두 삭제 후 재생성한다.
 -- 모든 timestamp는 UTC (timestamptz)
+
+-- ═══════════════════════════════════════════════════════════
+-- 0. 기존 객체 전부 삭제 (역순)
+-- ═══════════════════════════════════════════════════════════
+
+-- v2_ 접두사 테이블/타입 동적 삭제
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public' AND tablename LIKE 'v2_%'
+  LOOP
+    EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
+  END LOOP;
+
+  FOR r IN
+    SELECT typname FROM pg_type t
+    JOIN pg_namespace n ON t.typnamespace = n.oid
+    WHERE n.nspname = 'public' AND t.typtype = 'e' AND t.typname LIKE 'v2_%'
+  LOOP
+    EXECUTE 'DROP TYPE IF EXISTS public.' || quote_ident(r.typname) || ' CASCADE';
+  END LOOP;
+END $$;
+
+DROP TABLE IF EXISTS detection_cache CASCADE;
+DROP TABLE IF EXISTS user_profiles CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS approval_requests CASCADE;
+DROP TABLE IF EXISTS risk_events CASCADE;
+DROP TABLE IF EXISTS live_positions CASCADE;
+DROP TABLE IF EXISTS live_fills CASCADE;
+DROP TABLE IF EXISTS live_orders CASCADE;
+DROP TABLE IF EXISTS equity_snapshots CASCADE;
+DROP TABLE IF EXISTS paper_positions CASCADE;
+DROP TABLE IF EXISTS paper_fills CASCADE;
+DROP TABLE IF EXISTS paper_orders CASCADE;
+DROP TABLE IF EXISTS paper_sessions CASCADE;
+DROP TABLE IF EXISTS orchestrator_candidate_rankings CASCADE;
+DROP TABLE IF EXISTS orchestrator_decisions CASCADE;
+DROP TABLE IF EXISTS orchestrator_slots CASCADE;
+DROP TABLE IF EXISTS research_promotions CASCADE;
+DROP TABLE IF EXISTS research_run_metrics CASCADE;
+DROP TABLE IF EXISTS research_runs CASCADE;
+DROP TABLE IF EXISTS regime_snapshots CASCADE;
+DROP TABLE IF EXISTS candles CASCADE;
+DROP TABLE IF EXISTS strategy_parameters CASCADE;
+DROP TABLE IF EXISTS strategies CASCADE;
+DROP TABLE IF EXISTS asset_mappings CASCADE;
+DROP TABLE IF EXISTS assets CASCADE;
+
+DROP TYPE IF EXISTS risk_event_type CASCADE;
+DROP TYPE IF EXISTS promotion_status CASCADE;
+DROP TYPE IF EXISTS research_run_status CASCADE;
+DROP TYPE IF EXISTS notification_channel CASCADE;
+DROP TYPE IF EXISTS notification_priority CASCADE;
+DROP TYPE IF EXISTS decision_status CASCADE;
+DROP TYPE IF EXISTS decision_type CASCADE;
+DROP TYPE IF EXISTS order_status CASCADE;
+DROP TYPE IF EXISTS session_status CASCADE;
+DROP TYPE IF EXISTS strategy_status CASCADE;
+DROP TYPE IF EXISTS order_side CASCADE;
+DROP TYPE IF EXISTS position_side CASCADE;
+DROP TYPE IF EXISTS regime_state CASCADE;
+DROP TYPE IF EXISTS market_type CASCADE;
+DROP TYPE IF EXISTS asset_class CASCADE;
 
 -- ═══════════════════════════════════════════════════════════
 -- 1. ENUM 타입
@@ -54,48 +121,48 @@ CREATE TYPE risk_event_type AS ENUM (
 -- ═══════════════════════════════════════════════════════════
 
 -- 자산 마스터
-CREATE TABLE v2_assets (
+CREATE TABLE assets (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  asset_key     text NOT NULL UNIQUE,  -- "BTC-KRW", "BTC-USDT-SWAP"
+  asset_key     text NOT NULL UNIQUE,
   asset_class   asset_class NOT NULL,
-  base_currency text NOT NULL,         -- "BTC"
-  quote_currency text NOT NULL,        -- "KRW", "USDT"
+  base_currency text NOT NULL,
+  quote_currency text NOT NULL,
   market_type   market_type NOT NULL,
   status        text NOT NULL DEFAULT 'active',
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
 -- 거래소별 심볼 매핑
-CREATE TABLE v2_asset_mappings (
+CREATE TABLE asset_mappings (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  asset_id      uuid NOT NULL REFERENCES v2_assets(id),
-  exchange      text NOT NULL,         -- "upbit", "okx"
-  exchange_symbol text NOT NULL,       -- "KRW-BTC", "BTC-USDT-SWAP"
+  asset_id      uuid NOT NULL REFERENCES assets(id),
+  exchange      text NOT NULL,
+  exchange_symbol text NOT NULL,
   UNIQUE(asset_id, exchange)
 );
 
 -- 전략 카탈로그
-CREATE TABLE v2_strategies (
+CREATE TABLE strategies (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  strategy_id     text NOT NULL UNIQUE,  -- "btc_ema_crossover"
+  strategy_id     text NOT NULL UNIQUE,
   name            text NOT NULL,
   description     text,
   asset_class     asset_class NOT NULL,
-  timeframe       text NOT NULL,         -- "4h", "1h"
-  exchange        text NOT NULL,         -- "upbit", "okx"
-  direction       text NOT NULL DEFAULT 'both',  -- "long", "short", "both"
+  timeframe       text NOT NULL,
+  exchange        text NOT NULL,
+  direction       text NOT NULL DEFAULT 'both',
   default_params  jsonb NOT NULL DEFAULT '{}',
   status          strategy_status NOT NULL DEFAULT 'research_only',
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- 전략 파라미터 세트 (연구 루프에서 탐색한 파라미터)
-CREATE TABLE v2_strategy_parameters (
+-- 전략 파라미터 세트
+CREATE TABLE strategy_parameters (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  strategy_id   uuid NOT NULL REFERENCES v2_strategies(id),
+  strategy_id   uuid NOT NULL REFERENCES strategies(id),
   param_set     jsonb NOT NULL,
-  source        text NOT NULL DEFAULT 'manual', -- "manual", "research_loop"
+  source        text NOT NULL DEFAULT 'manual',
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
@@ -104,7 +171,7 @@ CREATE TABLE v2_strategy_parameters (
 -- ═══════════════════════════════════════════════════════════
 
 -- OHLCV 캔들
-CREATE TABLE v2_candles (
+CREATE TABLE candles (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_key     text NOT NULL,
   exchange      text NOT NULL,
@@ -118,10 +185,10 @@ CREATE TABLE v2_candles (
   UNIQUE(asset_key, exchange, timeframe, open_time)
 );
 
-CREATE INDEX idx_v2_candles_lookup ON v2_candles(asset_key, exchange, timeframe, open_time DESC);
+CREATE INDEX idx_candles_lookup ON candles(asset_key, exchange, timeframe, open_time DESC);
 
 -- 레짐 스냅샷
-CREATE TABLE v2_regime_snapshots (
+CREATE TABLE regime_snapshots (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   regime        regime_state NOT NULL,
   btc_price     numeric NOT NULL,
@@ -131,17 +198,17 @@ CREATE TABLE v2_regime_snapshots (
   recorded_at   timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_v2_regime_time ON v2_regime_snapshots(recorded_at DESC);
+CREATE INDEX idx_regime_time ON regime_snapshots(recorded_at DESC);
 
 -- ═══════════════════════════════════════════════════════════
 -- 4. 연구 루프
 -- ═══════════════════════════════════════════════════════════
 
-CREATE TABLE v2_research_runs (
+CREATE TABLE research_runs (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  strategy_id     uuid NOT NULL REFERENCES v2_strategies(id),
-  param_set_id    uuid REFERENCES v2_strategy_parameters(id),
-  market_scope    text NOT NULL,         -- "BTC-USDT-SWAP", "upbit_top20"
+  strategy_id     uuid NOT NULL REFERENCES strategies(id),
+  param_set_id    uuid REFERENCES strategy_parameters(id),
+  market_scope    text NOT NULL,
   parameter_set   jsonb NOT NULL,
   status          research_run_status NOT NULL DEFAULT 'queued',
   promotion_status promotion_status NOT NULL DEFAULT 'not_evaluated',
@@ -150,9 +217,9 @@ CREATE TABLE v2_research_runs (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE v2_research_run_metrics (
+CREATE TABLE research_run_metrics (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  research_run_id uuid NOT NULL REFERENCES v2_research_runs(id) ON DELETE CASCADE,
+  research_run_id uuid NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
   total_return    numeric,
   max_drawdown    numeric,
   win_rate        numeric,
@@ -161,15 +228,15 @@ CREATE TABLE v2_research_run_metrics (
   trade_count     integer,
   avg_hold_hours  numeric,
   cost_ratio      numeric,
-  equity_curve    jsonb,               -- [{t, equity}]
-  trades          jsonb,               -- [BacktestTrade]
+  equity_curve    jsonb,
+  trades          jsonb,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
 -- 승격 이력
-CREATE TABLE v2_research_promotions (
+CREATE TABLE research_promotions (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  research_run_id uuid NOT NULL REFERENCES v2_research_runs(id),
+  research_run_id uuid NOT NULL REFERENCES research_runs(id),
   from_status     strategy_status NOT NULL,
   to_status       strategy_status NOT NULL,
   reason          text,
@@ -181,26 +248,26 @@ CREATE TABLE v2_research_promotions (
 -- ═══════════════════════════════════════════════════════════
 
 -- 자산별 전략 슬롯
-CREATE TABLE v2_orchestrator_slots (
+CREATE TABLE orchestrator_slots (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_key       text NOT NULL,
-  slot_type       text NOT NULL DEFAULT 'primary', -- "primary", "shadow"
-  strategy_id     uuid REFERENCES v2_strategies(id),
-  allocation_pct  numeric NOT NULL DEFAULT 0,      -- 자본 배분 비율
+  slot_type       text NOT NULL DEFAULT 'primary',
+  strategy_id     uuid REFERENCES strategies(id),
+  allocation_pct  numeric NOT NULL DEFAULT 0,
   regime          regime_state,
-  status          text NOT NULL DEFAULT 'empty',   -- "empty", "active", "cooldown", "flat"
+  status          text NOT NULL DEFAULT 'empty',
   cooldown_until  timestamptz,
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
 -- 오케스트레이터 판단 로그
-CREATE TABLE v2_orchestrator_decisions (
+CREATE TABLE orchestrator_decisions (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  slot_id         uuid REFERENCES v2_orchestrator_slots(id),
+  slot_id         uuid REFERENCES orchestrator_slots(id),
   decision_type   decision_type NOT NULL,
   status          decision_status NOT NULL DEFAULT 'pending',
-  from_strategy_id uuid REFERENCES v2_strategies(id),
-  to_strategy_id  uuid REFERENCES v2_strategies(id),
+  from_strategy_id uuid REFERENCES strategies(id),
+  to_strategy_id  uuid REFERENCES strategies(id),
   regime          regime_state NOT NULL,
   reason_summary  text NOT NULL,
   score_snapshot  jsonb NOT NULL DEFAULT '{}',
@@ -208,12 +275,12 @@ CREATE TABLE v2_orchestrator_decisions (
   executed_at     timestamptz
 );
 
-CREATE INDEX idx_v2_decisions_time ON v2_orchestrator_decisions(created_at DESC);
+CREATE INDEX idx_decisions_time ON orchestrator_decisions(created_at DESC);
 
--- 후보 전략 랭킹 (매 사이클마다 갱신)
-CREATE TABLE v2_orchestrator_candidate_rankings (
+-- 후보 전략 랭킹
+CREATE TABLE orchestrator_candidate_rankings (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  strategy_id     uuid NOT NULL REFERENCES v2_strategies(id),
+  strategy_id     uuid NOT NULL REFERENCES strategies(id),
   regime          regime_state NOT NULL,
   score           numeric NOT NULL,
   sharpe          numeric,
@@ -226,10 +293,10 @@ CREATE TABLE v2_orchestrator_candidate_rankings (
 -- 6. 페이퍼트레이딩
 -- ═══════════════════════════════════════════════════════════
 
-CREATE TABLE v2_paper_sessions (
+CREATE TABLE paper_sessions (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         uuid,                -- Stage 3 멀티유저용 예약
-  strategy_id     uuid NOT NULL REFERENCES v2_strategies(id),
+  user_id         uuid,
+  strategy_id     uuid NOT NULL REFERENCES strategies(id),
   asset_slot      text,
   status          session_status NOT NULL DEFAULT 'draft',
   initial_capital numeric NOT NULL DEFAULT 10000,
@@ -240,13 +307,13 @@ CREATE TABLE v2_paper_sessions (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE v2_paper_orders (
+CREATE TABLE paper_orders (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id      uuid NOT NULL REFERENCES v2_paper_sessions(id) ON DELETE CASCADE,
+  session_id      uuid NOT NULL REFERENCES paper_sessions(id) ON DELETE CASCADE,
   asset_key       text NOT NULL,
   side            order_side NOT NULL,
   position_side   position_side,
-  order_type      text NOT NULL DEFAULT 'market', -- "market", "limit", "stop_market"
+  order_type      text NOT NULL DEFAULT 'market',
   requested_qty   numeric NOT NULL,
   requested_price numeric,
   status          order_status NOT NULL DEFAULT 'pending_validation',
@@ -255,9 +322,9 @@ CREATE TABLE v2_paper_orders (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE v2_paper_fills (
+CREATE TABLE paper_fills (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id        uuid NOT NULL REFERENCES v2_paper_orders(id) ON DELETE CASCADE,
+  order_id        uuid NOT NULL REFERENCES paper_orders(id) ON DELETE CASCADE,
   fill_qty        numeric NOT NULL,
   fill_price      numeric NOT NULL,
   fill_fee        numeric NOT NULL DEFAULT 0,
@@ -265,9 +332,9 @@ CREATE TABLE v2_paper_fills (
   filled_at       timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE v2_paper_positions (
+CREATE TABLE paper_positions (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id      uuid NOT NULL REFERENCES v2_paper_sessions(id) ON DELETE CASCADE,
+  session_id      uuid NOT NULL REFERENCES paper_sessions(id) ON DELETE CASCADE,
   asset_key       text NOT NULL,
   side            position_side NOT NULL,
   entry_price     numeric NOT NULL,
@@ -279,13 +346,13 @@ CREATE TABLE v2_paper_positions (
   entry_time      timestamptz NOT NULL DEFAULT now(),
   exit_time       timestamptz,
   exit_reason     text,
-  status          text NOT NULL DEFAULT 'open' -- "open", "closed", "liquidated"
+  status          text NOT NULL DEFAULT 'open'
 );
 
--- 에퀴티 스냅샷 (Proof Chart 데이터)
-CREATE TABLE v2_equity_snapshots (
+-- 에퀴티 스냅샷
+CREATE TABLE equity_snapshots (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  source          text NOT NULL,         -- "paper:{session_id}", "live"
+  source          text NOT NULL,
   total_equity    numeric NOT NULL,
   regime          regime_state NOT NULL,
   active_strategies jsonb NOT NULL DEFAULT '[]',
@@ -294,13 +361,65 @@ CREATE TABLE v2_equity_snapshots (
   recorded_at     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_v2_equity_time ON v2_equity_snapshots(source, recorded_at DESC);
+CREATE INDEX idx_equity_time ON equity_snapshots(source, recorded_at DESC);
 
 -- ═══════════════════════════════════════════════════════════
--- 7. 리스크 / 승인 / 알림
+-- 7. 실전 매매
 -- ═══════════════════════════════════════════════════════════
 
-CREATE TABLE v2_risk_events (
+CREATE TABLE live_orders (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  decision_id     uuid REFERENCES orchestrator_decisions(id),
+  asset_key       text NOT NULL,
+  exchange        text NOT NULL,
+  side            order_side NOT NULL,
+  position_side   position_side,
+  order_type      text NOT NULL,
+  requested_qty   numeric NOT NULL,
+  requested_price numeric,
+  exchange_order_id text,
+  status          order_status NOT NULL DEFAULT 'pending_validation',
+  submitted_at    timestamptz,
+  filled_at       timestamptz,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE live_fills (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id        uuid NOT NULL REFERENCES live_orders(id) ON DELETE CASCADE,
+  fill_qty        numeric NOT NULL,
+  fill_price      numeric NOT NULL,
+  fill_fee        numeric NOT NULL DEFAULT 0,
+  exchange_fill_id text,
+  filled_at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE live_positions (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_key       text NOT NULL,
+  exchange        text NOT NULL,
+  side            position_side NOT NULL,
+  entry_price     numeric NOT NULL,
+  current_qty     numeric NOT NULL,
+  peak_price      numeric,
+  unrealized_pnl  numeric NOT NULL DEFAULT 0,
+  realized_pnl    numeric NOT NULL DEFAULT 0,
+  stop_price      numeric,
+  stop_order_id   text,
+  leverage        integer NOT NULL DEFAULT 1,
+  margin_mode     text NOT NULL DEFAULT 'isolated',
+  strategy_id     uuid REFERENCES strategies(id),
+  entry_time      timestamptz NOT NULL DEFAULT now(),
+  exit_time       timestamptz,
+  exit_reason     text,
+  status          text NOT NULL DEFAULT 'open'
+);
+
+-- ═══════════════════════════════════════════════════════════
+-- 8. 리스크 / 승인 / 알림
+-- ═══════════════════════════════════════════════════════════
+
+CREATE TABLE risk_events (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_type      risk_event_type NOT NULL,
   severity        notification_priority NOT NULL DEFAULT 'warning',
@@ -310,24 +429,24 @@ CREATE TABLE v2_risk_events (
   resolved_at     timestamptz
 );
 
-CREATE TABLE v2_approval_requests (
+CREATE TABLE approval_requests (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid,
-  target_type     text NOT NULL,         -- "strategy_promotion", "live_deploy"
+  target_type     text NOT NULL,
   target_id       uuid NOT NULL,
   reason_summary  text NOT NULL,
-  status          text NOT NULL DEFAULT 'pending', -- "pending", "approved", "rejected"
+  status          text NOT NULL DEFAULT 'pending',
   requested_at    timestamptz NOT NULL DEFAULT now(),
   resolved_at     timestamptz
 );
 
-CREATE TABLE v2_notifications (
+CREATE TABLE notifications (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid,
   event_type      text NOT NULL,
   priority        notification_priority NOT NULL DEFAULT 'info',
   channel         notification_channel NOT NULL DEFAULT 'in_app',
-  target_ref      text,                  -- 참조 ID
+  target_ref      text,
   message_summary text NOT NULL,
   message_detail  text,
   sent_at         timestamptz NOT NULL DEFAULT now(),
@@ -335,64 +454,81 @@ CREATE TABLE v2_notifications (
 );
 
 -- ═══════════════════════════════════════════════════════════
--- 8. 사용자 플랫폼 (Stage 3 예약, 컬럼만 정의)
+-- 9. 사용자 (Stage 3 예약)
 -- ═══════════════════════════════════════════════════════════
 
-CREATE TABLE v2_user_profiles (
+CREATE TABLE user_profiles (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  auth_id         uuid UNIQUE,           -- Supabase Auth UID
+  auth_id         uuid UNIQUE,
   display_name    text,
   risk_profile    text DEFAULT 'moderate',
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
 -- ═══════════════════════════════════════════════════════════
--- 9. 실전 매매 (Phase 7)
+-- 10. 알트코인 탐지 캐시
 -- ═══════════════════════════════════════════════════════════
 
-CREATE TABLE v2_live_orders (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  decision_id     uuid REFERENCES v2_orchestrator_decisions(id),
-  asset_key       text NOT NULL,
-  exchange        text NOT NULL,
-  side            order_side NOT NULL,
-  position_side   position_side,
-  order_type      text NOT NULL,
-  requested_qty   numeric NOT NULL,
-  requested_price numeric,
-  exchange_order_id text,              -- 거래소 주문 ID
-  status          order_status NOT NULL DEFAULT 'pending_validation',
-  submitted_at    timestamptz,
-  filled_at       timestamptz,
-  created_at      timestamptz NOT NULL DEFAULT now()
+CREATE TABLE detection_cache (
+  id BIGSERIAL PRIMARY KEY,
+  scanned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  total_scanned INT NOT NULL,
+  detected INT NOT NULL,
+  results JSONB NOT NULL,
+  scan_duration_ms INT,
+  created_by TEXT DEFAULT 'system'
 );
 
-CREATE TABLE v2_live_fills (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id        uuid NOT NULL REFERENCES v2_live_orders(id) ON DELETE CASCADE,
-  fill_qty        numeric NOT NULL,
-  fill_price      numeric NOT NULL,
-  fill_fee        numeric NOT NULL DEFAULT 0,
-  exchange_fill_id text,
-  filled_at       timestamptz NOT NULL DEFAULT now()
-);
+CREATE INDEX idx_detection_cache_scanned_at ON detection_cache (scanned_at DESC);
 
-CREATE TABLE v2_live_positions (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  asset_key       text NOT NULL,
-  exchange        text NOT NULL,
-  side            position_side NOT NULL,
-  entry_price     numeric NOT NULL,
-  current_qty     numeric NOT NULL,
-  peak_price      numeric,
-  unrealized_pnl  numeric NOT NULL DEFAULT 0,
-  realized_pnl    numeric NOT NULL DEFAULT 0,
-  stop_price      numeric,
-  stop_order_id   text,                -- 거래소 손절 주문 ID
-  leverage        integer NOT NULL DEFAULT 1,
-  margin_mode     text NOT NULL DEFAULT 'isolated',
-  entry_time      timestamptz NOT NULL DEFAULT now(),
-  exit_time       timestamptz,
-  exit_reason     text,
-  status          text NOT NULL DEFAULT 'open'
-);
+-- ═══════════════════════════════════════════════════════════
+-- 11. RLS 정책
+-- ═══════════════════════════════════════════════════════════
+
+-- 모든 테이블 RLS 활성화
+ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE asset_mappings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE strategies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE strategy_parameters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE regime_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE research_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE research_run_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE research_promotions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orchestrator_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orchestrator_decisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orchestrator_candidate_rankings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE paper_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE paper_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE paper_fills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE paper_positions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE equity_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_fills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE live_positions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE risk_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE approval_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- 인증된 사용자 읽기 정책
+CREATE POLICY "인증된 사용자 읽기" ON equity_snapshots FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON regime_snapshots FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON strategies FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON research_runs FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON research_run_metrics FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON orchestrator_slots FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON orchestrator_decisions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON orchestrator_candidate_rankings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON paper_sessions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON paper_positions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON live_positions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON risk_events FOR SELECT TO authenticated USING (true);
+CREATE POLICY "인증된 사용자 읽기" ON notifications FOR SELECT TO authenticated USING (true);
+
+-- 알림 확인 처리
+CREATE POLICY "인증된 사용자 알림 확인" ON notifications FOR UPDATE TO authenticated
+  USING (true) WITH CHECK (true);
+
+-- 탐지 캐시 공개 읽기
+ALTER TABLE detection_cache ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_read_detection_cache" ON detection_cache FOR SELECT USING (true);

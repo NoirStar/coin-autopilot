@@ -1,6 +1,6 @@
 import { calcMACD, calcRSI, calcADX, calcATRPercent, calcEMA } from '../indicator/indicator-engine.js'
 import { calcATRStop } from './utils/atr-stop.js'
-import { registerStrategy } from './v2-registry.js'
+import { registerStrategy } from './registry.js'
 import type {
   Strategy,
   StrategyConfig,

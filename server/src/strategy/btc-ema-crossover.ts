@@ -1,6 +1,6 @@
-import { calcDonchianChannel, calcATRPercent } from '../indicator/indicator-engine.js'
+import { calcEMA, calcADX, calcATRPercent } from '../indicator/indicator-engine.js'
 import { calcATRStop } from './utils/atr-stop.js'
-import { registerStrategy } from './v2-registry.js'
+import { registerStrategy } from './registry.js'
 import type {
   Strategy,
   StrategyConfig,
@@ -12,41 +12,41 @@ import type {
 } from '../core/types.js'
 
 const DEFAULT_PARAMS = {
-  donchianPeriod: 20,
-  atrPeriod: 14,
-  atrStopMult: 2.0,
-  atrTrailMult: 3.0,
-  volumeMultiplier: 2.0,
-  timeLimitCandles: 20,     // 20 x 1H = 20시간
+  fastEma: 12,
+  slowEma: 26,
+  trendEma: 200,
+  adxThreshold: 20,
+  atrStopMult: 1.5,
+  atrTrailMult: 2.0,
+  riskRewardMin: 2.0,
+  timeLimitCandles: 30,     // 30 x 4H = 120시간 = 5일
   leverage: 2,
+  volumeMultiplier: 1.2,
 }
 
 /**
- * BTC 돈치안 브레이크아웃 전략 (OKX 선물용) — V2
- *
- * 돈치안 채널 20기간 (1H 타임프레임)
+ * BTC/ETH EMA 크로스오버 전략 (OKX 선물용) — V2
  *
  * 진입:
- *   롱: 가격이 상단 돌파 + 볼륨 > SMA(20) x 2.0 + ATR 확장 중
- *   숏: 가격이 하단 돌파 + 볼륨 > SMA(20) x 2.0 + ATR 확장 중
- *   시간 필터: UTC 00:00-04:00, 12:00-16:00 (세션 시작 시점)
+ *   롱: Fast EMA > Slow EMA (골든크로스) + 가격 > EMA(200) + ADX > 20
+ *   숏: Fast EMA < Slow EMA (데드크로스) + 가격 < EMA(200) + ADX > 20
  *
  * 청산:
- *   손절: ATR(14) x 2.0
- *   트레일링 스탑: ATR(14) x 3.0 (peak 기반)
- *   시간 청산: 20캔들
- *   반대 돌파: 반대 채널 돌파 시
+ *   손절: ATR(14) x 1.5
+ *   트레일링 스탑: ATR(14) x 2.0
+ *   시간 청산: 30캔들 (5일)
+ *   반대 크로스: 역 시그널 발생 시
  */
-class BtcDonchianBreakoutV2 implements Strategy {
+class BtcEmaCrossoverV2 implements Strategy {
   config: StrategyConfig
 
   constructor(overrides?: Partial<typeof DEFAULT_PARAMS>) {
     const params = { ...DEFAULT_PARAMS, ...overrides }
     this.config = {
-      id: 'btc_donchian_breakout',
-      name: 'BTC 돈치안 브레이크아웃',
-      description: '돈치안 채널 20기간 돌파 + 볼륨 확인 + ATR 확장. OKX 선물 롱/숏.',
-      timeframe: '1h',
+      id: 'btc_ema_crossover',
+      name: 'BTC EMA 크로스오버',
+      description: 'EMA(12/26) 크로스 + EMA(200) 트렌드 필터 + ADX 확인. OKX 선물 롱/숏.',
+      timeframe: '4h',
       exchange: 'okx',
       assetClass: 'crypto_futures',
       direction: 'both',
@@ -56,39 +56,48 @@ class BtcDonchianBreakoutV2 implements Strategy {
 
   evaluate(candles: CandleMap, regime: RegimeState): StrategySignal[] {
     const signals: StrategySignal[] = []
-    const { donchianPeriod, atrPeriod, volumeMultiplier, leverage } = this.config.params
+    const { fastEma, slowEma, trendEma, adxThreshold, leverage, volumeMultiplier } = this.config.params
 
+    // BTC와 ETH 모두 평가
     for (const symbol of ['BTC', 'ETH']) {
       const symbolCandles = candles.get(symbol)
-      if (!symbolCandles || symbolCandles.length < donchianPeriod + 2) continue
+      if (!symbolCandles || symbolCandles.length < trendEma + 1) continue
 
       const closes = symbolCandles.map((c) => c.close)
       const highs = symbolCandles.map((c) => c.high)
       const lows = symbolCandles.map((c) => c.low)
       const volumes = symbolCandles.map((c) => c.volume)
 
-      // 돈치안 채널 계산
-      const dcValues = calcDonchianChannel(highs, lows, donchianPeriod)
-      if (dcValues.length < 2) continue
+      // 지표 계산
+      const fastEmaValues = calcEMA(closes, fastEma)
+      const slowEmaValues = calcEMA(closes, slowEma)
+      const trendEmaValues = calcEMA(closes, trendEma)
+      const adxValues = calcADX(highs, lows, closes, 14)
 
-      // ATR 계산 (확장 확인용)
-      const atrPctValues = calcATRPercent(highs, lows, closes, atrPeriod)
-      if (atrPctValues.length < 2) continue
+      if (
+        fastEmaValues.length < 2 ||
+        slowEmaValues.length < 2 ||
+        trendEmaValues.length === 0 ||
+        adxValues.length === 0
+      ) continue
 
       const latestClose = closes[closes.length - 1]
-      const prevClose = closes[closes.length - 2]
-      // 이전 캔들의 돈치안 채널 (현재 캔들 돌파 판단 기준)
-      const prevDc = dcValues[dcValues.length - 2]
-      const latestAtrPct = atrPctValues[atrPctValues.length - 1]
-      const prevAtrPct = atrPctValues[atrPctValues.length - 2]
+      const latestFast = fastEmaValues[fastEmaValues.length - 1]
+      const latestSlow = slowEmaValues[slowEmaValues.length - 1]
+      const prevFast = fastEmaValues[fastEmaValues.length - 2]
+      const prevSlow = slowEmaValues[slowEmaValues.length - 2]
+      const latestTrend = trendEmaValues[trendEmaValues.length - 1]
+      const latestAdx = adxValues[adxValues.length - 1]
 
       // NaN 방어: 지표 값이 유효하지 않으면 스킵
-      if ([latestClose, prevClose, prevDc.upper, prevDc.lower, latestAtrPct, prevAtrPct].some(v => !Number.isFinite(v))) continue
+      if ([latestClose, latestFast, latestSlow, prevFast, prevSlow, latestTrend, latestAdx].some(v => !Number.isFinite(v))) continue
 
-      // ATR 확장 중: 현재 ATR > 이전 ATR
-      const atrExpanding = latestAtrPct > prevAtrPct
+      // 크로스 감지 (이전 캔들에서 교차 발생)
+      const goldenCross = prevFast <= prevSlow && latestFast > latestSlow
+      const deathCross = prevFast >= prevSlow && latestFast < latestSlow
 
-      if (!atrExpanding) continue
+      // ADX 필터: 트렌드가 충분히 강한지
+      if (latestAdx < adxThreshold) continue
 
       // 볼륨 필터: 현재 거래량 > SMA(20) x volumeMultiplier
       const volumeWindow = volumes.slice(-20)
@@ -98,48 +107,40 @@ class BtcDonchianBreakoutV2 implements Strategy {
       const latestVolume = volumes[volumes.length - 1]
       if (volumeSma20 > 0 && latestVolume <= volumeSma20 * volumeMultiplier) continue
 
-      // 시간 필터: UTC 00:00-04:00, 12:00-16:00
-      const latestCandle = symbolCandles[symbolCandles.length - 1]
-      const candleHour = latestCandle.openTime.getUTCHours()
-      const inSession = (candleHour >= 0 && candleHour < 4) || (candleHour >= 12 && candleHour < 16)
-      if (!inSession) continue
-
-      // 롱: 가격이 이전 돈치안 상단 돌파
-      const breakoutUp = prevClose <= prevDc.upper && latestClose > prevDc.upper
-      if (breakoutUp) {
+      // 롱 시그널: 골든크로스 + 가격 > 200 EMA
+      if (goldenCross && latestClose > latestTrend) {
         signals.push({
           symbol,
           direction: 'buy',
           positionSide: 'long',
           leverage,
           reasoning: {
-            type: 'donchian_breakout',
-            side: 'long',
+            type: 'ema_crossover',
+            cross: 'golden',
+            fast_ema: round(latestFast),
+            slow_ema: round(latestSlow),
+            trend_ema: round(latestTrend),
+            adx: round(latestAdx),
             close: round(latestClose),
-            dc_upper: round(prevDc.upper),
-            dc_lower: round(prevDc.lower),
-            atr_pct: round(latestAtrPct),
-            volume_ratio: volumeSma20 > 0 ? round(latestVolume / volumeSma20) : 0,
           },
         })
       }
 
-      // 숏: 가격이 이전 돈치안 하단 돌파
-      const breakoutDown = prevClose >= prevDc.lower && latestClose < prevDc.lower
-      if (breakoutDown) {
+      // 숏 시그널: 데드크로스 + 가격 < 200 EMA
+      if (deathCross && latestClose < latestTrend) {
         signals.push({
           symbol,
           direction: 'sell',
           positionSide: 'short',
           leverage,
           reasoning: {
-            type: 'donchian_breakout',
-            side: 'short',
+            type: 'ema_crossover',
+            cross: 'death',
+            fast_ema: round(latestFast),
+            slow_ema: round(latestSlow),
+            trend_ema: round(latestTrend),
+            adx: round(latestAdx),
             close: round(latestClose),
-            dc_upper: round(prevDc.upper),
-            dc_lower: round(prevDc.lower),
-            atr_pct: round(latestAtrPct),
-            volume_ratio: volumeSma20 > 0 ? round(latestVolume / volumeSma20) : 0,
           },
         })
       }
@@ -154,7 +155,7 @@ class BtcDonchianBreakoutV2 implements Strategy {
     openPositions: OpenPosition[],
   ): ExitSignal[] {
     const exits: ExitSignal[] = []
-    const { donchianPeriod, atrStopMult, atrTrailMult, timeLimitCandles } = this.config.params
+    const { fastEma, slowEma, atrStopMult, atrTrailMult, timeLimitCandles } = this.config.params
 
     for (const pos of openPositions) {
       const symbolCandles = candles.get(pos.symbol)
@@ -207,11 +208,13 @@ class BtcDonchianBreakoutV2 implements Strategy {
 
           if (pnlPct >= stopDistance * 2) {
             const trailDistance = (atrTrailMult * latestAtrPct) / 100
+            // peakPrice: 롱이면 진입 후 최고가, 숏이면 진입 후 최저가
             const peak = pos.peakPrice ?? currentPrice
             const trailStop = isLong
               ? peak * (1 - trailDistance)
               : peak * (1 + trailDistance)
 
+            // 트레일링 스탑 발동: peak 대비 가격이 trailDistance만큼 되돌림
             const trailHit = isLong
               ? currentPrice <= trailStop
               : currentPrice >= trailStop
@@ -233,26 +236,28 @@ class BtcDonchianBreakoutV2 implements Strategy {
         }
       }
 
-      // 3. 반대 돌파 청산
-      const dcValues = calcDonchianChannel(highs, lows, donchianPeriod)
-      if (dcValues.length >= 2) {
-        const prevDc = dcValues[dcValues.length - 2]
-        const prevClose = closes[closes.length - 2]
+      // 3. 반대 크로스 청산
+      const fastEmaValues = calcEMA(closes, fastEma)
+      const slowEmaValues = calcEMA(closes, slowEma)
 
-        // 롱 보유 중 하단 돌파 → 청산, 숏 보유 중 상단 돌파 → 청산
-        const reverseBreakout = isLong
-          ? (prevClose >= prevDc.lower && currentPrice < prevDc.lower)
-          : (prevClose <= prevDc.upper && currentPrice > prevDc.upper)
+      if (fastEmaValues.length >= 2 && slowEmaValues.length >= 2) {
+        const latestFast = fastEmaValues[fastEmaValues.length - 1]
+        const latestSlow = slowEmaValues[slowEmaValues.length - 1]
+        const prevFast = fastEmaValues[fastEmaValues.length - 2]
+        const prevSlow = slowEmaValues[slowEmaValues.length - 2]
 
-        if (reverseBreakout) {
+        const reverseCross = isLong
+          ? (prevFast >= prevSlow && latestFast < latestSlow)  // 롱 보유 중 데드크로스
+          : (prevFast <= prevSlow && latestFast > latestSlow)  // 숏 보유 중 골든크로스
+
+        if (reverseCross) {
           exits.push({
             symbol: pos.symbol,
             reason: 'take_profit',
             reasoning: {
-              type: 'reverse_breakout',
-              current_price: currentPrice,
-              dc_upper: round(prevDc.upper),
-              dc_lower: round(prevDc.lower),
+              type: 'reverse_cross',
+              fast_ema: round(latestFast),
+              slow_ema: round(latestSlow),
             },
           })
           continue
@@ -281,6 +286,6 @@ function round(value: number, decimals: number = 2): number {
 }
 
 // 레지스트리에 자동 등록
-registerStrategy(new BtcDonchianBreakoutV2())
+registerStrategy(new BtcEmaCrossoverV2())
 
-export { BtcDonchianBreakoutV2 }
+export { BtcEmaCrossoverV2 }

@@ -1,12 +1,12 @@
 import cron from 'node-cron'
 import { supabase } from '../services/database.js'
-import { runResearchLoop } from '../research/v2-research-loop.js'
-import { runOrchestratorCycle } from '../orchestrator/v2-orchestrator.js'
-import { runPaperTradingCycle } from '../paper/v2-paper-engine.js'
-import { reconcilePositions } from '../execution/v2-execution-engine.js'
-import { runRiskCheck } from '../risk/v2-risk-manager.js'
+import { runResearchLoop } from '../research/research-loop.js'
+import { runOrchestratorCycle } from '../orchestrator/orchestrator.js'
+import { runPaperTradingCycle } from '../paper/paper-engine.js'
+import { reconcilePositions } from '../execution/execution-engine.js'
+import { runRiskCheck } from '../risk/risk-manager.js'
 import { runFullScan, cleanOldCache } from '../routes/detection.js'
-import { collectLatestCandles } from '../data/v2-candle-collector.js'
+import { collectLatestCandles } from '../data/candle-collector.js'
 
 /**
  * 크론 작업 시작
@@ -56,7 +56,7 @@ export function startCronJobs(): void {
   // 6시간마다 Supabase 헬스체크 (7일 미사용 정지 방지)
   cron.schedule('0 */6 * * *', async () => {
     try {
-      const { error } = await supabase.from('v2_regime_snapshots').select('id').limit(1)
+      const { error } = await supabase.from('regime_snapshots').select('id').limit(1)
       if (error) console.warn('[헬스체크] Supabase 연결 문제:', error.message)
       else console.log('[헬스체크] Supabase OK')
     } catch (err) {

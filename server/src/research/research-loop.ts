@@ -6,9 +6,9 @@ import type {
   StrategyStatus,
 } from '../core/types.js'
 import { VALIDATION_THRESHOLDS } from '../core/types.js'
-import { getAllStrategies } from '../strategy/v2-registry.js'
-import { loadCandles } from '../data/v2-candle-collector.js'
-import { runBacktest } from './v2-backtest-engine.js'
+import { getAllStrategies } from '../strategy/registry.js'
+import { loadCandles } from '../data/candle-collector.js'
+import { runBacktest } from './backtest-engine.js'
 import { supabase } from '../services/database.js'
 
 // ─── 상수 ──────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ const BTC_KEYS: Record<string, string> = {
  * 자동 연구 파이프라인 — 크론 스케줄러에서 호출하는 진입점
  *
  * 등록된 전략 전체를 순회하며:
- *   1. 캔들 데이터 로드 (v2_candles)
+ *   1. 캔들 데이터 로드 (candles)
  *   2. 백테스트 실행
  *   3. research_run + metrics DB 저장
  *   4. 검증 기준 평가 → 통과 시 paper_candidate 승격
@@ -144,11 +144,11 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
 // ─── DB 연산 ───────────────────────────────────────────────────
 
 /**
- * v2_research_runs 레코드 생성
+ * research_runs 레코드 생성
  * @returns 생성된 run의 UUID, 실패 시 null
  */
 async function createResearchRun(strategy: Strategy): Promise<string | null> {
-  // v2_strategies 테이블에서 전략 UUID 조회
+  // strategies 테이블에서 전략 UUID 조회
   const strategyUuid = await getStrategyUuid(strategy.config.id)
   if (!strategyUuid) {
     console.error(`[연구루프] 전략 ${strategy.config.id}의 DB UUID를 찾을 수 없음`)
@@ -156,7 +156,7 @@ async function createResearchRun(strategy: Strategy): Promise<string | null> {
   }
 
   const { data, error } = await supabase
-    .from('v2_research_runs')
+    .from('research_runs')
     .insert({
       strategy_id: strategyUuid,
       market_scope: BTC_KEYS[strategy.config.exchange] ?? 'BTC-KRW',
@@ -183,7 +183,7 @@ async function updateResearchRunCompleted(
   result: BacktestResult
 ): Promise<void> {
   const { error } = await supabase
-    .from('v2_research_runs')
+    .from('research_runs')
     .update({
       status: 'completed',
       ended_at: new Date().toISOString(),
@@ -196,7 +196,7 @@ async function updateResearchRunCompleted(
 }
 
 /**
- * v2_research_run_metrics에 백테스트 결과 저장
+ * research_run_metrics에 백테스트 결과 저장
  */
 async function saveResearchRunMetrics(
   runId: string,
@@ -220,7 +220,7 @@ async function saveResearchRunMetrics(
     : 0
 
   const { error } = await supabase
-    .from('v2_research_run_metrics')
+    .from('research_run_metrics')
     .insert({
       research_run_id: runId,
       total_return: result.totalReturn,
@@ -276,7 +276,7 @@ async function evaluateAndPromote(
   // research_run의 promotion_status 업데이트
   const promotionStatus = allPass ? 'promoted_to_paper' : 'below_threshold'
   await supabase
-    .from('v2_research_runs')
+    .from('research_runs')
     .update({ promotion_status: promotionStatus })
     .eq('id', runId)
 
@@ -296,7 +296,7 @@ async function evaluateAndPromote(
 
   // 현재 상태 조회 (이미 paper 이상이면 재승격 불필요)
   const { data: currentStrategy } = await supabase
-    .from('v2_strategies')
+    .from('strategies')
     .select('status')
     .eq('id', strategyUuid)
     .single()
@@ -318,7 +318,7 @@ async function evaluateAndPromote(
 
   // 전략 상태 업데이트
   const { error: updateError } = await supabase
-    .from('v2_strategies')
+    .from('strategies')
     .update({
       status: 'paper_candidate',
       updated_at: new Date().toISOString(),
@@ -332,7 +332,7 @@ async function evaluateAndPromote(
 
   // 승격 이력 저장
   const { error: promoError } = await supabase
-    .from('v2_research_promotions')
+    .from('research_promotions')
     .insert({
       research_run_id: runId,
       from_status: currentStatus ?? 'research_only',
@@ -366,7 +366,7 @@ async function getStrategyUuid(strategyId: string): Promise<string | null> {
   if (cached) return cached
 
   const { data, error } = await supabase
-    .from('v2_strategies')
+    .from('strategies')
     .select('id')
     .eq('strategy_id', strategyId)
     .single()

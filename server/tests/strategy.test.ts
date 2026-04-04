@@ -13,13 +13,13 @@ vi.mock('../src/services/database.js', () => ({
 }))
 
 // 전략 파일을 import하면 registerStrategy()가 자동 호출됨
-import '../src/strategy/v2-btc-ema-crossover.js'
-import '../src/strategy/v2-btc-bollinger-reversion.js'
-import '../src/strategy/v2-btc-macd-momentum.js'
-import '../src/strategy/v2-btc-donchian-breakout.js'
-import '../src/strategy/v2-alt-mean-reversion.js'
-import '../src/strategy/v2-alt-detection.js'
-import { getStrategy, getAllStrategies } from '../src/strategy/v2-registry.js'
+import '../src/strategy/btc-ema-crossover.js'
+import '../src/strategy/btc-bollinger-reversion.js'
+import '../src/strategy/btc-macd-momentum.js'
+import '../src/strategy/btc-donchian-breakout.js'
+import '../src/strategy/alt-mean-reversion.js'
+import '../src/strategy/alt-detection.js'
+import { getStrategy, getAllStrategies } from '../src/strategy/registry.js'
 
 /** 테스트용 캔들 생성 */
 function generateCandles(count: number, basePrice: number, trend: number = 0, volatility: number = 1): Candle[] {

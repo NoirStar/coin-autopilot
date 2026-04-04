@@ -1,7 +1,7 @@
 import type { Candle, RegimeState } from '../core/types.js'
 import { calcEMA, calcRSI, calcATRPercent } from '../indicator/indicator-engine.js'
 import { supabase } from '../services/database.js'
-import { loadCandles } from './v2-candle-collector.js'
+import { loadCandles } from './candle-collector.js'
 
 // ─── 레짐 판정 임계값 ──────────────────────────────────────
 // PRD 정의 기준:
@@ -128,11 +128,11 @@ function classifyRegime(
 // ─── DB 저장 + 통합 함수 ────────────────────────────────────
 
 /**
- * BTC 4h 캔들을 로드하고 레짐을 판정하여 v2_regime_snapshots에 저장
+ * BTC 4h 캔들을 로드하고 레짐을 판정하여 regime_snapshots에 저장
  *
  * 크론 스케줄러에서 주기적으로 호출하는 메인 진입점
  * - 업비트 BTC-KRW 4h 캔들 기준으로 레짐 판정
- * - 판정 결과를 v2_regime_snapshots 테이블에 기록
+ * - 판정 결과를 regime_snapshots 테이블에 기록
  */
 export async function detectAndSaveRegime(): Promise<RegimeState> {
   // BTC-KRW 4h 캔들 로드 (EMA200 계산을 위해 충분한 양 확보)
@@ -149,9 +149,9 @@ export async function detectAndSaveRegime(): Promise<RegimeState> {
     return 'risk_off'
   }
 
-  // v2_regime_snapshots 테이블에 저장
+  // regime_snapshots 테이블에 저장
   const { error } = await supabase
-    .from('v2_regime_snapshots')
+    .from('regime_snapshots')
     .insert({
       regime: snapshot.regime,
       btc_price: snapshot.btcPrice,

@@ -175,10 +175,10 @@ async function fetchOkxCandles(
   return fetchOkxCandlesCCXT(symbol, tfMap[timeframe] ?? '4h', limit)
 }
 
-// ─── DB 저장/조회 (v2_candles 테이블) ───────────────────────
+// ─── DB 저장/조회 (candles 테이블) ───────────────────────
 
 /**
- * 캔들을 v2_candles 테이블에 저장 (upsert, 중복 무시)
+ * 캔들을 candles 테이블에 저장 (upsert, 중복 무시)
  */
 async function saveCandlesToDb(
   exchange: Exchange,
@@ -201,7 +201,7 @@ async function saveCandlesToDb(
   }))
 
   const { error, count } = await supabase
-    .from('v2_candles')
+    .from('candles')
     .upsert(rows, {
       onConflict: 'asset_key,exchange,timeframe,open_time',
       ignoreDuplicates: true,
@@ -315,7 +315,7 @@ export async function collectLatestCandles(
 }
 
 /**
- * v2_candles 테이블에서 캔들 조회
+ * candles 테이블에서 캔들 조회
  * @param exchange 거래소
  * @param assetKey 내부 심볼 키 (예: "BTC-KRW")
  * @param timeframe 타임프레임
@@ -328,7 +328,7 @@ export async function loadCandles(
   limit: number = 500
 ): Promise<Candle[]> {
   const { data, error } = await supabase
-    .from('v2_candles')
+    .from('candles')
     .select('*')
     .eq('asset_key', assetKey)
     .eq('exchange', exchange)

@@ -29,8 +29,8 @@
  */
 
 import { supabase } from '../services/database.js'
-import { detectAndSaveRegime } from '../data/v2-regime-detector.js'
-import { createSession, stopSession } from '../paper/v2-paper-engine.js'
+import { detectAndSaveRegime } from '../data/regime-detector.js'
+import { createSession, stopSession } from '../paper/paper-engine.js'
 import type {
   RegimeState,
   DecisionType,
@@ -63,8 +63,8 @@ const SHORT_RISK_RATIO = VALIDATION_THRESHOLDS.orchestrator.shortRiskRatio
 
 /** 후보 전략 랭킹 결과 */
 interface CandidateRanking {
-  strategyDbId: string    // v2_strategies.id (uuid)
-  strategyId: string      // v2_strategies.strategy_id (텍스트 키)
+  strategyDbId: string    // strategies.id (uuid)
+  strategyId: string      // strategies.strategy_id (텍스트 키)
   direction: string       // "long", "short", "both"
   score: number
   sharpe: number
@@ -150,7 +150,7 @@ export async function runOrchestratorCycle(): Promise<void> {
 /**
  * 후보 전략 랭킹
  *
- * v2_research_run_metrics에서 최근 완료된 연구 결과를 조회하고
+ * research_run_metrics에서 최근 완료된 연구 결과를 조회하고
  * 레짐에 맞는 방향의 전략만 필터링한 뒤 가중 점수를 계산한다.
  *
  * 점수 = sharpe * 0.4 + winRate * 0.3 + (1 - mdd) * 0.3
@@ -160,13 +160,13 @@ export async function rankCandidates(regime: RegimeState): Promise<CandidateRank
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: runs, error: runsErr } = await supabase
-    .from('v2_research_runs')
+    .from('research_runs')
     .select(`
       id,
       strategy_id,
       status,
-      v2_strategies!inner(id, strategy_id, direction, status),
-      v2_research_run_metrics(sharpe, max_drawdown, win_rate, trade_count)
+      strategies!inner(id, strategy_id, direction, status),
+      research_run_metrics(sharpe, max_drawdown, win_rate, trade_count)
     `)
     .eq('status', 'completed')
     .gte('created_at', thirtyDaysAgo)
@@ -188,13 +188,13 @@ export async function rankCandidates(regime: RegimeState): Promise<CandidateRank
   }>()
 
   for (const run of runs) {
-    const strategy = run.v2_strategies as unknown as {
+    const strategy = run.strategies as unknown as {
       id: string
       strategy_id: string
       direction: string
       status: string
     }
-    const metrics = run.v2_research_run_metrics as unknown as Array<{
+    const metrics = run.research_run_metrics as unknown as Array<{
       sharpe: number | null
       max_drawdown: number | null
       win_rate: number | null
@@ -269,7 +269,7 @@ export async function rankCandidates(regime: RegimeState): Promise<CandidateRank
     }))
 
     const { error: insertErr } = await supabase
-      .from('v2_orchestrator_candidate_rankings')
+      .from('orchestrator_candidate_rankings')
       .insert(rows)
 
     if (insertErr) {
@@ -352,7 +352,7 @@ export function allocateCapital(
 export async function executeDecision(decisionId: string): Promise<boolean> {
   // 판단 조회
   const { data: decision, error: fetchErr } = await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .select('*')
     .eq('id', decisionId)
     .single()
@@ -424,7 +424,7 @@ export async function checkGoFlat(rankings: CandidateRanking[]): Promise<boolean
 
   // 현재 레짐 조회 (최신 스냅샷)
   const { data: latestRegime } = await supabase
-    .from('v2_regime_snapshots')
+    .from('regime_snapshots')
     .select('regime')
     .order('recorded_at', { ascending: false })
     .limit(1)
@@ -434,7 +434,7 @@ export async function checkGoFlat(rankings: CandidateRanking[]): Promise<boolean
 
   // go_flat 판단 생성
   const { data: decision, error: decErr } = await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .insert({
       decision_type: 'go_flat' satisfies DecisionType,
       status: 'pending' satisfies DecisionStatus,
@@ -464,7 +464,7 @@ export async function checkGoFlat(rankings: CandidateRanking[]): Promise<boolean
  */
 export async function getSlotStatus(): Promise<SlotStatus[]> {
   const { data: slots, error } = await supabase
-    .from('v2_orchestrator_slots')
+    .from('orchestrator_slots')
     .select(`
       id,
       asset_key,
@@ -490,7 +490,7 @@ export async function getSlotStatus(): Promise<SlotStatus[]> {
   let strategyNameMap = new Map<string, string>()
   if (strategyDbIds.length > 0) {
     const { data: strategies } = await supabase
-      .from('v2_strategies')
+      .from('strategies')
       .select('id, strategy_id')
       .in('id', strategyDbIds)
 
@@ -509,6 +509,115 @@ export async function getSlotStatus(): Promise<SlotStatus[]> {
     status: s.status,
     cooldownUntil: s.cooldown_until,
   }))
+}
+
+// ─── EDGE 스코어 계산 (대시보드용) ────────────────────────────
+
+/**
+ * EDGE 스코어: "현재 시장이 내 전략에 얼마나 유리한가" (0-100)
+ *
+ * 계산식:
+ *   EDGE = weighted_avg( 전략적합도 * 시장적합도 )
+ *
+ *   전략 적합도 = 최근 연구 메트릭 기반 (승률, sharpe, MDD)
+ *   시장 적합도 = 현재 레짐과 전략 최적 레짐 일치도
+ *
+ * 활성 슬롯이 없으면 null 반환.
+ */
+export async function calculateEdgeScore(): Promise<number | null> {
+  // 활성 슬롯 조회
+  const { data: activeSlots } = await supabase
+    .from('orchestrator_slots')
+    .select('strategy_id, allocation_pct, regime')
+    .eq('status', 'active')
+
+  if (!activeSlots || activeSlots.length === 0) return null
+
+  // 현재 레짐 조회
+  const { data: currentRegime } = await supabase
+    .from('regime_snapshots')
+    .select('regime')
+    .order('recorded_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  const regime = currentRegime?.regime ?? 'neutral'
+
+  // 각 슬롯의 전략 메트릭 조회
+  const strategyIds = activeSlots
+    .map((s) => s.strategy_id)
+    .filter((id): id is string => id !== null)
+
+  if (strategyIds.length === 0) return null
+
+  // 전략별 최신 연구 메트릭
+  const { data: runs } = await supabase
+    .from('research_runs')
+    .select('strategy_id, research_run_metrics(sharpe, max_drawdown, win_rate)')
+    .in('strategy_id', strategyIds)
+    .eq('status', 'completed')
+    .order('ended_at', { ascending: false })
+
+  // 전략별 최신 메트릭만 추출
+  const metricsMap = new Map<string, { sharpe: number; mdd: number; winRate: number }>()
+  for (const run of runs ?? []) {
+    if (metricsMap.has(run.strategy_id)) continue
+    const m = Array.isArray(run.research_run_metrics)
+      ? run.research_run_metrics[0]
+      : run.research_run_metrics
+    if (m) {
+      metricsMap.set(run.strategy_id, {
+        sharpe: Number(m.sharpe ?? 0),
+        mdd: Math.abs(Number(m.max_drawdown ?? 0)),
+        winRate: Number(m.win_rate ?? 0),
+      })
+    }
+  }
+
+  // 전략 방향 조회
+  const { data: strategies } = await supabase
+    .from('strategies')
+    .select('id, direction')
+    .in('id', strategyIds)
+
+  const directionMap = new Map<string, string>()
+  for (const s of strategies ?? []) {
+    directionMap.set(s.id, s.direction)
+  }
+
+  // 슬롯별 점수 계산
+  let totalWeight = 0
+  let weightedScore = 0
+
+  for (const slot of activeSlots) {
+    if (!slot.strategy_id) continue
+    const metrics = metricsMap.get(slot.strategy_id)
+    if (!metrics) continue
+
+    // 전략 적합도 (0-100): sharpe, 승률, MDD 기반
+    const sharpeScore = Math.min(metrics.sharpe / 2, 1) * 100   // sharpe 2.0 = 100점
+    const winRateScore = metrics.winRate                          // 승률 그대로
+    const mddScore = Math.max(0, 100 - metrics.mdd * 10)         // MDD -10% = 0점
+    const strategyFitness = sharpeScore * 0.4 + winRateScore * 0.3 + mddScore * 0.3
+
+    // 시장 적합도 (0-100): 레짐과 전략 방향 일치도
+    const direction = directionMap.get(slot.strategy_id) ?? 'both'
+    let marketFitness = 50 // 기본값
+    if (regime === 'risk_on' && (direction === 'long' || direction === 'both')) marketFitness = 90
+    else if (regime === 'risk_on' && direction === 'short') marketFitness = 20
+    else if (regime === 'risk_off' && (direction === 'short' || direction === 'both')) marketFitness = 80
+    else if (regime === 'risk_off' && direction === 'long') marketFitness = 30
+    else if (regime === 'neutral') marketFitness = 50
+
+    const slotScore = (strategyFitness * marketFitness) / 100
+    const weight = Number(slot.allocation_pct) || 1
+    weightedScore += slotScore * weight
+    totalWeight += weight
+  }
+
+  if (totalWeight === 0) return null
+
+  return Math.round(weightedScore / totalWeight)
 }
 
 // ─── 내부 헬퍼 ───────────────────────────────────────────────
@@ -553,7 +662,7 @@ async function loadActiveSlots(): Promise<Array<{
   cooldown_until: string | null
 }>> {
   const { data, error } = await supabase
-    .from('v2_orchestrator_slots')
+    .from('orchestrator_slots')
     .select('*')
     .in('status', ['active', 'cooldown'])
 
@@ -673,7 +782,7 @@ async function initialAssignment(
   for (const alloc of allocations) {
     // 슬롯 생성
     const { data: slot, error: slotErr } = await supabase
-      .from('v2_orchestrator_slots')
+      .from('orchestrator_slots')
       .insert({
         asset_key: 'BTC-USDT',  // 초기에는 BTC 단일 자산
         slot_type: 'primary',
@@ -718,7 +827,7 @@ async function handleStrategyAssign(decision: Record<string, unknown>): Promise<
 
   // 슬롯 업데이트
   await supabase
-    .from('v2_orchestrator_slots')
+    .from('orchestrator_slots')
     .update({
       strategy_id: toStrategyId,
       status: 'active',
@@ -737,7 +846,7 @@ async function handleStrategySwitch(decision: Record<string, unknown>): Promise<
 
   // 기존 전략의 활성 페이퍼 세션 종료
   const { data: activeSessions } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .select('id')
     .eq('strategy_id', fromStrategyId)
     .eq('status', 'running')
@@ -758,7 +867,7 @@ async function handleStrategySwitch(decision: Record<string, unknown>): Promise<
 
   // 슬롯 업데이트 (쿨다운 설정)
   await supabase
-    .from('v2_orchestrator_slots')
+    .from('orchestrator_slots')
     .update({
       strategy_id: toStrategyId,
       status: 'cooldown',
@@ -780,7 +889,7 @@ async function handleStrategyRetire(decision: Record<string, unknown>): Promise<
 
   // 활성 세션 종료
   const { data: activeSessions } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .select('id')
     .eq('strategy_id', fromStrategyId)
     .eq('status', 'running')
@@ -791,7 +900,7 @@ async function handleStrategyRetire(decision: Record<string, unknown>): Promise<
 
   // 슬롯 비움
   await supabase
-    .from('v2_orchestrator_slots')
+    .from('orchestrator_slots')
     .update({
       strategy_id: null,
       allocation_pct: 0,
@@ -807,7 +916,7 @@ async function handleStrategyRetire(decision: Record<string, unknown>): Promise<
 async function handleGoFlat(_decision: Record<string, unknown>): Promise<void> {
   // 모든 running 세션 종료
   const { data: runningSessions } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .select('id')
     .eq('status', 'running')
 
@@ -819,7 +928,7 @@ async function handleGoFlat(_decision: Record<string, unknown>): Promise<void> {
 
   // 모든 슬롯을 flat 상태로
   await supabase
-    .from('v2_orchestrator_slots')
+    .from('orchestrator_slots')
     .update({
       strategy_id: null,
       allocation_pct: 0,
@@ -838,7 +947,7 @@ async function handleRebalance(decision: Record<string, unknown>): Promise<void>
 
   // 현재 활성 슬롯 조회
   const { data: activeSlots } = await supabase
-    .from('v2_orchestrator_slots')
+    .from('orchestrator_slots')
     .select('id, strategy_id')
     .eq('status', 'active')
 
@@ -853,7 +962,7 @@ async function handleRebalance(decision: Record<string, unknown>): Promise<void>
 
     // strategy_id(uuid)에서 전략 텍스트 키 조회
     const { data: strategy } = await supabase
-      .from('v2_strategies')
+      .from('strategies')
       .select('strategy_id')
       .eq('id', slot.strategy_id)
       .single()
@@ -863,7 +972,7 @@ async function handleRebalance(decision: Record<string, unknown>): Promise<void>
     const newPct = totalScore > 0 ? (score / totalScore) * 100 : 0
 
     await supabase
-      .from('v2_orchestrator_slots')
+      .from('orchestrator_slots')
       .update({
         allocation_pct: Math.round(newPct * 100) / 100,
         updated_at: new Date().toISOString(),
@@ -887,7 +996,7 @@ async function updateDecisionStatus(
   }
 
   const { error } = await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .update(update)
     .eq('id', decisionId)
 
@@ -907,7 +1016,7 @@ async function createAndExecuteDecision(params: {
   scoreSnapshot: Record<string, number>
 }): Promise<void> {
   const { data: decision, error: decErr } = await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .insert({
       slot_id: params.slotId,
       decision_type: params.decisionType,

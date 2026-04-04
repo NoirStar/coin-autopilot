@@ -16,7 +16,7 @@
 
 import { supabase } from '../services/database.js'
 import { fetchBalance, fetchOpenPositions } from '../exchange/okx-client.js'
-import { closeAllPositions } from '../execution/v2-execution-engine.js'
+import { closeAllPositions } from '../execution/execution-engine.js'
 import type { RegimeState, DecisionType, DecisionStatus } from '../core/types.js'
 
 // ─── 상수 ─────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ export async function runRiskCheck(): Promise<void> {
  * 일일 실현+미실현 손실 한도 확인
  *
  * 오늘(UTC) 기준:
- *   1. 실현 손실 = 오늘 청산된 v2_live_positions의 realized_pnl 합
+ *   1. 실현 손실 = 오늘 청산된 live_positions의 realized_pnl 합
  *   2. 미실현 손실 = 현재 오픈 포지션의 unrealized_pnl 합
  *   3. 총 일일 손실 = 실현 + 미실현
  *
@@ -124,7 +124,7 @@ export async function checkDailyLossLimit(maxLossPct: number): Promise<boolean> 
 
   // 1. 오늘 실현 손실 합산 (청산된 포지션)
   const { data: closedPositions, error: closedErr } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('realized_pnl')
     .eq('status', 'closed')
     .gte('exit_time', todayStart.toISOString())
@@ -141,7 +141,7 @@ export async function checkDailyLossLimit(maxLossPct: number): Promise<boolean> 
 
   // 2. 현재 오픈 포지션의 미실현 손실 합산
   const { data: openPositions, error: openErr } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('unrealized_pnl')
     .eq('status', 'open')
 
@@ -200,7 +200,7 @@ export async function checkDailyLossLimit(maxLossPct: number): Promise<boolean> 
  * 서킷 브레이커 — 총 드로다운 한도 확인
  *
  * 전체 계좌 기준:
- *   1. 피크 에퀴티 조회 (v2_equity_snapshots에서 live 소스 최대값)
+ *   1. 피크 에퀴티 조회 (equity_snapshots에서 live 소스 최대값)
  *   2. 현재 에퀴티 = 잔고 + 미실현 PnL
  *   3. 드로다운 = (피크 - 현재) / 피크
  *
@@ -222,7 +222,7 @@ export async function checkCircuitBreaker(maxDrawdownPct: number): Promise<boole
 
   // 미실현 손익 합산
   const { data: openPositions } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('unrealized_pnl')
     .eq('status', 'open')
 
@@ -234,7 +234,7 @@ export async function checkCircuitBreaker(maxDrawdownPct: number): Promise<boole
 
   // 피크 에퀴티 조회 (live 소스 에퀴티 스냅샷 최대값)
   const { data: peakSnapshot } = await supabase
-    .from('v2_equity_snapshots')
+    .from('equity_snapshots')
     .select('total_equity')
     .eq('source', 'live')
     .order('total_equity', { ascending: false })
@@ -314,7 +314,7 @@ export async function getCircuitBreakerStatus(): Promise<{
 
   // 미실현 손익 합산
   const { data: openPositions } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('unrealized_pnl')
     .eq('status', 'open')
 
@@ -326,7 +326,7 @@ export async function getCircuitBreakerStatus(): Promise<{
 
   // 피크 에퀴티
   const { data: peakSnapshot } = await supabase
-    .from('v2_equity_snapshots')
+    .from('equity_snapshots')
     .select('total_equity')
     .eq('source', 'live')
     .order('total_equity', { ascending: false })
@@ -353,7 +353,7 @@ export async function getCircuitBreakerStatus(): Promise<{
 async function triggerGoFlat(reason: string): Promise<void> {
   // 현재 레짐 조회
   const { data: latestRegime } = await supabase
-    .from('v2_regime_snapshots')
+    .from('regime_snapshots')
     .select('regime')
     .order('recorded_at', { ascending: false })
     .limit(1)
@@ -363,7 +363,7 @@ async function triggerGoFlat(reason: string): Promise<void> {
 
   // go_flat 판단 생성
   const { data: decision, error: decErr } = await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .insert({
       decision_type: 'go_flat' satisfies DecisionType,
       status: 'pending' satisfies DecisionStatus,
@@ -386,7 +386,7 @@ async function triggerGoFlat(reason: string): Promise<void> {
 
   // 판단 상태 완료 처리
   await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .update({
       status: 'executed' satisfies DecisionStatus,
       executed_at: new Date().toISOString(),
@@ -394,14 +394,14 @@ async function triggerGoFlat(reason: string): Promise<void> {
     .eq('id', decision.id)
 }
 
-/** v2_risk_events에 리스크 이벤트 기록 */
+/** risk_events에 리스크 이벤트 기록 */
 async function createRiskEvent(
   eventType: string,
   severity: 'info' | 'warning' | 'critical',
   details: Record<string, unknown>,
 ): Promise<void> {
   const { error } = await supabase
-    .from('v2_risk_events')
+    .from('risk_events')
     .insert({
       event_type: eventType,
       severity,
@@ -413,7 +413,7 @@ async function createRiskEvent(
   }
 }
 
-/** v2_notifications에 알림 기록 */
+/** notifications에 알림 기록 */
 async function createNotification(
   eventType: string,
   priority: 'info' | 'warning' | 'critical',
@@ -421,7 +421,7 @@ async function createNotification(
   detail: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('v2_notifications')
+    .from('notifications')
     .insert({
       event_type: eventType,
       priority,

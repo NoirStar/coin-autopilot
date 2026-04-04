@@ -6,17 +6,17 @@ import { logger } from 'hono/logger'
 import { portfolioRoutes } from './routes/portfolio.js'
 import { settingsRoutes } from './routes/settings.js'
 import { detectionRoutes } from './routes/detection.js'
-import v2ApiRoutes from './routes/v2-api.js'
+import apiRoutes from './routes/api.js'
 import { startCronJobs } from './core/cron.js'
 import { authMiddleware } from './core/auth.js'
-import { syncRegistryWithDb } from './strategy/v2-registry.js'
+import { syncRegistryWithDb } from './strategy/registry.js'
 // 전략 파일 import — 모듈 로드 시 registerStrategy() 자동 호출
-import './strategy/v2-btc-ema-crossover.js'
-import './strategy/v2-btc-bollinger-reversion.js'
-import './strategy/v2-btc-macd-momentum.js'
-import './strategy/v2-btc-donchian-breakout.js'
-import './strategy/v2-alt-mean-reversion.js'
-import './strategy/v2-alt-detection.js'
+import './strategy/btc-ema-crossover.js'
+import './strategy/btc-bollinger-reversion.js'
+import './strategy/btc-macd-momentum.js'
+import './strategy/btc-donchian-breakout.js'
+import './strategy/alt-mean-reversion.js'
+import './strategy/alt-detection.js'
 
 const app = new Hono()
 
@@ -37,13 +37,14 @@ app.get('/health', (c) => c.json({ status: 'ok', uptime: process.uptime() }))
 // 공개 API
 app.route('/api/detection', detectionRoutes)
 
-// 인증 필요 API
+// 인증 필요 API (포트폴리오, 설정 등 쓰기 작업)
 app.use('/api/portfolio/*', authMiddleware)
 app.use('/api/settings/*', authMiddleware)
-app.use('/api/v2/*', authMiddleware)
 app.route('/api/portfolio', portfolioRoutes)
 app.route('/api/settings', settingsRoutes)
-app.route('/api/v2', v2ApiRoutes)
+
+// 트레이딩 대시보드 API — 1인 사용 단계에서는 무인증 (HANDOFF.md §1)
+app.route('/api/dash', apiRoutes)
 
 // 서버 시작
 const port = parseInt(process.env.PORT || '3001', 10)

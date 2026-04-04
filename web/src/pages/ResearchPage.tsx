@@ -54,13 +54,43 @@ const formatDate = (iso: string | null): string => {
 export const ResearchPage = () => {
   const { data: runs, isLoading: runsLoading } = useQuery<ResearchRun[]>({
     queryKey: ['research-runs'],
-    queryFn: () => api.request('/api/v2/research/runs'),
+    queryFn: async () => {
+      const res = await api.request<{ data: Array<Record<string, unknown>> }>('/api/dash/research/runs')
+      return (res.data ?? []).map((r): ResearchRun => ({
+        id: String(r.id),
+        strategy_name: String(r.strategyName ?? r.strategy_id ?? ''),
+        asset: String(r.market_scope ?? ''),
+        status: r.status as ResearchRun['status'],
+        params: (r.parameter_set as Record<string, unknown>) ?? {},
+        total_return: (r.metrics as Record<string, unknown>)?.total_return as number | null ?? null,
+        sharpe_ratio: (r.metrics as Record<string, unknown>)?.sharpe as number | null ?? null,
+        max_drawdown: (r.metrics as Record<string, unknown>)?.max_drawdown as number | null ?? null,
+        win_rate: (r.metrics as Record<string, unknown>)?.win_rate as number | null ?? null,
+        total_trades: (r.metrics as Record<string, unknown>)?.trade_count as number | null ?? null,
+        started_at: String(r.started_at ?? ''),
+        completed_at: r.ended_at ? String(r.ended_at) : null,
+      }))
+    },
     refetchInterval: 30000,
   })
 
   const { data: candidates, isLoading: candidatesLoading } = useQuery<ResearchCandidate[]>({
     queryKey: ['research-candidates'],
-    queryFn: () => api.request('/api/v2/research/candidates'),
+    queryFn: async () => {
+      const res = await api.request<{ data: Array<Record<string, unknown>>; rankedAt: string | null }>('/api/dash/research/candidates')
+      return (res.data ?? []).map((c): ResearchCandidate => ({
+        id: String(c.strategy_id ?? ''),
+        strategy_name: String(c.strategyName ?? c.strategy_id ?? ''),
+        asset: '',
+        total_return: 0,
+        sharpe_ratio: Number(c.sharpe ?? 0),
+        max_drawdown: Number(c.mdd ?? 0),
+        win_rate: Number(c.win_rate ?? 0),
+        total_trades: 0,
+        promotion_status: 'none',
+        completed_at: String(c.ranked_at ?? ''),
+      }))
+    },
     refetchInterval: 60000,
   })
 

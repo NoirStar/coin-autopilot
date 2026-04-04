@@ -1,6 +1,6 @@
 import { computeDetectionScore } from '../detector/composite-scorer.js'
 import { calcATRPercent } from '../indicator/indicator-engine.js'
-import { registerStrategy } from './v2-registry.js'
+import { registerStrategy } from './registry.js'
 import type {
   Strategy,
   StrategyConfig,

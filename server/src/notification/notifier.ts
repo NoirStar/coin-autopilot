@@ -63,7 +63,7 @@ interface NotifyParams {
 /**
  * 알림 저장 및 채널 디스패치
  *
- * 1. v2_notifications 테이블에 기록
+ * 1. notifications 테이블에 기록
  * 2. 지정된 채널로 메시지 전송 (논블로킹)
  */
 export async function notify(params: NotifyParams): Promise<void> {
@@ -78,7 +78,7 @@ export async function notify(params: NotifyParams): Promise<void> {
 
   // DB 저장
   try {
-    const { error } = await supabase.from('v2_notifications').insert({
+    const { error } = await supabase.from('notifications').insert({
       event_type: eventType,
       priority,
       channel,
@@ -239,7 +239,7 @@ export async function notifyOrchestratorDecision(
  * 포함 내용:
  * - 현재 레짐 상태
  * - 활성 전략 및 배분 비율
- * - 오늘 PnL (v2_equity_snapshots)
+ * - 오늘 PnL (equity_snapshots)
  * - 주요 이벤트 (전략 교체, 리스크 알림)
  *
  * 텔레그램 + 디스코드 동시 전송
@@ -250,7 +250,7 @@ export async function sendDailyReport(): Promise<void> {
   try {
     // 1. 현재 레짐 조회 (가장 최근 스냅샷)
     const { data: regimeRow } = await supabase
-      .from('v2_regime_snapshots')
+      .from('regime_snapshots')
       .select('regime, btc_price, ema200, rsi14, atr_pct')
       .order('recorded_at', { ascending: false })
       .limit(1)
@@ -265,26 +265,26 @@ export async function sendDailyReport(): Promise<void> {
 
     // 2. 활성 슬롯 및 전략 조회
     const { data: slots } = await supabase
-      .from('v2_orchestrator_slots')
+      .from('orchestrator_slots')
       .select(`
         asset_key,
         allocation_pct,
         status,
-        v2_strategies(strategy_id, name)
+        strategies(strategy_id, name)
       `)
       .eq('status', 'active')
 
     const strategyLines = (slots ?? []).map((s) => {
-      const strategyData = s.v2_strategies as unknown as { strategy_id: string; name: string } | { strategy_id: string; name: string }[] | null
+      const strategyData = s.strategies as unknown as { strategy_id: string; name: string } | { strategy_id: string; name: string }[] | null
       const strategy = Array.isArray(strategyData) ? strategyData[0] : strategyData
       const name = strategy?.name ?? strategy?.strategy_id ?? '미배정'
       return `  ${s.asset_key} — ${name} (${s.allocation_pct}%)`
     })
 
-    // 3. 오늘 PnL 계산 (v2_equity_snapshots에서 오늘 첫/마지막 비교)
+    // 3. 오늘 PnL 계산 (equity_snapshots에서 오늘 첫/마지막 비교)
     const todayStart = getTodayStartKST()
     const { data: equityRows } = await supabase
-      .from('v2_equity_snapshots')
+      .from('equity_snapshots')
       .select('total_equity, unrealized_pnl, realized_pnl, recorded_at')
       .eq('source', 'live')
       .gte('recorded_at', todayStart)
@@ -309,7 +309,7 @@ export async function sendDailyReport(): Promise<void> {
 
     // 4. 오늘 주요 이벤트 (판단 + 리스크)
     const { data: decisions } = await supabase
-      .from('v2_orchestrator_decisions')
+      .from('orchestrator_decisions')
       .select('decision_type, reason_summary, created_at')
       .gte('created_at', todayStart)
       .order('created_at', { ascending: false })
@@ -322,7 +322,7 @@ export async function sendDailyReport(): Promise<void> {
     })
 
     const { data: riskEvents } = await supabase
-      .from('v2_risk_events')
+      .from('risk_events')
       .select('event_type, severity, details, created_at')
       .gte('created_at', todayStart)
       .order('created_at', { ascending: false })

@@ -105,7 +105,7 @@ function sleep(ms: number): Promise<void> {
  * 흐름:
  *   1. 판단 조회 및 상태 검증
  *   2. 판단 유형에 따라 주문 생성
- *   3. v2_live_orders, v2_live_fills, v2_live_positions 기록
+ *   3. live_orders, live_fills, live_positions 기록
  *   4. 판단 상태 업데이트 (EXECUTING → EXECUTED/FAILED)
  */
 export async function executeLiveDecision(decisionId: string): Promise<boolean> {
@@ -115,7 +115,7 @@ export async function executeLiveDecision(decisionId: string): Promise<boolean> 
 
   // 판단 조회
   const { data: decision, error: fetchErr } = await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .select('*')
     .eq('id', decisionId)
     .single()
@@ -175,7 +175,7 @@ export async function executeLiveDecision(decisionId: string): Promise<boolean> 
 /**
  * 포지션 조정 — 거래소가 진실의 원천
  *
- * OKX 실제 포지션과 v2_live_positions를 비교하여
+ * OKX 실제 포지션과 live_positions를 비교하여
  * 불일치가 있으면 DB를 거래소 기준으로 수정한다.
  * 불일치 발생 시 position_divergence 리스크 이벤트를 기록한다.
  */
@@ -195,7 +195,7 @@ export async function reconcilePositions(): Promise<void> {
 
   // 2. DB 오픈 포지션 조회
   const { data: dbPositions, error: dbErr } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('*')
     .eq('status', 'open')
 
@@ -223,7 +223,7 @@ export async function reconcilePositions(): Promise<void> {
       console.warn(`[V2실전] 불일치 감지: ${dbPos.asset_key} DB에 open이지만 거래소에 없음`)
 
       await supabase
-        .from('v2_live_positions')
+        .from('live_positions')
         .update({
           status: 'closed',
           exit_time: new Date().toISOString(),
@@ -253,7 +253,7 @@ export async function reconcilePositions(): Promise<void> {
 
       // 거래소 기준으로 DB 업데이트
       await supabase
-        .from('v2_live_positions')
+        .from('live_positions')
         .update({
           current_qty: exQty,
           unrealized_pnl: exchangePos.unrealizedPnl,
@@ -277,7 +277,7 @@ export async function reconcilePositions(): Promise<void> {
         : Math.max(dbPeak, exchangePos.markPrice)
 
       await supabase
-        .from('v2_live_positions')
+        .from('live_positions')
         .update({
           unrealized_pnl: exchangePos.unrealizedPnl,
           peak_price: newPeak,
@@ -293,7 +293,7 @@ export async function reconcilePositions(): Promise<void> {
   for (const [assetKey, pos] of exchangeMap) {
     console.warn(`[V2실전] 불일치 감지: ${assetKey} 거래소에 있으나 DB에 없음`)
 
-    await supabase.from('v2_live_positions').insert({
+    await supabase.from('live_positions').insert({
       asset_key: assetKey,
       exchange: 'okx',
       side: pos.side,
@@ -324,7 +324,7 @@ export async function reconcilePositions(): Promise<void> {
 /**
  * 특정 포지션 청산
  *
- * v2_live_positions.id를 받아서:
+ * live_positions.id를 받아서:
  *   1. DB에서 포지션 정보 조회
  *   2. OKX에 시장가 청산 주문
  *   3. DB 상태 업데이트
@@ -340,7 +340,7 @@ export async function closePosition(
 
   // DB에서 포지션 조회
   const { data: position, error: posErr } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('*')
     .eq('id', positionId)
     .eq('status', 'open')
@@ -369,7 +369,7 @@ export async function closePosition(
 
     const exitPrice = result.price ?? await fetchOkxPrice(symbol)
 
-    // v2_live_orders에 주문 기록
+    // live_orders에 주문 기록
     const orderId = await saveLiveOrder({
       decisionId: null,
       assetKey,
@@ -383,12 +383,12 @@ export async function closePosition(
       status: 'filled',
     })
 
-    // v2_live_fills에 체결 기록
+    // live_fills에 체결 기록
     if (orderId) {
       await saveLiveFill(orderId, closeQty, exitPrice, result.fee ?? 0, result.id)
     }
 
-    // v2_live_positions 상태 업데이트
+    // live_positions 상태 업데이트
     const entryPrice = Number(position.entry_price)
     const pnlMultiplier = side === 'long' ? 1 : -1
     const realizedPnl = (exitPrice - entryPrice) * closeQty * pnlMultiplier
@@ -396,7 +396,7 @@ export async function closePosition(
     if (partialRatio >= 1.0) {
       // 전량 청산
       await supabase
-        .from('v2_live_positions')
+        .from('live_positions')
         .update({
           status: 'closed',
           exit_time: new Date().toISOString(),
@@ -409,7 +409,7 @@ export async function closePosition(
     } else {
       // 부분 청산: 수량 감소, realized_pnl 누적
       await supabase
-        .from('v2_live_positions')
+        .from('live_positions')
         .update({
           current_qty: totalQty - closeQty,
           realized_pnl: Number(position.realized_pnl ?? 0) + realizedPnl,
@@ -431,7 +431,7 @@ export async function closePosition(
  * 모든 오픈 포지션 긴급 청산
  *
  * go_flat 또는 circuit_breaker 시 호출.
- * 모든 v2_live_positions(status='open')를 순회하며 청산한다.
+ * 모든 live_positions(status='open')를 순회하며 청산한다.
  */
 export async function closeAllPositions(reason: string): Promise<void> {
   if (!guardLiveTrading('closeAllPositions')) return
@@ -439,7 +439,7 @@ export async function closeAllPositions(reason: string): Promise<void> {
   console.log(`[V2실전] 전체 포지션 청산 시작 (사유: ${reason})`)
 
   const { data: openPositions, error } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('id, asset_key')
     .eq('status', 'open')
 
@@ -501,7 +501,7 @@ export async function checkPaperToLivePromotion(strategyDbId: string): Promise<{
 }> {
   // 페이퍼 세션 조회 (해당 전략의 가장 최근 완료 세션)
   const { data: session, error: sessErr } = await supabase
-    .from('v2_paper_sessions')
+    .from('paper_sessions')
     .select('*')
     .eq('strategy_id', strategyDbId)
     .in('status', ['running', 'completed'])
@@ -531,7 +531,7 @@ export async function checkPaperToLivePromotion(strategyDbId: string): Promise<{
 
   // 페이퍼 성과 — 에퀴티 스냅샷 기반 Sharpe 추정
   const { data: snapshots } = await supabase
-    .from('v2_equity_snapshots')
+    .from('equity_snapshots')
     .select('total_equity, recorded_at')
     .eq('source', `paper:${session.id}`)
     .order('recorded_at', { ascending: true })
@@ -571,11 +571,11 @@ export async function checkPaperToLivePromotion(strategyDbId: string): Promise<{
 
   // 백테스트 대비 괴리율 계산
   const { data: backtestMetrics } = await supabase
-    .from('v2_research_run_metrics')
+    .from('research_run_metrics')
     .select('total_return')
     .eq('research_run_id', (
       await supabase
-        .from('v2_research_runs')
+        .from('research_runs')
         .select('id')
         .eq('strategy_id', strategyDbId)
         .eq('status', 'completed')
@@ -621,7 +621,7 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
 
   // 전략 정보 조회
   const { data: strategy } = await supabase
-    .from('v2_strategies')
+    .from('strategies')
     .select('strategy_id, exchange, direction, default_params')
     .eq('id', strategyDbId)
     .single()
@@ -639,7 +639,7 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
 
   if (slotId) {
     const { data: slot } = await supabase
-      .from('v2_orchestrator_slots')
+      .from('orchestrator_slots')
       .select('allocation_pct')
       .eq('id', slotId)
       .single()
@@ -687,7 +687,7 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
 
     const entryPrice = result.price ?? price
 
-    // v2_live_orders 기록
+    // live_orders 기록
     const orderId = await saveLiveOrder({
       decisionId: decision.id as string,
       assetKey,
@@ -701,13 +701,13 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
       status: 'filled',
     })
 
-    // v2_live_fills 기록
+    // live_fills 기록
     if (orderId) {
       await saveLiveFill(orderId, amount, entryPrice, result.fee ?? 0, result.id)
     }
 
-    // v2_live_positions 기록 (strategy_id로 소유 전략 추적)
-    await supabase.from('v2_live_positions').insert({
+    // live_positions 기록 (strategy_id로 소유 전략 추적)
+    await supabase.from('live_positions').insert({
       asset_key: assetKey,
       exchange: 'okx',
       side: positionSide,
@@ -737,7 +737,7 @@ async function handleLiveSwitch(decision: Record<string, unknown>): Promise<void
   // 기존 전략의 오픈 포지션만 청산 (strategy_id 기준)
   if (fromStrategyId) {
     const { data: openPositions } = await supabase
-      .from('v2_live_positions')
+      .from('live_positions')
       .select('id')
       .eq('status', 'open')
       .eq('strategy_id', fromStrategyId)
@@ -767,7 +767,7 @@ async function handleLiveRetire(decision: Record<string, unknown>): Promise<void
 
   // 해당 전략의 오픈 포지션만 청산
   const { data: openPositions } = await supabase
-    .from('v2_live_positions')
+    .from('live_positions')
     .select('id')
     .eq('status', 'open')
     .eq('strategy_id', strategyId)
@@ -792,7 +792,7 @@ async function updateDecisionStatus(
   }
 
   const { error } = await supabase
-    .from('v2_orchestrator_decisions')
+    .from('orchestrator_decisions')
     .update(updateData)
     .eq('id', decisionId)
 
@@ -801,7 +801,7 @@ async function updateDecisionStatus(
   }
 }
 
-/** v2_live_orders에 주문 저장 → 생성된 id 반환 */
+/** live_orders에 주문 저장 → 생성된 id 반환 */
 async function saveLiveOrder(params: {
   decisionId: string | null
   assetKey: string
@@ -815,7 +815,7 @@ async function saveLiveOrder(params: {
   status: string
 }): Promise<string | null> {
   const { data, error } = await supabase
-    .from('v2_live_orders')
+    .from('live_orders')
     .insert({
       decision_id: params.decisionId,
       asset_key: params.assetKey,
@@ -841,7 +841,7 @@ async function saveLiveOrder(params: {
   return data?.id ?? null
 }
 
-/** v2_live_fills에 체결 저장 */
+/** live_fills에 체결 저장 */
 async function saveLiveFill(
   orderId: string,
   fillQty: number,
@@ -850,7 +850,7 @@ async function saveLiveFill(
   exchangeFillId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('v2_live_fills')
+    .from('live_fills')
     .insert({
       order_id: orderId,
       fill_qty: fillQty,
@@ -864,14 +864,14 @@ async function saveLiveFill(
   }
 }
 
-/** v2_risk_events에 리스크 이벤트 기록 */
+/** risk_events에 리스크 이벤트 기록 */
 async function createRiskEvent(
   eventType: string,
   severity: 'info' | 'warning' | 'critical',
   details: Record<string, unknown>,
 ): Promise<void> {
   const { error } = await supabase
-    .from('v2_risk_events')
+    .from('risk_events')
     .insert({
       event_type: eventType,
       severity,

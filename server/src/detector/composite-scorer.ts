@@ -1,5 +1,5 @@
 /**
- * 복합 스코어링 시스템 v2 — 부분점수제
+ * 복합 스코어링 시스템 부분점수제
  *
  * 6개 지표의 가중합산으로 최종 스코어 산출.
  * 각 지표는 0.0~1.0 사이의 연속 부분점수를 반환 (이진 ON/OFF → 그라데이션).
@@ -181,7 +181,7 @@ export function computeDetectionScore(input: DetectionInput): DetectionResult {
     reasoning: {
       composite_score: Math.round(score * 1000) / 1000,
       threshold: SCORE_THRESHOLD,
-      scoring: 'partial_v2',
+      scoring: 'partial',
       rsi_14: rsi14,
       atr_pct: atrPct,
       change_pct_24h: changePct,

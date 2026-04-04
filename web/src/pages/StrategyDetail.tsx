@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Activity, BarChart3, Clock, Shield } from 'lucide-react'
-import { mockAssetSlots, mockDecisions } from '@/mocks/dashboard-data'
+import { useOrchestrationStore } from '@/stores/orchestration-store'
 import { formatPercent } from '@/lib/utils'
 
 const modeLabels: Record<string, string> = {
@@ -10,6 +10,7 @@ const modeLabels: Record<string, string> = {
 }
 
 const formatDuration = (isoStart: string): string => {
+  if (!isoStart) return '—'
   const ms = Date.now() - new Date(isoStart).getTime()
   const hours = Math.floor(ms / 3600000)
   const mins = Math.floor((ms % 3600000) / 60000)
@@ -21,7 +22,9 @@ export const StrategyDetail = () => {
   const { slotId } = useParams<{ slotId: string }>()
   const navigate = useNavigate()
 
-  const slot = mockAssetSlots.find((s) => s.id === slotId)
+  const { assetSlots, decisions } = useOrchestrationStore()
+
+  const slot = assetSlots.find((s) => s.id === slotId)
 
   if (!slot) {
     return (
@@ -37,8 +40,8 @@ export const StrategyDetail = () => {
     )
   }
 
-  const relatedDecisions = mockDecisions.filter(
-    (d) => d.strategy === slot.strategy.shortName
+  const relatedDecisions = decisions.filter(
+    (d) => d.asset === slot.id || d.strategy === slot.strategy.shortName
   )
 
   return (

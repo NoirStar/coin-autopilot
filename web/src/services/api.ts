@@ -96,10 +96,123 @@ export const api = {
   deleteApiKeys: (exchange: string) =>
     request(`/api/settings/api-keys/${exchange}`, { method: 'DELETE' }),
 
+  // 트레이딩 대시보드 (HANDOFF.md §2: 집계 endpoint)
+  getOperatorHome: () => request<OperatorHomeResponse>('/api/dash/operator/home'),
+
   // Research (연구 루프)
-  getResearchRuns: () => request('/api/v2/research/runs'),
-  getResearchCandidates: () => request('/api/v2/research/candidates'),
+  getResearchRuns: () => request('/api/dash/research/runs'),
+  getResearchCandidates: () => request('/api/dash/research/candidates'),
+
+  // 판단 승인/거부
+  approveDecision: (id: string) =>
+    request(`/api/dash/decisions/${id}/approve`, { method: 'POST' }),
+  rejectDecision: (id: string) =>
+    request(`/api/dash/decisions/${id}/reject`, { method: 'POST' }),
+
+  // 리스크 이벤트 해결
+  resolveRiskEvent: (id: string) =>
+    request(`/api/dash/risk/events/${id}/resolve`, { method: 'POST' }),
 
   // 범용 request (새 페이지에서 직접 경로 지정)
   request: <T>(path: string, options?: RequestInit) => request<T>(path, options),
+}
+
+// ── /api/operator/home 응답 타입 ──
+export interface OperatorHomeResponse {
+  system: {
+    server: string
+    database: string
+    lastCollectedAt: string | null
+  }
+  hero: {
+    totalEquity: number
+    todayPnl: { realized: number; unrealized: number; total: number }
+    liveCount: number
+    paperCount: number
+    pendingApprovals: number
+    riskLevel: string
+    edgeScore: number | null
+  }
+  slots: Array<{
+    slotId: string
+    assetKey: string
+    slotType: string
+    strategyId: string | null
+    allocationPct: number
+    regime: string | null
+    status: string
+    cooldownUntil: string | null
+  }>
+  regime: {
+    regime: string
+    btc_price: number
+    ema200: number
+    rsi14: number
+    atr_pct: number
+    recorded_at: string
+  } | null
+  queue: {
+    pendingDecisions: Array<{
+      id: string
+      slotId: string
+      type: string
+      fromStrategy: string | null
+      toStrategy: string | null
+      regime: string
+      reason: string
+      createdAt: string
+    }>
+    unresolvedRisks: Array<{
+      id: string
+      eventType: string
+      severity: string
+      details: Record<string, unknown>
+      createdAt: string
+    }>
+  }
+  positions: {
+    live: Array<Record<string, unknown>>
+    paper: Array<Record<string, unknown>>
+  }
+  market: {
+    regime: string | null
+    btcPrice: number | null
+    rsi14: number | null
+    atrPct: number | null
+    volatility: 'low' | 'medium' | 'high'
+    fundingRate: number
+    openInterest: number
+    longShortRatio: number
+    kimchiPremium: number
+    updatedAt: string | null
+  }
+  decisions: Array<{
+    id: string
+    slotId: string
+    type: string
+    status: string
+    fromStrategy: string | null
+    toStrategy: string | null
+    regime: string
+    reason: string
+    createdAt: string
+    executedAt: string | null
+  }>
+  research: {
+    running: number
+    queued: number
+    completed: number
+    topCandidates: Array<{
+      id: string
+      strategyName: string
+      status: string
+      startedAt: string
+      completedAt: string | null
+      metrics: Record<string, unknown> | null
+    }>
+  }
+  circuitBreaker: {
+    triggered: boolean
+    dailyLossPct: number
+  }
 }
