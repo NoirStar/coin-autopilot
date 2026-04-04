@@ -42,7 +42,7 @@ export const MarketPanel = ({ market }: MarketPanelProps) => {
 
       {/* 암호화폐 */}
       <div className="px-4 py-2 border-b border-border-subtle">
-        <div className="text-[11px] font-semibold text-text-muted mb-2">암호화폐</div>
+        <div className="text-[12px] font-semibold text-text-muted mb-2">암호화폐</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           <Metric
             label="변동성"
@@ -79,7 +79,7 @@ export const MarketPanel = ({ market }: MarketPanelProps) => {
       {/* 한국주식 */}
       {market.krStock && (
         <div className="px-4 py-2">
-          <div className="text-[11px] font-semibold text-text-muted mb-2">한국주식</div>
+          <div className="text-[12px] font-semibold text-text-muted mb-2">한국주식</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
             <Metric
               label="시장 추세"
@@ -116,7 +116,7 @@ const Metric = ({
   hint?: string
 }) => (
   <div className="flex items-baseline justify-between py-0.5">
-    <span className="text-[11px] text-text-muted" title={hint}>{label}</span>
-    <span className={`font-mono text-[11px] font-medium tabular-nums ${valueColor}`}>{value}</span>
+    <span className="text-[12px] text-text-muted" title={hint}>{label}</span>
+    <span className={`font-mono text-[12px] font-medium tabular-nums ${valueColor}`}>{value}</span>
   </div>
 )

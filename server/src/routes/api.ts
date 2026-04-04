@@ -196,9 +196,10 @@ apiRoutes.get('/operator/home', async (c) => {
 
     const response = {
       // 시스템 상태 (기본 health)
+      // regime_snapshots가 비어있어도 DB 연결 자체는 정상일 수 있음
       system: {
         server: 'connected',
-        database: regimeResult.data ? 'connected' : 'error',
+        database: regimeResult.error && regimeResult.error.code !== 'PGRST116' ? 'error' : 'connected',
         lastCollectedAt: regimeResult.data?.recorded_at ?? null,
       },
 

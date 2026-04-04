@@ -15,7 +15,9 @@ const formatTime = (date: Date): string => {
 }
 
 const formatElapsed = (isoString: string): string => {
+  if (!isoString) return '-'
   const elapsed = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
+  if (Number.isNaN(elapsed)) return '-'
   if (elapsed < 60) return `${elapsed}s`
   if (elapsed < 3600) return `${Math.floor(elapsed / 60)}m`
   return `${Math.floor(elapsed / 3600)}h`
