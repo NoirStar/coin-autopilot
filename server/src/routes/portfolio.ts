@@ -49,14 +49,18 @@ portfolioRoutes.get('/balance', async (c) => {
   const liveEquity = liveEquityResult.data
   const paperEquity = paperEquityResult.data
 
+  // .env 기반 거래소 연결 여부 판단
+  const upbitConfigured = !!(process.env.UPBIT_ACCESS_KEY && process.env.UPBIT_SECRET_KEY)
+  const okxConfigured = !!(process.env.OKX_API_KEY && process.env.OKX_SECRET_KEY)
+
   return c.json({
     upbit: {
-      configured: upbitPositions.length > 0,
+      configured: upbitConfigured,
       krw: 0,
       positions: upbitPositions,
     },
     okx: {
-      configured: okxPositions.length > 0,
+      configured: okxConfigured,
       usd: Number(liveEquity?.total_equity ?? 0),
       positions: okxPositions,
     },

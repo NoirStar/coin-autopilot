@@ -127,7 +127,7 @@ export function PortfolioPage() {
       {/* 거래 내역 */}
       <div className="card-surface rounded-md p-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">TRADES</h3>
+          <h3 className="text-[12px] font-semibold text-text-muted">TRADES</h3>
           <div className="flex items-center gap-2">
             <select
               value={exchangeFilter}
@@ -292,7 +292,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
       <div className="card-surface rounded-md p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">{name} ({type})</h3>
+            <h3 className="text-[12px] font-semibold text-text-muted">{name} ({type})</h3>
           </div>
           <span className="rounded-full bg-muted px-2 py-0.5 text-[12px] text-text-muted">미설정</span>
         </div>
@@ -314,7 +314,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
   return (
     <div className="card-surface rounded-md p-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">{name} ({type})</h3>
+        <h3 className="text-[12px] font-semibold text-text-muted">{name} ({type})</h3>
         <span className="flex items-center gap-1 text-[12px] text-profit">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />
           연결됨

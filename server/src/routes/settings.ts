@@ -25,6 +25,14 @@ const DEFAULT_SETTINGS = {
   alert_on_execution: false,
 }
 
+/** .env 기반 거래소 연결 상태 */
+function envConfigured() {
+  return {
+    upbit_configured: !!(process.env.UPBIT_ACCESS_KEY && process.env.UPBIT_SECRET_KEY),
+    okx_configured: !!(process.env.OKX_API_KEY && process.env.OKX_SECRET_KEY),
+  }
+}
+
 /** GET /api/settings — 사용자 설정 조회 (1인 사용, 무인증) */
 settingsRoutes.get('/', async (c) => {
   const { data, error } = await supabase
@@ -35,10 +43,11 @@ settingsRoutes.get('/', async (c) => {
 
   if (error && error.code !== 'PGRST116') {
     // 테이블 자체가 없으면 기본값 반환
-    return c.json({ data: DEFAULT_SETTINGS })
+    return c.json({ data: { ...DEFAULT_SETTINGS, ...envConfigured() } })
   }
 
-  return c.json({ data: data ?? DEFAULT_SETTINGS })
+  // .env 기반 거래소 연결 상태를 DB 값보다 우선
+  return c.json({ data: { ...(data ?? DEFAULT_SETTINGS), ...envConfigured() } })
 })
 
 /** PUT /api/settings/risk-profile — 리스크 파라미터 수정 (인증 필요) */
