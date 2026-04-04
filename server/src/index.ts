@@ -1,6 +1,5 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 
 import { portfolioRoutes } from './routes/portfolio.js'
@@ -20,15 +19,43 @@ import './strategy/alt-detection.js'
 
 const app = new Hono()
 
-// Middleware
+// CORS — Cloudflare Tunnel이 OPTIONS preflight를 전달하지 않을 수 있으므로 수동 처리
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:5173', 'http://localhost:3000']
 
-app.use('*', cors({
-  origin: allowedOrigins,
-  credentials: true,
-}))
+function isAllowedOrigin(origin: string | undefined): string | null {
+  if (!origin) return null
+  if (allowedOrigins.includes(origin)) return origin
+  if (/^https:\/\/(.*\.)?noirstar\.cloud$/.test(origin)) return origin
+  return null
+}
+
+// OPTIONS preflight 직접 처리
+app.all('*', async (c, next) => {
+  const origin = c.req.header('Origin')
+  const allowed = isAllowedOrigin(origin)
+
+  if (c.req.method === 'OPTIONS') {
+    const headers: Record<string, string> = {}
+    if (allowed) {
+      headers['Access-Control-Allow-Origin'] = allowed
+      headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
+      headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+      headers['Access-Control-Allow-Credentials'] = 'true'
+      headers['Access-Control-Max-Age'] = '86400'
+    }
+    return new Response(null, { status: 204, headers })
+  }
+
+  await next()
+
+  if (allowed) {
+    c.res.headers.set('Access-Control-Allow-Origin', allowed)
+    c.res.headers.set('Access-Control-Allow-Credentials', 'true')
+  }
+})
+
 app.use('*', logger())
 
 // Health check

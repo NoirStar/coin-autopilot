@@ -43,7 +43,7 @@ function upbitMarketToAssetKey(market: string): string {
 }
 
 /** asset_key(BTC-KRW)를 업비트 마켓 코드(KRW-BTC)로 변환 */
-function assetKeyToUpbitMarket(assetKey: string): string {
+export function assetKeyToUpbitMarket(assetKey: string): string {
   const [base, quote] = assetKey.split('-')
   return `${quote}-${base}`
 }

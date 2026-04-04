@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase'
 
-/** API URL: localStorage 우선 → 환경변수 → localhost 폴백 */
+/** API URL: localStorage 우선 → 환경변수 → 프로덕션은 same-origin, 로컬은 localhost 폴백 */
 export function getApiBase(): string {
-  return localStorage.getItem('coin-autopilot-api-url') || import.meta.env.VITE_API_URL || 'http://localhost:3001'
+  return localStorage.getItem('coin-autopilot-api-url')
+    || import.meta.env.VITE_API_URL
+    || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '')
 }
 export const API_BASE = getApiBase()
 
@@ -51,16 +53,29 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return {}
 }
 
+/** 인증이 필요한 경로 (서버에서 authMiddleware가 걸린 경로) */
+const AUTH_PATHS = ['/api/portfolio', '/api/settings']
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const authHeaders = await getAuthHeaders()
   // AbortSignal 제거 — 탭 이동 시 진행 중인 요청이 취소되지 않도록
   const { signal: _signal, ...restOptions } = options ?? {}
+  const hasBody = restOptions?.body != null
+  const needsAuth = AUTH_PATHS.some((p) => path.startsWith(p))
+
+  const headers: Record<string, string> = {
+    ...(restOptions?.headers as Record<string, string>),
+  }
+  // Content-Type은 body가 있을 때만 — GET에 붙이면 불필요한 preflight 발생
+  if (hasBody) {
+    headers['Content-Type'] = 'application/json'
+  }
+  // Authorization은 인증 경로에서만 — 공개 API에 붙이면 불필요한 preflight 발생
+  if (needsAuth) {
+    const authHeaders = await getAuthHeaders()
+    Object.assign(headers, authHeaders)
+  }
   const res = await fetch(`${getApiBase()}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders,
-      ...restOptions?.headers,
-    },
+    headers,
     ...restOptions,
   })
 

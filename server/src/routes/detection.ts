@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { scoreMultipleCoins, computeDetectionScore } from '../detector/composite-scorer.js'
-import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap } from '../data/candle-collector.js'
+import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap, assetKeyToUpbitMarket } from '../data/candle-collector.js'
 import { supabase } from '../services/database.js'
 import { notifyStrongBuySignals } from '../services/telegram-notifier.js'
 import type { Candle } from '../core/types.js'
@@ -157,7 +157,8 @@ export async function runFullScan(): Promise<{
   for (const symbol of allKrwSymbols) {
     try {
       await sleep(130)
-      const altCandles = await fetchUpbitCandlesDirect(`KRW-${symbol}`, 50)
+      const market = assetKeyToUpbitMarket(symbol)
+      const altCandles = await fetchUpbitCandlesDirect(market, 50)
       if (altCandles.length < 21) continue
 
       const currentPrice = altCandles[altCandles.length - 1].close
@@ -166,7 +167,7 @@ export async function runFullScan(): Promise<{
         : altCandles[0].open
 
       // 오더북 데이터 가져오기 (실패해도 무시)
-      const orderbook = await fetchUpbitOrderbook(`KRW-${symbol}`)
+      const orderbook = await fetchUpbitOrderbook(market)
 
       inputs.push({
         symbol,
@@ -321,7 +322,8 @@ detectionRoutes.get('/scan/stream', async (c) => {
         const symbol = allKrwSymbols[i]
         try {
           await sleep(130)
-          const altCandles = await fetchUpbitCandlesDirect(`KRW-${symbol}`, 50)
+          const market = assetKeyToUpbitMarket(symbol)
+          const altCandles = await fetchUpbitCandlesDirect(market, 50)
           if (altCandles.length < 21) {
             await stream.writeSSE({
               data: JSON.stringify({ type: 'scan', current: i + 1, total, symbol, status: 'skip' }),
@@ -334,7 +336,7 @@ detectionRoutes.get('/scan/stream', async (c) => {
           const openPriceAt9 = altCandles.length > 9
             ? altCandles[altCandles.length - 9].open
             : altCandles[0].open
-          const orderbook = await fetchUpbitOrderbook(`KRW-${symbol}`)
+          const orderbook = await fetchUpbitOrderbook(market)
 
           inputs.push({
             symbol,

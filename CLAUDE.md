@@ -41,6 +41,19 @@ Schedule:  node-cron
 Frontend:  React + Vite + Tailwind CSS + Zustand
 ```
 
+## 도메인 / 배포
+
+```text
+프론트엔드:  noirstar.cloud            (Vercel)
+API 서버:   api.noirstar.cloud         (Cloudflare Tunnel → 로컬 서버)
+로컬 서버:  localhost:3001             (Hono)
+로컬 프론트: localhost:5173            (Vite dev)
+```
+
+- 서버는 로컬에서 실행하고 Cloudflare Tunnel로 `api.noirstar.cloud`에 노출
+- 프론트엔드 API 연결: Vercel 환경변수 `VITE_API_URL=https://api.noirstar.cloud`
+- 서버 CORS: `ALLOWED_ORIGINS` 환경변수 (미설정 시 localhost만 허용)
+
 ## 코드 원칙
 
 - 컴포넌트는 함수형
