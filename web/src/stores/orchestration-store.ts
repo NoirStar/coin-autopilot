@@ -46,25 +46,26 @@ function mapSystemStatus(data: OperatorHomeResponse): SystemStatus {
 }
 
 function mapHeroSummary(data: OperatorHomeResponse): HeroSummary {
-  const live = data.hero.live
-  const paper = data.hero.paper
+  const hero = data.hero
+  const live = hero.live ?? { totalEquity: 0, todayPnl: { total: 0 }, count: 0, active: false }
+  const paper = hero.paper ?? { totalEquity: 0, todayPnl: { total: 0 }, count: 0 }
   return {
-    edgeScore: data.hero.edgeScore ?? 0,
+    edgeScore: hero.edgeScore ?? 0,
     live: {
-      totalEquity: live.totalEquity,
-      todayPnl: live.todayPnl.total,
-      todayPnlPct: live.totalEquity > 0 ? (live.todayPnl.total / live.totalEquity) * 100 : 0,
-      count: live.count,
-      active: live.active,
+      totalEquity: live.totalEquity ?? 0,
+      todayPnl: live.todayPnl?.total ?? 0,
+      todayPnlPct: live.totalEquity > 0 ? ((live.todayPnl?.total ?? 0) / live.totalEquity) * 100 : 0,
+      count: live.count ?? 0,
+      active: live.active ?? false,
     },
     paper: {
-      totalEquity: paper.totalEquity,
-      todayPnl: paper.todayPnl.total,
-      todayPnlPct: paper.totalEquity > 0 ? (paper.todayPnl.total / paper.totalEquity) * 100 : 0,
-      count: paper.count,
+      totalEquity: paper.totalEquity ?? 0,
+      todayPnl: paper.todayPnl?.total ?? 0,
+      todayPnlPct: paper.totalEquity > 0 ? ((paper.todayPnl?.total ?? 0) / paper.totalEquity) * 100 : 0,
+      count: paper.count ?? 0,
     },
-    pendingApprovals: data.hero.pendingApprovals,
-    riskLevel: data.hero.riskLevel as RiskLevel,
+    pendingApprovals: hero.pendingApprovals ?? 0,
+    riskLevel: (hero.riskLevel as RiskLevel) ?? 'normal',
   }
 }
 
