@@ -14,6 +14,7 @@ import { formatPercent } from '../lib/utils'
 interface BalanceResponse {
   upbit: {
     configured: boolean
+    connected?: boolean
     krw: number
     positions: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }>
   }
@@ -95,6 +96,7 @@ export function PortfolioPage() {
           type="현물"
           currency="KRW"
           configured={balance?.upbit.configured ?? false}
+          connected={balance?.upbit.connected}
           balance={balance?.upbit.krw ?? 0}
           positions={balance?.upbit.positions ?? []}
           isLoading={balanceLoading}
@@ -263,11 +265,12 @@ export function PortfolioPage() {
   )
 }
 
-function ExchangeCard({ name, type, currency: _currency, configured, balance, positions, isLoading, onGoToSettings, formatBalance }: {
+function ExchangeCard({ name, type, currency: _currency, configured, connected, balance, positions, isLoading, onGoToSettings, formatBalance }: {
   name: string
   type: string
   currency: string
   configured: boolean
+  connected?: boolean
   balance: number
   positions: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }>
   isLoading: boolean
@@ -315,10 +318,17 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
     <div className="card-surface rounded-md p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-[12px] font-semibold text-text-muted">{name} ({type})</h3>
-        <span className="flex items-center gap-1 text-[12px] text-profit">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />
-          연결됨
-        </span>
+        {connected === false ? (
+          <span className="flex items-center gap-1 text-[12px] text-warning">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-warning" />
+            연결 실패
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-[12px] text-profit">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-profit status-active" />
+            연결됨
+          </span>
+        )}
       </div>
       <div className="mt-2 text-[24px] font-bold text-text-primary">
         {formatBalance(balance)}

@@ -51,17 +51,64 @@ portfolioRoutes.get('/balance', async (c) => {
   const liveEquity = liveEquityResult.data
   const paperEquity = paperEquityResult.data
 
-  // .env 기반 거래소 연결 여부 판단
-  const upbitConfigured = !!(process.env.UPBIT_ACCESS_KEY && process.env.UPBIT_SECRET_KEY)
+  // 업비트 실계좌 조회 (KRW + 코인 평가금 합산)
+  const hasUpbitKeys = !!(process.env.UPBIT_ACCESS_KEY && process.env.UPBIT_SECRET_KEY)
   const okxConfigured = !!(process.env.OKX_API_KEY && process.env.OKX_SECRET_KEY)
 
-  // 업비트 실잔고 조회
-  let upbitKrw = 0
-  if (upbitConfigured) {
+  let upbitConnected = false
+  let upbitTotalKrw = 0
+  let upbitHoldings: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }> = []
+
+  if (hasUpbitKeys) {
     try {
       const accounts = await fetchUpbitAccounts()
-      const krwAccount = accounts.find((a) => a.currency === 'KRW')
-      upbitKrw = Number(krwAccount?.balance ?? 0)
+      upbitConnected = true // API 호출 성공 = 실제 연결됨
+
+      let krwBalance = 0
+      const coinAccounts: Array<{ currency: string; balance: number; avgBuyPrice: number }> = []
+
+      for (const a of accounts) {
+        const bal = Number(a.balance) + Number(a.locked)
+        if (a.currency === 'KRW') {
+          krwBalance = bal
+        } else if (bal > 0) {
+          coinAccounts.push({
+            currency: a.currency,
+            balance: bal,
+            avgBuyPrice: Number(a.avg_buy_price),
+          })
+        }
+      }
+
+      // 코인 현재가 조회 → 평가금 계산
+      if (coinAccounts.length > 0) {
+        const markets = coinAccounts.map((c) => `KRW-${c.currency}`).join(',')
+        try {
+          const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${markets}`)
+          if (tickerRes.ok) {
+            const tickers = await tickerRes.json() as Array<{ market: string; trade_price: number }>
+            const priceMap = new Map(tickers.map((t) => [t.market, t.trade_price]))
+
+            for (const coin of coinAccounts) {
+              const market = `KRW-${coin.currency}`
+              const currentPrice = priceMap.get(market) ?? coin.avgBuyPrice
+              const evalKrw = coin.balance * currentPrice
+              const costKrw = coin.balance * coin.avgBuyPrice
+              const pnl = costKrw > 0 ? ((evalKrw - costKrw) / costKrw) * 100 : 0
+
+              upbitTotalKrw += evalKrw
+              upbitHoldings.push({
+                symbol: coin.currency,
+                qty: coin.balance,
+                entryPrice: coin.avgBuyPrice,
+                pnl: Math.round(pnl * 100) / 100,
+              })
+            }
+          }
+        } catch { /* 현재가 조회 실패 시 매입가 기준 */ }
+      }
+
+      upbitTotalKrw += krwBalance
     } catch (err) {
       console.warn('[포트폴리오] 업비트 잔고 조회 실패:', err)
     }
@@ -69,9 +116,10 @@ portfolioRoutes.get('/balance', async (c) => {
 
   return c.json({
     upbit: {
-      configured: upbitConfigured,
-      krw: Math.round(upbitKrw),
-      positions: upbitPositions,
+      configured: hasUpbitKeys,
+      connected: upbitConnected,
+      krw: Math.round(upbitTotalKrw),
+      positions: upbitHoldings,
     },
     okx: {
       configured: okxConfigured,
