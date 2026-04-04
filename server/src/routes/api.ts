@@ -218,7 +218,8 @@ apiRoutes.get('/operator/home', async (c) => {
 
     // 서킷 브레이커에서 riskLevel 추출
     const cb = circuitBreakerResult
-    const riskLevel = cb.triggered ? 'critical' : cb.currentLossPct < -3 ? 'warning' : cb.currentLossPct < -1 ? 'caution' : 'normal'
+    // currentLossPct는 드로다운(양수). 3% 이상이면 경고, 1% 이상이면 주의
+    const riskLevel = cb.triggered ? 'critical' : cb.currentLossPct > 3 ? 'warning' : cb.currentLossPct > 1 ? 'caution' : 'normal'
 
     const pendingApprovals = (pendingDecisionsResult.data ?? []).length + (unresolvedRiskResult.data ?? []).length
 

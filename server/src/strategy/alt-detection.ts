@@ -62,22 +62,22 @@ class AltDetectionV2 implements Strategy {
       if (btcChange < -0.02) return []
     }
 
-    // 현재 시각 (KST)
-    const now = new Date()
+    // 최신 캔들의 시간을 기준으로 사용 (백테스트 호환)
     const kstOffset = 9 * 60 * 60 * 1000
-    const kstNow = new Date(now.getTime() + kstOffset)
 
     for (const [symbol, altCandles] of candles) {
       if (symbol === 'BTC') continue
       if (signals.length >= maxPositions) break
       if (altCandles.length < 21) continue
 
-      const currentPrice = altCandles[altCandles.length - 1].close
+      const latestCandle = altCandles[altCandles.length - 1]
+      const currentPrice = latestCandle.close
 
-      // 당일 KST 09:00 시가 — 캔들 배열에서 실제 09:00 캔들 검색
-      const kstToday9 = new Date(kstNow)
+      // 최신 캔들 시간 기준 KST 당일 09:00 계산 (new Date() 대신 캔들 시간 사용)
+      const candleTimeKST = new Date(latestCandle.openTime.getTime() + kstOffset)
+      const kstToday9 = new Date(candleTimeKST)
       kstToday9.setHours(9, 0, 0, 0)
-      const utcToday9 = new Date(kstToday9.getTime() - kstOffset) // KST 09:00 → UTC
+      const utcToday9 = new Date(kstToday9.getTime() - kstOffset)
 
       let openPriceAt9 = altCandles[0].open
       for (const c of altCandles) {
@@ -93,7 +93,7 @@ class AltDetectionV2 implements Strategy {
         btcPrices: btcPrices.slice(-altCandles.length),
         currentPrice,
         openPriceAt9,
-        currentTimeKST: kstNow,
+        currentTimeKST: candleTimeKST,
       })
 
       if (result.detected && result.score >= scoreThreshold) {

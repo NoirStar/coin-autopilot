@@ -49,25 +49,30 @@ export async function runResearchLoop(): Promise<void> {
   let failCount = 0
   let promotedCount = 0
 
-  // 쿨다운: 최근 3시간 이내 완료된 전략은 스킵 (서버 재시작 시 중복 방지)
-  const cooldownSince = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+  // 쿨다운: 최근 N시간 이내 완료된 전략은 스킵 (RESEARCH_COOLDOWN_H=0 으로 비활성화 가능)
+  const cooldownHours = Number(process.env.RESEARCH_COOLDOWN_H ?? 3)
+  const cooldownSince = cooldownHours > 0
+    ? new Date(Date.now() - cooldownHours * 60 * 60 * 1000).toISOString()
+    : null
 
   for (const strategy of strategies) {
     const sid = strategy.config.id
     try {
-      // 중복 실행 방지: 최근 3시간 이내 같은 전략의 완료된 연구가 있으면 스킵
-      const strategyUuid = await getStrategyUuid(sid)
-      if (strategyUuid) {
-        const { count } = await supabase
-          .from('research_runs')
-          .select('id', { count: 'exact', head: true })
-          .eq('strategy_id', strategyUuid)
-          .eq('status', 'completed')
-          .gte('ended_at', cooldownSince)
+      // 중복 실행 방지 (RESEARCH_COOLDOWN_H=0 으로 비활성화)
+      if (cooldownSince) {
+        const strategyUuid = await getStrategyUuid(sid)
+        if (strategyUuid) {
+          const { count } = await supabase
+            .from('research_runs')
+            .select('id', { count: 'exact', head: true })
+            .eq('strategy_id', strategyUuid)
+            .eq('status', 'completed')
+            .gte('ended_at', cooldownSince)
 
-        if ((count ?? 0) > 0) {
-          console.log(`[연구루프] ${sid} — 최근 3시간 이내 완료됨, 스킵`)
-          continue
+          if ((count ?? 0) > 0) {
+            console.log(`[연구루프] ${sid} — 최근 ${cooldownHours}시간 이내 완료됨, 스킵`)
+            continue
+          }
         }
       }
 

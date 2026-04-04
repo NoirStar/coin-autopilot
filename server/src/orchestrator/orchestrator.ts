@@ -233,10 +233,10 @@ export async function rankCandidates(regime: RegimeState): Promise<CandidateRank
 
   // 점수 계산 및 정렬
   const rankings: CandidateRanking[] = filtered.map((s) => {
-    // 정규화: sharpe는 0~3 범위를 0~1로, winRate는 0~1 그대로, mdd는 0~1 범위
+    // 정규화: sharpe 0~3→0~1, winRate 0~100%→0~1, mdd 0~100%→0~1 (반전)
     const normalizedSharpe = Math.max(0, Math.min(s.sharpe / 3, 1))
-    const normalizedWinRate = Math.max(0, Math.min(s.winRate, 1))
-    const normalizedMddInverse = Math.max(0, 1 - Math.min(s.mdd, 1))
+    const normalizedWinRate = Math.max(0, Math.min(s.winRate / 100, 1))
+    const normalizedMddInverse = Math.max(0, 1 - Math.min(s.mdd / 100, 1))
 
     const score =
       normalizedSharpe * WEIGHT.sharpe +
