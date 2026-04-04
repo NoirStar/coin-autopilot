@@ -335,24 +335,38 @@ export async function loadCandles(
   timeframe: Timeframe,
   limit: number = 500
 ): Promise<Candle[]> {
-  // 최신 N개를 가져온 뒤 시간순 정렬 (DESC limit → reverse)
-  const { data, error } = await supabase
-    .from('candles')
-    .select('*')
-    .eq('asset_key', assetKey)
-    .eq('exchange', exchange)
-    .eq('timeframe', timeframe)
-    .order('open_time', { ascending: false })
-    .limit(limit)
+  // Supabase 단일 쿼리 최대 1000행 → 페이지네이션 필요
+  const PAGE_SIZE = 1000
+  const allRows: Array<Record<string, unknown>> = []
+  let remaining = limit
 
-  if (error) {
-    console.error('[V2] 캔들 조회 오류:', error.message)
-    return []
+  while (remaining > 0) {
+    const from = allRows.length
+    const to = from + Math.min(remaining, PAGE_SIZE) - 1
+
+    const { data, error } = await supabase
+      .from('candles')
+      .select('*')
+      .eq('asset_key', assetKey)
+      .eq('exchange', exchange)
+      .eq('timeframe', timeframe)
+      .order('open_time', { ascending: false })
+      .range(from, to)
+
+    if (error) {
+      console.error('[V2] 캔들 조회 오류:', error.message)
+      break
+    }
+
+    if (!data || data.length === 0) break
+    allRows.push(...data)
+    remaining -= data.length
+    if (data.length < PAGE_SIZE) break
   }
 
   // DESC로 가져왔으므로 시간순(ASC)으로 뒤집기
-  return (data ?? []).reverse().map((d) => ({
-    openTime: new Date(d.open_time),
+  return allRows.reverse().map((d) => ({
+    openTime: new Date(d.open_time as string),
     open: Number(d.open),
     high: Number(d.high),
     low: Number(d.low),
