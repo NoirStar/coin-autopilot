@@ -49,9 +49,28 @@ export async function runResearchLoop(): Promise<void> {
   let failCount = 0
   let promotedCount = 0
 
+  // 쿨다운: 최근 3시간 이내 완료된 전략은 스킵 (서버 재시작 시 중복 방지)
+  const cooldownSince = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+
   for (const strategy of strategies) {
     const sid = strategy.config.id
     try {
+      // 중복 실행 방지: 최근 3시간 이내 같은 전략의 완료된 연구가 있으면 스킵
+      const strategyUuid = await getStrategyUuid(sid)
+      if (strategyUuid) {
+        const { count } = await supabase
+          .from('research_runs')
+          .select('id', { count: 'exact', head: true })
+          .eq('strategy_id', strategyUuid)
+          .eq('status', 'completed')
+          .gte('ended_at', cooldownSince)
+
+        if ((count ?? 0) > 0) {
+          console.log(`[연구루프] ${sid} — 최근 3시간 이내 완료됨, 스킵`)
+          continue
+        }
+      }
+
       console.log(`[연구루프] ${sid} 백테스트 시작...`)
 
       // 1. 캔들 로드
