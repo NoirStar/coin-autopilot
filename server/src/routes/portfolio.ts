@@ -232,7 +232,7 @@ async function fetchUpbitAccounts(): Promise<UpbitAccount[]> {
   const token = jwt.sign(
     { access_key: accessKey, nonce: randomUUID() },
     secretKey,
-    { algorithm: 'HS256' },
+    { algorithm: 'HS512' },
   )
 
   const res = await fetch('https://api.upbit.com/v1/accounts', {
