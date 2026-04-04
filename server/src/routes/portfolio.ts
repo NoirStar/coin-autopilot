@@ -1,97 +1,104 @@
 import { Hono } from 'hono'
 import { supabase } from '../services/database.js'
 
-type AuthEnv = { Variables: { userId: string } }
+export const portfolioRoutes = new Hono()
 
-export const portfolioRoutes = new Hono<AuthEnv>()
-
-/** GET /api/portfolio/balance — 거래소 잔고 조회 */
+/** GET /api/portfolio/balance — 거래소 잔고 조회 (1인 사용, 무인증) */
 portfolioRoutes.get('/balance', async (c) => {
-  const userId = c.get('userId')
+  // live_positions + paper_positions 기반 잔고 집계
+  const [liveResult, paperResult, equityResult] = await Promise.all([
+    supabase
+      .from('live_positions')
+      .select('asset_key, exchange, side, current_qty, entry_price, unrealized_pnl')
+      .eq('status', 'open'),
+    supabase
+      .from('paper_positions')
+      .select('asset_key, side, current_qty, entry_price, unrealized_pnl')
+      .eq('status', 'open'),
+    supabase
+      .from('equity_snapshots')
+      .select('total_equity, source')
+      .order('recorded_at', { ascending: false })
+      .limit(2),
+  ])
 
-  // 사용자 설정에서 거래소 연결 상태 확인
-  const { data: settings } = await supabase
-    .from('user_settings')
-    .select('upbit_configured, okx_configured')
-    .eq('user_id', userId)
-    .single()
+  const livePositions = (liveResult.data ?? []).map((p) => ({
+    symbol: p.asset_key,
+    qty: Number(p.current_qty),
+    entryPrice: Number(p.entry_price),
+    pnl: Number(p.unrealized_pnl ?? 0),
+  }))
 
-  const upbitConfigured = settings?.upbit_configured ?? false
-  const okxConfigured = settings?.okx_configured ?? false
+  const upbitPositions = livePositions.filter((p) =>
+    (liveResult.data ?? []).find((d) => d.asset_key === p.symbol)?.exchange === 'upbit',
+  )
+  const okxPositions = livePositions.filter((p) =>
+    (liveResult.data ?? []).find((d) => d.asset_key === p.symbol)?.exchange === 'okx',
+  )
 
-  // 현재는 DB 포지션 기반 잔고 집계 (실제 거래소 API 연동은 추후)
-  const { data: openPositions } = await supabase
-    .from('positions')
-    .select('exchange, symbol, quantity, entry_price, pnl, session_type')
-    .eq('user_id', userId)
-    .eq('status', 'open')
-    .in('session_type', ['live', 'paper'])
-
-  const upbitPositions = (openPositions ?? [])
-    .filter((p) => p.exchange === 'upbit' || !p.exchange)
-    .map((p) => ({
-      symbol: p.symbol,
-      qty: p.quantity,
-      entryPrice: p.entry_price,
-      pnl: p.pnl ?? 0,
-    }))
-
-  const okxPositions = (openPositions ?? [])
-    .filter((p) => p.exchange === 'okx')
-    .map((p) => ({
-      symbol: p.symbol,
-      qty: p.quantity,
-      entryPrice: p.entry_price,
-      pnl: p.pnl ?? 0,
-    }))
+  // 에퀴티 스냅샷에서 잔고 추출
+  const liveEquity = equityResult.data?.find((e) => e.source === 'live')
+  const paperEquity = equityResult.data?.find((e) => e.source === 'paper')
 
   return c.json({
     upbit: {
-      configured: upbitConfigured,
+      configured: upbitPositions.length > 0,
       krw: 0,
       positions: upbitPositions,
     },
     okx: {
-      configured: okxConfigured,
-      usd: 0,
+      configured: okxPositions.length > 0,
+      usd: Number(liveEquity?.total_equity ?? 0),
       positions: okxPositions,
+    },
+    paper: {
+      equity: Number(paperEquity?.total_equity ?? 0),
+      positions: (paperResult.data ?? []).map((p) => ({
+        symbol: p.asset_key,
+        qty: Number(p.current_qty),
+        entryPrice: Number(p.entry_price),
+        pnl: Number(p.unrealized_pnl ?? 0),
+      })),
     },
   })
 })
 
-/** GET /api/portfolio/positions — 활성 포지션 */
+/** GET /api/portfolio/positions — 활성 포지션 (1인 사용, 무인증) */
 portfolioRoutes.get('/positions', async (c) => {
-  const userId = c.get('userId')
+  const [live, paper] = await Promise.all([
+    supabase
+      .from('live_positions')
+      .select('*')
+      .eq('status', 'open')
+      .order('entry_time', { ascending: false }),
+    supabase
+      .from('paper_positions')
+      .select('*')
+      .eq('status', 'open')
+      .order('entry_time', { ascending: false }),
+  ])
 
-  const { data, error } = await supabase
-    .from('positions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'open')
-    .order('opened_at', { ascending: false })
-
-  if (error) {
-    return c.json({ error: '포지션 조회 실패' }, 500)
-  }
-
-  return c.json({ data: data ?? [] })
+  return c.json({
+    data: [
+      ...(live.data ?? []).map((p) => ({ ...p, session_type: 'live' })),
+      ...(paper.data ?? []).map((p) => ({ ...p, session_type: 'paper' })),
+    ],
+  })
 })
 
-/** GET /api/portfolio/trades — 거래 내역 (페이지네이션) */
+/** GET /api/portfolio/trades — 거래 내역 (1인 사용, 무인증) */
 portfolioRoutes.get('/trades', async (c) => {
-  const userId = c.get('userId')
-
   const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100)
   const offset = parseInt(c.req.query('offset') || '0', 10)
   const exchange = c.req.query('exchange')
   const days = parseInt(c.req.query('days') || '0', 10)
 
+  // live_positions에서 청산된 거래 조회
   let query = supabase
-    .from('positions')
+    .from('live_positions')
     .select('*', { count: 'exact' })
-    .eq('user_id', userId)
     .eq('status', 'closed')
-    .order('closed_at', { ascending: false })
+    .order('exit_time', { ascending: false })
     .range(offset, offset + limit - 1)
 
   if (exchange) {
@@ -100,7 +107,7 @@ portfolioRoutes.get('/trades', async (c) => {
 
   if (days > 0) {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-    query = query.gte('closed_at', since)
+    query = query.gte('exit_time', since)
   }
 
   const { data, error, count } = await query
@@ -110,7 +117,20 @@ portfolioRoutes.get('/trades', async (c) => {
   }
 
   return c.json({
-    data: data ?? [],
+    data: (data ?? []).map((p) => ({
+      id: p.id,
+      exchange: p.exchange,
+      symbol: p.asset_key,
+      direction: p.side,
+      entry_price: Number(p.entry_price),
+      exit_price: Number(p.exit_price ?? 0),
+      quantity: Number(p.current_qty),
+      pnl: Number(p.realized_pnl ?? 0),
+      pnl_pct: 0,
+      strategy: p.strategy_id ?? '',
+      session_type: 'live',
+      closed_at: p.exit_time,
+    })),
     total: count ?? 0,
     limit,
     offset,

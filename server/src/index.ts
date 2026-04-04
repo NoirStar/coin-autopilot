@@ -7,7 +7,6 @@ import { settingsRoutes } from './routes/settings.js'
 import { detectionRoutes } from './routes/detection.js'
 import apiRoutes from './routes/api.js'
 import { startCronJobs } from './core/cron.js'
-import { authMiddleware } from './core/auth.js'
 import { syncRegistryWithDb } from './strategy/registry.js'
 // 전략 파일 import — 모듈 로드 시 registerStrategy() 자동 호출
 import './strategy/btc-ema-crossover.js'
@@ -64,9 +63,7 @@ app.get('/health', (c) => c.json({ status: 'ok', uptime: process.uptime() }))
 // 공개 API
 app.route('/api/detection', detectionRoutes)
 
-// 인증 필요 API (포트폴리오, 설정 등 쓰기 작업)
-app.use('/api/portfolio/*', authMiddleware)
-app.use('/api/settings/*', authMiddleware)
+// 포트폴리오/설정 — 1인 사용 단계에서 읽기는 무인증, 쓰기만 인증 (HANDOFF.md §1)
 app.route('/api/portfolio', portfolioRoutes)
 app.route('/api/settings', settingsRoutes)
 

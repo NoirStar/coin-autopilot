@@ -53,14 +53,15 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return {}
 }
 
-/** 인증이 필요한 경로 (서버에서 authMiddleware가 걸린 경로) */
-const AUTH_PATHS = ['/api/portfolio', '/api/settings']
+/** 인증이 필요한 경로 (쓰기 작업만 — 읽기는 1인 사용 단계에서 무인증) */
+const AUTH_METHODS = ['PUT', 'POST', 'DELETE']
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   // AbortSignal 제거 — 탭 이동 시 진행 중인 요청이 취소되지 않도록
   const { signal: _signal, ...restOptions } = options ?? {}
   const hasBody = restOptions?.body != null
-  const needsAuth = AUTH_PATHS.some((p) => path.startsWith(p))
+  const method = (restOptions?.method ?? 'GET').toUpperCase()
+  const needsAuth = AUTH_METHODS.includes(method)
 
   const headers: Record<string, string> = {
     ...(restOptions?.headers as Record<string, string>),

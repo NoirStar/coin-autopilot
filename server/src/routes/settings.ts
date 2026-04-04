@@ -1,35 +1,48 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { supabase } from '../services/database.js'
+import { authMiddleware } from '../core/auth.js'
 
-type AuthEnv = { Variables: { userId: string } }
+export const settingsRoutes = new Hono()
 
-export const settingsRoutes = new Hono<AuthEnv>()
+/** 기본 설정값 (1인 사용 단계, user_id 불필요) */
+const DEFAULT_SETTINGS = {
+  risk_profile: 'moderate',
+  daily_max_loss_pct: 2.0,
+  position_max_loss_pct: 0.30,
+  mdd_warning_pct: 15.0,
+  mdd_stop_pct: 25.0,
+  upbit_configured: false,
+  okx_configured: false,
+  telegram_enabled: false,
+  telegram_bot_token: null,
+  telegram_chat_id: null,
+  discord_enabled: false,
+  discord_webhook_url: null,
+  alert_on_signal: true,
+  alert_on_mdd: true,
+  alert_on_regime: true,
+  alert_on_execution: false,
+}
 
-/** GET /api/settings — 사용자 설정 조회 */
+/** GET /api/settings — 사용자 설정 조회 (1인 사용, 무인증) */
 settingsRoutes.get('/', async (c) => {
-  const userId = c.get('userId')
-
   const { data, error } = await supabase
     .from('user_settings')
     .select('*')
-    .eq('user_id', userId)
+    .limit(1)
     .single()
 
   if (error && error.code !== 'PGRST116') {
-    return c.json({ error: '설정 조회 실패' }, 500)
+    // 테이블 자체가 없으면 기본값 반환
+    return c.json({ data: DEFAULT_SETTINGS })
   }
 
-  // 설정이 없으면 기본값 반환
-  if (!data) {
-    return c.json({ data: getDefaultSettings(userId) })
-  }
-
-  return c.json({ data })
+  return c.json({ data: data ?? DEFAULT_SETTINGS })
 })
 
-/** PUT /api/settings/risk-profile — 리스크 파라미터 수정 */
-settingsRoutes.put('/risk-profile', async (c) => {
+/** PUT /api/settings/risk-profile — 리스크 파라미터 수정 (인증 필요) */
+settingsRoutes.put('/risk-profile', authMiddleware, async (c) => {
   const userId = c.get('userId')
 
   const schema = z.object({
@@ -53,12 +66,11 @@ settingsRoutes.put('/risk-profile', async (c) => {
   if (parsed.data.mddWarningPct !== undefined) updates.mdd_warning_pct = parsed.data.mddWarningPct
   if (parsed.data.mddStopPct !== undefined) updates.mdd_stop_pct = parsed.data.mddStopPct
 
-  // upsert — 없으면 생성
-  const defaults = getDefaultSettings(userId)
   const { error } = await supabase
     .from('user_settings')
     .upsert({
-      ...defaults,
+      user_id: userId,
+      ...DEFAULT_SETTINGS,
       ...updates,
     }, { onConflict: 'user_id' })
 
@@ -69,8 +81,8 @@ settingsRoutes.put('/risk-profile', async (c) => {
   return c.json({ success: true })
 })
 
-/** PUT /api/settings/alerts — 알림 설정 수정 */
-settingsRoutes.put('/alerts', async (c) => {
+/** PUT /api/settings/alerts — 알림 설정 수정 (인증 필요) */
+settingsRoutes.put('/alerts', authMiddleware, async (c) => {
   const userId = c.get('userId')
 
   const schema = z.object({
@@ -102,11 +114,11 @@ settingsRoutes.put('/alerts', async (c) => {
   if (parsed.data.alertOnRegime !== undefined) updates.alert_on_regime = parsed.data.alertOnRegime
   if (parsed.data.alertOnExecution !== undefined) updates.alert_on_execution = parsed.data.alertOnExecution
 
-  const alertDefaults = getDefaultSettings(userId)
   const { error } = await supabase
     .from('user_settings')
     .upsert({
-      ...alertDefaults,
+      user_id: userId,
+      ...DEFAULT_SETTINGS,
       ...updates,
     }, { onConflict: 'user_id' })
 
@@ -117,15 +129,15 @@ settingsRoutes.put('/alerts', async (c) => {
   return c.json({ success: true })
 })
 
-/** PUT /api/settings/api-keys — API 키 저장 */
-settingsRoutes.put('/api-keys', async (c) => {
+/** PUT /api/settings/api-keys — API 키 저장 (인증 필요) */
+settingsRoutes.put('/api-keys', authMiddleware, async (c) => {
   const userId = c.get('userId')
 
   const schema = z.object({
     exchange: z.enum(['upbit', 'okx']),
     accessKey: z.string().min(1),
     secretKey: z.string().min(1),
-    passphrase: z.string().optional(), // OKX 전용
+    passphrase: z.string().optional(),
   })
 
   const body = await c.req.json().catch(() => ({}))
@@ -151,11 +163,11 @@ settingsRoutes.put('/api-keys', async (c) => {
     updates.okx_configured = true
   }
 
-  const defaults = getDefaultSettings(userId)
   const { error } = await supabase
     .from('user_settings')
     .upsert({
-      ...defaults,
+      user_id: userId,
+      ...DEFAULT_SETTINGS,
       ...updates,
     }, { onConflict: 'user_id' })
 
@@ -166,8 +178,8 @@ settingsRoutes.put('/api-keys', async (c) => {
   return c.json({ success: true })
 })
 
-/** DELETE /api/settings/api-keys/:exchange — API 키 삭제 */
-settingsRoutes.delete('/api-keys/:exchange', async (c) => {
+/** DELETE /api/settings/api-keys/:exchange — API 키 삭제 (인증 필요) */
+settingsRoutes.delete('/api-keys/:exchange', authMiddleware, async (c) => {
   const userId = c.get('userId')
   const exchange = c.req.param('exchange')
 
@@ -202,9 +214,8 @@ settingsRoutes.delete('/api-keys/:exchange', async (c) => {
   return c.json({ success: true })
 })
 
-/** GET /api/settings/agent-status — 에이전트 상태 */
+/** GET /api/settings/agent-status — 에이전트 상태 (무인증) */
 settingsRoutes.get('/agent-status', async (c) => {
-  // 현재 에이전트는 같은 프로세스에서 실행 — 크론 상태 반환
   return c.json({
     agentId: 'vps-main',
     state: 'running',
@@ -214,22 +225,3 @@ settingsRoutes.get('/agent-status', async (c) => {
     wsConnections: { upbit: false, okx: false },
   })
 })
-
-function getDefaultSettings(userId: string) {
-  return {
-    user_id: userId,
-    risk_profile: 'moderate',
-    daily_max_loss_pct: 2.0,
-    position_max_loss_pct: 0.30,
-    mdd_warning_pct: 15.0,
-    mdd_stop_pct: 25.0,
-    upbit_configured: false,
-    okx_configured: false,
-    telegram_enabled: false,
-    discord_enabled: false,
-    alert_on_signal: true,
-    alert_on_mdd: true,
-    alert_on_regime: true,
-    alert_on_execution: false,
-  }
-}

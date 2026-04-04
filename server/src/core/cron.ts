@@ -18,32 +18,49 @@ import { collectLatestCandles } from '../data/candle-collector.js'
  */
 let cycleFailCount = 0
 
+/** 메인 파이프라인 실행 (크론 + 서버 시작 시 공용) */
+async function runMainPipeline(): Promise<void> {
+  console.log(`[크론] ═══ 4H 파이프라인 시작: ${new Date().toISOString()} ═══`)
+  // 1. 캔들 수집 (업비트 + OKX, 4H 타임프레임)
+  await collectLatestCandles('upbit', ['BTC', 'ETH', 'XRP', 'SOL', 'DOGE'], '4h')
+  await collectLatestCandles('okx', ['BTC', 'ETH'], '4h')
+
+  // 2. 연구 루프 (백테스트 → 승격 평가)
+  await runResearchLoop()
+
+  // 3. 오케스트레이터 (레짐 판정 → 전략 배치/교체)
+  await runOrchestratorCycle()
+
+  // 4. 가상매매 사이클
+  await runPaperTradingCycle()
+
+  // 5. 실전 포지션 조정 (거래소 ↔ DB 동기화)
+  await reconcilePositions()
+
+  // 6. 리스크 체크 (일일 손실 한도, 서킷 브레이커)
+  await runRiskCheck()
+
+  console.log(`[크론] ═══ 4H 파이프라인 완료 ═══`)
+}
+
 export function startCronJobs(): void {
+  // 서버 시작 시 즉시 1회 실행 (비동기, 서버 응답 차단 안 함)
+  setTimeout(async () => {
+    console.log('[크론] 서버 시작 — 최초 파이프라인 실행')
+    try {
+      await runMainPipeline()
+      cycleFailCount = 0
+    } catch (err) {
+      cycleFailCount++
+      console.error('[크론] 최초 파이프라인 실패:', err)
+    }
+  }, 3_000) // 3초 대기 (DB 연결 안정화)
+
   // 4시간마다 메인 파이프라인
   cron.schedule('0 0,4,8,12,16,20 * * *', async () => {
-    console.log(`[크론] ═══ 4H 파이프라인 시작: ${new Date().toISOString()} ═══`)
     try {
-      // 1. 캔들 수집 (업비트 + OKX, 4H 타임프레임)
-      await collectLatestCandles('upbit', ['BTC', 'ETH', 'XRP', 'SOL', 'DOGE'], '4h')
-      await collectLatestCandles('okx', ['BTC', 'ETH'], '4h')
-
-      // 2. 연구 루프 (백테스트 → 승격 평가)
-      await runResearchLoop()
-
-      // 3. 오케스트레이터 (레짐 판정 → 전략 배치/교체)
-      await runOrchestratorCycle()
-
-      // 4. 가상매매 사이클
-      await runPaperTradingCycle()
-
-      // 5. 실전 포지션 조정 (거래소 ↔ DB 동기화)
-      await reconcilePositions()
-
-      // 6. 리스크 체크 (일일 손실 한도, 서킷 브레이커)
-      await runRiskCheck()
-
+      await runMainPipeline()
       cycleFailCount = 0
-      console.log(`[크론] ═══ 4H 파이프라인 완료 ═══`)
     } catch (err) {
       cycleFailCount++
       console.error(`[크론] 4H 파이프라인 실패 (연속 ${cycleFailCount}회):`, err)
