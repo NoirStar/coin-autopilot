@@ -59,10 +59,12 @@ portfolioRoutes.get('/balance', async (c) => {
   let upbitTotalKrw = 0
   let upbitHoldings: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }> = []
 
+  console.log(`[포트폴리오] 업비트 키 존재: ${hasUpbitKeys}, OKX 키 존재: ${okxConfigured}`)
   if (hasUpbitKeys) {
     try {
       const accounts = await fetchUpbitAccounts()
-      upbitConnected = true // API 호출 성공 = 실제 연결됨
+      console.log(`[포트폴리오] 업비트 계좌 ${accounts.length}개 조회 성공`)
+      upbitConnected = true
 
       let krwBalance = 0
       const coinAccounts: Array<{ currency: string; balance: number; avgBuyPrice: number }> = []
@@ -110,9 +112,11 @@ portfolioRoutes.get('/balance', async (c) => {
 
       upbitTotalKrw += krwBalance
     } catch (err) {
-      console.warn('[포트폴리오] 업비트 잔고 조회 실패:', err)
+      console.warn('[포트폴리오] 업비트 잔고 조회 실패:', err instanceof Error ? err.message : err)
     }
   }
+
+  console.log(`[포트폴리오] 응답: connected=${upbitConnected}, totalKrw=${upbitTotalKrw}, holdings=${upbitHoldings.length}개`)
 
   return c.json({
     upbit: {
