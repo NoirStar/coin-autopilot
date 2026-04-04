@@ -226,14 +226,15 @@ async function updateResearchRunCompleted(
   runId: string,
   result: BacktestResult
 ): Promise<void> {
+  // period_start/end 컬럼이 DB에 있으면 저장, 없으면 무시
+  const update: Record<string, unknown> = {
+    status: 'completed',
+    ended_at: new Date().toISOString(),
+  }
+
   const { error } = await supabase
     .from('research_runs')
-    .update({
-      status: 'completed',
-      ended_at: new Date().toISOString(),
-      period_start: result.periodStart.toISOString(),
-      period_end: result.periodEnd.toISOString(),
-    })
+    .update(update)
     .eq('id', runId)
 
   if (error) {
