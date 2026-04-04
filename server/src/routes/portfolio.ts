@@ -82,19 +82,30 @@ portfolioRoutes.get('/balance', async (c) => {
         }
       }
 
-      // 코인 현재가 조회 → 평가금 계산
-      console.log(`[포트폴리오] 코인 계좌: ${coinAccounts.length}개`, coinAccounts.map((c) => `${c.currency}=${c.balance}`).join(', '))
-      if (coinAccounts.length > 0) {
-        const markets = coinAccounts.map((c) => `KRW-${c.currency}`).join(',')
-        console.log(`[포트폴리오] 현재가 조회: ${markets}`)
+      // KRW 마켓 존재 여부 확인 → 없는 코인은 BTC 마켓 등이라 현재가 조회 불가
+      let krwMarketSet = new Set<string>()
+      try {
+        const marketRes = await fetch('https://api.upbit.com/v1/market/all?isDetails=false')
+        if (marketRes.ok) {
+          const allMarkets = await marketRes.json() as Array<{ market: string }>
+          krwMarketSet = new Set(allMarkets.filter((m) => m.market.startsWith('KRW-')).map((m) => m.market))
+        }
+      } catch { /* 마켓 목록 실패 시 전체 시도 */ }
+
+      // KRW 마켓 코인과 비-KRW 코인 분리
+      const krwCoins = coinAccounts.filter((c) => krwMarketSet.size === 0 || krwMarketSet.has(`KRW-${c.currency}`))
+      const nonKrwCoins = coinAccounts.filter((c) => krwMarketSet.size > 0 && !krwMarketSet.has(`KRW-${c.currency}`))
+
+      // KRW 마켓 코인 현재가 조회
+      if (krwCoins.length > 0) {
+        const markets = krwCoins.map((c) => `KRW-${c.currency}`).join(',')
         try {
           const tickerRes = await fetch(`https://api.upbit.com/v1/ticker?markets=${markets}`)
-          console.log(`[포트폴리오] 현재가 응답: ${tickerRes.status}`)
           if (tickerRes.ok) {
             const tickers = await tickerRes.json() as Array<{ market: string; trade_price: number }>
             const priceMap = new Map(tickers.map((t) => [t.market, t.trade_price]))
 
-            for (const coin of coinAccounts) {
+            for (const coin of krwCoins) {
               const market = `KRW-${coin.currency}`
               const currentPrice = priceMap.get(market) ?? coin.avgBuyPrice
               const evalKrw = coin.balance * currentPrice
@@ -110,22 +121,31 @@ portfolioRoutes.get('/balance', async (c) => {
               })
             }
           }
-        } catch (tickerErr) {
-          console.warn('[포트폴리오] 현재가 조회 실패:', tickerErr instanceof Error ? tickerErr.message : tickerErr)
-        }
+        } catch { /* 현재가 실패 시 아래 폴백 */ }
+      }
 
-        // 현재가 조회 실패해도 매입가 기준으로 표시
-        if (upbitHoldings.length === 0) {
-          for (const coin of coinAccounts) {
-            const evalKrw = coin.balance * coin.avgBuyPrice
-            upbitTotalKrw += evalKrw
-            upbitHoldings.push({
-              symbol: coin.currency,
-              qty: coin.balance,
-              entryPrice: coin.avgBuyPrice,
-              pnl: 0,
-            })
-          }
+      // 비-KRW 마켓 코인 (BTC 마켓 등)은 매입가 기준 표시
+      for (const coin of nonKrwCoins) {
+        upbitHoldings.push({
+          symbol: `${coin.currency} (BTC)`,
+          qty: coin.balance,
+          entryPrice: coin.avgBuyPrice,
+          pnl: 0,
+        })
+        // BTC 마켓은 KRW 평가금 산출 어려우므로 총자산에 미포함
+      }
+
+      // KRW 마켓 현재가도 실패한 경우 매입가 폴백
+      if (upbitHoldings.length === 0 && coinAccounts.length > 0) {
+        for (const coin of coinAccounts) {
+          const evalKrw = coin.balance * coin.avgBuyPrice
+          upbitTotalKrw += evalKrw
+          upbitHoldings.push({
+            symbol: coin.currency,
+            qty: coin.balance,
+            entryPrice: coin.avgBuyPrice,
+            pnl: 0,
+          })
         }
       }
 
