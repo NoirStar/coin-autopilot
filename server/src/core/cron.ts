@@ -127,8 +127,8 @@ async function candleCount(assetKey: string, exchange: string, timeframe: string
 
 /** 캔들이 충분한지 확인하고, 부족하면 backfill */
 async function ensureMinimumCandles(): Promise<void> {
-  // 1h 전략이 18000개 필요. 4h는 5000개지만 같은 체크포인트로 관리
-  const MIN_CANDLES = 4000
+  // 타임프레임별 최소 캔들 수 (연구루프 CANDLE_LIMITS와 동기화)
+  const MIN_BY_TF: Record<string, number> = { '1h': 18000, '4h': 5000 }
 
   // 전략이 사용하는 모든 (exchange, asset_key, timeframe) 조합
   const targets: Array<{ exchange: 'upbit' | 'okx'; key: string; tf: '4h' | '1h' }> = [
@@ -154,8 +154,9 @@ async function ensureMinimumCandles(): Promise<void> {
 
   let needsBackfill = false
   for (const t of targets) {
+    const minNeeded = MIN_BY_TF[t.tf] ?? 5000
     const cnt = await candleCount(t.key, t.exchange, t.tf)
-    if (cnt < MIN_CANDLES) {
+    if (cnt < minNeeded) {
       needsBackfill = true
       break
     }
@@ -166,11 +167,12 @@ async function ensureMinimumCandles(): Promise<void> {
   console.log(`[크론] 캔들 부족 감지 — backfill 시작`)
 
   for (const t of targets) {
+    const minNeeded = MIN_BY_TF[t.tf] ?? 5000
     const cnt = await candleCount(t.key, t.exchange, t.tf)
-    if (cnt < MIN_CANDLES) {
-      // 1h: 30개월(2.5년, ~18000개), 4h: 12개월(1년, ~2200개) + DB 기존분
-      const months = t.tf === '1h' ? 30 : 12
-      console.log(`[크론] ${t.exchange}/${t.key} ${t.tf}: ${cnt}개 → backfill (${months}개월)`)
+    if (cnt < minNeeded) {
+      // 1h: 30개월(2.5년, ~18000개), 4h: 30개월(2.5년, ~5400개)
+      const months = 30
+      console.log(`[크론] ${t.exchange}/${t.key} ${t.tf}: ${cnt}개 (필요 ${minNeeded}) → backfill (${months}개월)`)
       await backfillCandles(t.exchange, t.key, t.tf, months)
     }
   }
