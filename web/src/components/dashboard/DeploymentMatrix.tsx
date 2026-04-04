@@ -27,7 +27,7 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
   return (
     <div className="flex-1 min-w-0 overflow-y-auto">
       {/* 섹션 헤더 — 한국어 + 영문 */}
-      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between">
+      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between sticky top-0 z-10">
         <span className="text-[12px] font-semibold text-text-secondary">전략 배치 현황</span>
         <span className="text-[12px] text-text-faint"><span className="font-mono">{slots.length}</span>개 자산</span>
       </div>

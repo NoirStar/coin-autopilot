@@ -13,7 +13,7 @@ interface ResearchStatusProps {
 export const ResearchStatus = ({ summary }: ResearchStatusProps) => {
   return (
     <div className="flex-1 min-w-0 border-t lg:border-t-0 lg:border-l border-border-subtle overflow-y-auto">
-      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between">
+      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between sticky top-0 z-10">
         <span className="text-[12px] font-semibold text-text-secondary">연구 현황</span>
       </div>
 

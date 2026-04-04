@@ -45,6 +45,12 @@ export async function getMarketSummary(atrPct: number | null): Promise<MarketSum
     fetchKimchiPremium(),
   ])
 
+  // 실패한 항목 로그 (디버그용)
+  if (funding.status === 'rejected') console.warn('[시장] 펀딩비 조회 실패:', funding.reason)
+  if (oi.status === 'rejected') console.warn('[시장] OI 조회 실패:', oi.reason)
+  if (lsRatio.status === 'rejected') console.warn('[시장] 롱숏비율 조회 실패:', lsRatio.reason)
+  if (kimchi.status === 'rejected') console.warn('[시장] 김프 조회 실패:', kimchi.reason)
+
   const summary: MarketSummary = {
     volatility: atrToVolatility(atrPct),
     fundingRate: funding.status === 'fulfilled' ? funding.value : 0,

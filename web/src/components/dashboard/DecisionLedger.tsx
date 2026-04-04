@@ -30,7 +30,7 @@ interface DecisionLedgerProps {
 export const DecisionLedger = ({ decisions }: DecisionLedgerProps) => {
   return (
     <div className="flex-1 min-w-0 overflow-y-auto">
-      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between">
+      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between sticky top-0 z-10">
         <span className="text-[12px] font-semibold text-text-secondary">시스템 판단 기록</span>
         <span className="text-[12px] text-text-faint">최근 <span className="font-mono">{decisions.length}</span>건</span>
       </div>

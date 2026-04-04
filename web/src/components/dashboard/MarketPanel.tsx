@@ -19,7 +19,9 @@ const formatBillion = (n: number): string => {
 }
 
 const formatElapsed = (iso: string): string => {
+  if (!iso) return '—'
   const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (sec < 0) return '방금'
   if (sec < 60) return `${sec}초 전`
   if (sec < 3600) return `${Math.floor(sec / 60)}분 전`
   return `${Math.floor(sec / 3600)}시간 전`
@@ -35,13 +37,13 @@ export const MarketPanel = ({ market }: MarketPanelProps) => {
 
   return (
     <div className="flex-1 min-w-0 border-t lg:border-t-0 lg:border-l border-border-subtle overflow-y-auto">
-      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between">
+      <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between sticky top-0 z-10">
         <span className="text-[12px] font-semibold text-text-secondary">시장 상황</span>
         <span className="text-[12px] text-text-faint">{formatElapsed(market.crypto.updatedAt)}</span>
       </div>
 
       {/* 암호화폐 */}
-      <div className="px-4 py-2 border-b border-border-subtle">
+      <div className={`px-4 py-2${market.krStock ? ' border-b border-border-subtle' : ''}`}>
         <div className="text-[12px] font-semibold text-text-muted mb-2">암호화폐</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           <Metric
