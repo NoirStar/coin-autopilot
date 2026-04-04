@@ -106,25 +106,25 @@ const AccountBlock = ({
       {/* 자산 */}
       <div>
         <div className="text-[12px] font-semibold text-text-muted mb-0.5">{label} 자산</div>
-        <div className={`font-mono font-semibold text-[20px] ${textMute}`}>
-          {isUsd ? `$${equity.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : formatKRW(equity)}
+        <div className={`font-semibold text-[20px] ${textMute}`}>
+          <span className="font-mono tabular-nums">{isUsd ? `$${equity.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : formatKRW(equity)}</span>
         </div>
       </div>
       {/* 손익 */}
       <div>
         <div className="text-[12px] font-semibold text-text-muted mb-0.5">오늘 손익</div>
-        <div className={`font-mono font-semibold text-[15px] ${muted ? 'text-text-faint' : pnlColor}`}>
-          {pnlSign}{isUsd ? `$${Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : formatKRW(pnl)}
+        <div className={`font-semibold text-[15px] ${muted ? 'text-text-faint' : pnlColor}`}>
+          <span className="font-mono tabular-nums">{pnlSign}{isUsd ? `$${Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : formatKRW(pnl)}</span>
           <span className={`ml-1.5 text-[12px] font-medium ${muted ? 'text-text-faint' : pnlColor}`}>
-            {pnlSign}{formatPercent(pnlPct)}
+            <span className="font-mono tabular-nums">{pnlSign}{formatPercent(pnlPct)}</span>
           </span>
         </div>
       </div>
       {/* 포지션 수 */}
       <div>
         <div className="text-[12px] font-semibold text-text-muted mb-0.5">운용</div>
-        <div className={`font-mono font-semibold text-[15px] ${textMute}`}>
-          <span className="font-mono">{count}</span>개
+        <div className={`font-semibold text-[15px] ${textMute}`}>
+          <span className="font-mono tabular-nums">{count}</span>개
         </div>
       </div>
     </div>

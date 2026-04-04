@@ -99,7 +99,7 @@ export function PortfolioPage() {
           positions={balance?.upbit.positions ?? []}
           isLoading={balanceLoading}
           onGoToSettings={() => navigate('/settings')}
-          formatBalance={(v) => `${v.toLocaleString('ko-KR')}원`}
+          formatBalance={(v) => <><span className="font-mono tabular-nums">{v.toLocaleString('ko-KR')}</span>원</>}
         />
         <ExchangeCard
           name="OKX"
@@ -110,7 +110,7 @@ export function PortfolioPage() {
           positions={balance?.okx.positions ?? []}
           isLoading={balanceLoading}
           onGoToSettings={() => navigate('/settings')}
-          formatBalance={(v) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          formatBalance={(v) => <><span className="font-mono tabular-nums">${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></>}
         />
         <ExchangeCard
           name="모의 운용"
@@ -120,7 +120,7 @@ export function PortfolioPage() {
           balance={balance?.paper.equity ?? 0}
           positions={balance?.paper.positions ?? []}
           isLoading={balanceLoading}
-          formatBalance={(v) => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          formatBalance={(v) => <><span className="font-mono tabular-nums">${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></>}
         />
       </div>
 
@@ -272,7 +272,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
   positions: Array<{ symbol: string; qty: number; entryPrice: number; pnl: number }>
   isLoading: boolean
   onGoToSettings?: () => void
-  formatBalance: (v: number) => string
+  formatBalance: (v: number) => React.ReactNode
 }) {
   if (isLoading) {
     return (
@@ -321,7 +321,7 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
         </span>
       </div>
       <div className="mt-2 text-[24px] font-bold text-text-primary">
-        <span className="font-mono tabular-nums">{formatBalance(balance)}</span>
+        {formatBalance(balance)}
       </div>
       {positions.length > 0 ? (
         <div className="mt-3 space-y-1.5">
