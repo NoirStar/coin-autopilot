@@ -74,7 +74,7 @@ export const TradingDashboard = () => {
       <SystemStrip status={systemStatus} />
       <HeroStrip summary={heroSummary} />
 
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:max-h-[280px]">
+      <div className="flex flex-col lg:flex-row flex-[3] min-h-0">
         <DeploymentMatrix slots={assetSlots} />
         <OperatorQueue
           items={queueItems}
@@ -84,12 +84,12 @@ export const TradingDashboard = () => {
         />
       </div>
 
-      <div className="flex flex-col lg:flex-row border-t border-border lg:h-[180px] shrink-0">
+      <div className="flex flex-col lg:flex-row border-t border-border flex-[2] min-h-0">
         <PositionPanel positions={positions} />
         <MarketPanel market={market} />
       </div>
 
-      <div className="flex flex-col lg:flex-row border-t border-border lg:h-[180px] shrink-0">
+      <div className="flex flex-col lg:flex-row border-t border-border flex-[2] min-h-0">
         <DecisionLedger decisions={decisions} />
         <ResearchStatus summary={researchSummary} />
       </div>
