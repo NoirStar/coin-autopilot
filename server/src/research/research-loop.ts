@@ -13,8 +13,9 @@ import { supabase } from '../services/database.js'
 
 // ─── 상수 ──────────────────────────────────────────────────────
 
-/** 백테스트용 캔들 조회 수 (EMA200 + 충분한 거래 기간) */
-const CANDLE_LIMIT = 1000
+/** 백테스트용 캔들 조회 수 (EMA200 워밍업 + 충분한 거래 기간)
+ *  4h: 3000개 ≈ 500일, 1h: 3000개 ≈ 125일 */
+const CANDLE_LIMIT = 3000
 
 /** BTC 기준 심볼 키 (레짐 판단 + 대부분 전략에서 필요) */
 const BTC_KEYS: Record<string, string> = {
@@ -230,6 +231,8 @@ async function updateResearchRunCompleted(
     .update({
       status: 'completed',
       ended_at: new Date().toISOString(),
+      period_start: result.periodStart.toISOString(),
+      period_end: result.periodEnd.toISOString(),
     })
     .eq('id', runId)
 

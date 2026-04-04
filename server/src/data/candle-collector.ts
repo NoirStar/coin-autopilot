@@ -335,13 +335,14 @@ export async function loadCandles(
   timeframe: Timeframe,
   limit: number = 500
 ): Promise<Candle[]> {
+  // 최신 N개를 가져온 뒤 시간순 정렬 (DESC limit → reverse)
   const { data, error } = await supabase
     .from('candles')
     .select('*')
     .eq('asset_key', assetKey)
     .eq('exchange', exchange)
     .eq('timeframe', timeframe)
-    .order('open_time', { ascending: true })
+    .order('open_time', { ascending: false })
     .limit(limit)
 
   if (error) {
@@ -349,7 +350,8 @@ export async function loadCandles(
     return []
   }
 
-  return (data ?? []).map((d) => ({
+  // DESC로 가져왔으므로 시간순(ASC)으로 뒤집기
+  return (data ?? []).reverse().map((d) => ({
     openTime: new Date(d.open_time),
     open: Number(d.open),
     high: Number(d.high),
