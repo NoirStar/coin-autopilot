@@ -74,27 +74,43 @@ function atrToVolatility(atrPct: number | null): 'low' | 'medium' | 'high' {
 // ─── 개별 수집 함수 ─────────────────────────────────────────
 
 async function fetchBtcFunding(): Promise<number> {
-  const { current } = await fetchFundingRate('BTC')
-  return Math.round(current * 10000) / 100 // 소수점 → % 변환 (0.0001 → 0.01%)
-}
-
-async function fetchBtcOpenInterest(): Promise<number> {
+  // CCXT로 실패할 수 있으므로 REST 폴백 포함
   try {
-    const okx = getOkxExchange()
-    // CCXT fetchOpenInterest
-    const oi = await okx.fetchOpenInterest('BTC/USDT:USDT')
-    return Number(oi.openInterestAmount ?? 0) * Number(oi.info?.last ?? 0) // 계약 수 * 가격 = USD
+    const { current } = await fetchFundingRate('BTC')
+    // CCXT fundingRate는 0.00015 같은 소수 → % 변환
+    return Math.round(current * 100 * 1000) / 1000 // 0.00015 → 0.015%
   } catch {
-    // fetchOpenInterest 미지원 시 REST 폴백
+    // REST API 직접 호출 폴백
     try {
-      const res = await fetch('https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-volume?ccy=BTC&period=5m')
+      const res = await fetch('https://www.okx.com/api/v5/public/funding-rate?instId=BTC-USDT-SWAP')
       if (!res.ok) return 0
-      const json = await res.json() as { data: Array<[string, string, string]> }
-      const latest = json.data?.[0]
-      return latest ? Number(latest[1]) : 0 // OI value
+      const json = await res.json() as { data: Array<{ fundingRate: string }> }
+      const rate = Number(json.data?.[0]?.fundingRate ?? 0)
+      return Math.round(rate * 100 * 1000) / 1000
     } catch {
       return 0
     }
+  }
+}
+
+async function fetchBtcOpenInterest(): Promise<number> {
+  // OKX REST API 직접 호출 (인증 불필요, CCXT보다 안정적)
+  try {
+    const res = await fetch('https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=BTC-USDT-SWAP')
+    if (!res.ok) return 0
+    const json = await res.json() as { data: Array<{ oi: string; oiCcy: string }> }
+    const entry = json.data?.[0]
+    if (!entry) return 0
+    // oi는 계약 수(BTC 단위), BTC 가격을 곱해서 USD로 변환
+    const oiBtc = Number(entry.oi ?? 0)
+    // BTC 가격 조회
+    const priceRes = await fetch('https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT-SWAP')
+    if (!priceRes.ok) return oiBtc
+    const priceJson = await priceRes.json() as { data: Array<{ last: string }> }
+    const price = Number(priceJson.data?.[0]?.last ?? 0)
+    return Math.round(oiBtc * price)
+  } catch {
+    return 0
   }
 }
 
@@ -119,10 +135,21 @@ async function fetchKimchiPremium(): Promise<number> {
     const upbitData = await upbitRes.json() as Array<{ trade_price: number }>
     const btcKrw = upbitData[0]?.trade_price ?? 0
 
-    // OKX BTC/USDT 가격 (이미 초기화된 CCXT 인스턴스 사용)
-    const okx = getOkxExchange()
-    const ticker = await okx.fetchTicker('BTC/USDT:USDT')
-    const btcUsdt = ticker.last ?? 0
+    // OKX BTC/USDT 현물 가격 (REST API 직접 — 선물 가격 왜곡 방지)
+    let btcUsdt = 0
+    try {
+      const okxRes = await fetch('https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT')
+      if (okxRes.ok) {
+        const okxData = await okxRes.json() as { data: Array<{ last: string }> }
+        btcUsdt = Number(okxData.data?.[0]?.last ?? 0)
+      }
+    } catch { /* 폴백 아래 */ }
+    // 현물 실패 시 CCXT 선물 가격 사용
+    if (btcUsdt === 0) {
+      const okx = getOkxExchange()
+      const ticker = await okx.fetchTicker('BTC/USDT:USDT')
+      btcUsdt = ticker.last ?? 0
+    }
 
     // 환율 (하나은행 API 또는 고정 폴백)
     let usdKrw = 1380 // 폴백
