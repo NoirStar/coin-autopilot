@@ -116,7 +116,7 @@ export function PortfolioPage() {
           name="모의 운용"
           type="페이퍼"
           currency="USDT"
-          configured={(balance?.paper.equity ?? 0) > 0 || (balance?.paper.positions ?? []).length > 0}
+          configured={true}
           balance={balance?.paper.equity ?? 0}
           positions={balance?.paper.positions ?? []}
           isLoading={balanceLoading}
@@ -336,7 +336,9 @@ function ExchangeCard({ name, type, currency: _currency, configured, balance, po
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-[12px] text-text-muted">보유 코인: 없음</p>
+        <p className="mt-2 text-[12px] text-text-muted">
+          {name === '모의 운용' ? '활성 세션 없음 — 전략이 승격되면 자동 시작' : '보유 코인: 없음'}
+        </p>
       )}
     </div>
   )
