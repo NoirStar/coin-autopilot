@@ -13,9 +13,14 @@ import { supabase } from '../services/database.js'
 
 // ─── 상수 ──────────────────────────────────────────────────────
 
-/** 백테스트용 캔들 조회 수 (EMA200 워밍업 + 충분한 거래 기간)
- *  4h: 3000개 ≈ 500일, 1h: 3000개 ≈ 125일 */
-const CANDLE_LIMIT = 3000
+/** 타임프레임별 백테스트 캔들 수 (워밍업 200개 + 실평가 구간)
+ *  1h: 18000개 ≈ 2년 (실평가 ~740일)
+ *  4h: 5000개 ≈ 2.7년 (실평가 ~800일) */
+const CANDLE_LIMITS: Record<string, number> = {
+  '1h': 18000,
+  '4h': 5000,
+}
+const DEFAULT_CANDLE_LIMIT = 5000
 
 /** BTC 기준 심볼 키 (레짐 판단 + 대부분 전략에서 필요) */
 const BTC_KEYS: Record<string, string> = {
@@ -144,11 +149,12 @@ export async function runResearchLoop(): Promise<void> {
  */
 async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
   const { exchange, timeframe } = strategy.config
+  const candleLimit = CANDLE_LIMITS[timeframe] ?? DEFAULT_CANDLE_LIMIT
   const candleMap: CandleMap = new Map()
 
   // BTC 캔들은 항상 로드 (레짐 판단 + 대부분 전략에서 필요)
   const btcKey = BTC_KEYS[exchange] ?? 'BTC-KRW'
-  const btcCandles = await loadCandles(exchange, btcKey, timeframe, CANDLE_LIMIT)
+  const btcCandles = await loadCandles(exchange, btcKey, timeframe, candleLimit)
   candleMap.set('BTC', btcCandles)
 
   // 1. 전략 파라미터에 심볼 목록이 있으면 사용
@@ -156,7 +162,7 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
   if (Array.isArray(symbols) && symbols.length > 0) {
     for (const sym of symbols as unknown as string[]) {
       if (sym === btcKey) continue
-      const candles = await loadCandles(exchange, sym, timeframe, CANDLE_LIMIT)
+      const candles = await loadCandles(exchange, sym, timeframe, candleLimit)
       const base = sym.split('-')[0]
       candleMap.set(base, candles)
     }
@@ -175,7 +181,7 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
     // 중복 제거
     const uniqueKeys = [...new Set((altKeys ?? []).map((r) => r.asset_key as string))]
     for (const key of uniqueKeys) {
-      const candles = await loadCandles(exchange, key, timeframe, CANDLE_LIMIT)
+      const candles = await loadCandles(exchange, key, timeframe, candleLimit)
       if (candles.length < 20) continue // 너무 적으면 스킵
       const base = key.split('-')[0]
       candleMap.set(base, candles)
