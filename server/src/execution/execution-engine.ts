@@ -533,7 +533,7 @@ export async function checkPaperToLivePromotion(strategyDbId: string): Promise<{
   const { data: snapshots } = await supabase
     .from('equity_snapshots')
     .select('total_equity, recorded_at')
-    .eq('source', `paper:${session.id}`)
+    .eq('source', 'paper')
     .order('recorded_at', { ascending: true })
 
   if (!snapshots || snapshots.length < 2) {

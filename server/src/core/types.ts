@@ -84,7 +84,9 @@ export type DecisionType =
   | 'rebalance'          // 자본 재배분
 
 export type DecisionStatus =
-  | 'pending'            // 판단 생성, 실행 대기
+  | 'pending'            // 판단 생성, 승인 대기
+  | 'approved'           // 승인됨, 실행 대기
+  | 'rejected'           // 거부됨
   | 'executing'          // 실행 엔진이 처리 중
   | 'executed'           // 실행 완료
   | 'failed'             // 실행 실패

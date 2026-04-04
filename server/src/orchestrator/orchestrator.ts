@@ -362,9 +362,9 @@ export async function executeDecision(decisionId: string): Promise<boolean> {
     return false
   }
 
-  // PENDING 상태만 실행 가능
-  if (decision.status !== 'pending') {
-    console.warn(`[오케스트레이터] 판단 ${decisionId} 상태가 pending이 아님: ${decision.status}`)
+  // PENDING 또는 APPROVED 상태만 실행 가능
+  if (decision.status !== 'pending' && decision.status !== 'approved') {
+    console.warn(`[오케스트레이터] 판단 ${decisionId} 실행 불가 상태: ${decision.status}`)
     return false
   }
 
@@ -1005,7 +1005,10 @@ async function updateDecisionStatus(
   }
 }
 
-/** 판단 생성 + 즉시 실행 */
+/** 승인 없이 즉시 실행하는 판단 유형 (긴급/시스템 판단) */
+const AUTO_EXECUTE_TYPES: DecisionType[] = ['go_flat', 'rebalance']
+
+/** 판단 생성 — 유형에 따라 즉시 실행 또는 승인 대기 */
 async function createAndExecuteDecision(params: {
   slotId: string
   decisionType: DecisionType
@@ -1015,6 +1018,8 @@ async function createAndExecuteDecision(params: {
   reason: string
   scoreSnapshot: Record<string, number>
 }): Promise<void> {
+  const autoExecute = AUTO_EXECUTE_TYPES.includes(params.decisionType)
+
   const { data: decision, error: decErr } = await supabase
     .from('orchestrator_decisions')
     .insert({
@@ -1035,8 +1040,12 @@ async function createAndExecuteDecision(params: {
     return
   }
 
-  console.log(`[오케스트레이터] 판단 생성: ${params.decisionType} (${decision.id})`)
-
-  // 즉시 실행
-  await executeDecision(decision.id)
+  if (autoExecute) {
+    // go_flat, rebalance는 긴급 판단 — 즉시 실행
+    console.log(`[오케스트레이터] 판단 생성 + 즉시 실행: ${params.decisionType} (${decision.id})`)
+    await executeDecision(decision.id)
+  } else {
+    // strategy_assign, strategy_switch, strategy_retire는 승인 대기
+    console.log(`[오케스트레이터] 판단 생성 → 승인 대기: ${params.decisionType} (${decision.id})`)
+  }
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { QueueItem, Approval, RiskAlert, RiskLevel } from '@/types/orchestration'
 import type { OperatorHomeResponse } from '@/services/api'
+import { api } from '@/services/api'
 
 interface ApprovalState {
   queueItems: QueueItem[]
@@ -34,7 +35,10 @@ export const useApprovalStore = create<ApprovalState>((set) => ({
       kind: 'approval' as const,
       data: {
         id: d.id,
-        type: 'strategy_swap' as const,
+        type: (d.type === 'strategy_assign' ? 'position_entry'
+          : d.type === 'strategy_switch' ? 'strategy_swap'
+          : d.type === 'strategy_retire' ? 'risk_adjustment'
+          : 'strategy_swap') as Approval['type'],
         status: 'pending' as const,
         title: `${d.type} / ${d.slotId}`,
         description: d.reason ?? '',
@@ -65,29 +69,39 @@ export const useApprovalStore = create<ApprovalState>((set) => ({
     set({ queueItems: [...approvals, ...risks], isLoading: false })
   },
 
-  approveItem: (id) =>
+  approveItem: (id) => {
+    // 낙관적 UI: 즉시 제거 후 서버 호출
     set((state) => ({
-      queueItems: state.queueItems.filter((item) => {
-        if (item.kind === 'approval') return item.data.id !== id
-        return true
-      }),
-    })),
+      queueItems: state.queueItems.filter((item) =>
+        item.kind !== 'approval' || item.data.id !== id,
+      ),
+    }))
+    api.approveDecision(id).catch((err) => {
+      console.error('[승인] 서버 호출 실패:', err)
+    })
+  },
 
-  rejectItem: (id) =>
+  rejectItem: (id) => {
     set((state) => ({
-      queueItems: state.queueItems.filter((item) => {
-        if (item.kind === 'approval') return item.data.id !== id
-        return true
-      }),
-    })),
+      queueItems: state.queueItems.filter((item) =>
+        item.kind !== 'approval' || item.data.id !== id,
+      ),
+    }))
+    api.rejectDecision(id).catch((err) => {
+      console.error('[거부] 서버 호출 실패:', err)
+    })
+  },
 
-  dismissItem: (id) =>
+  dismissItem: (id) => {
     set((state) => ({
-      queueItems: state.queueItems.filter((item) => {
-        if (item.kind === 'risk') return item.data.id !== id
-        return true
-      }),
-    })),
+      queueItems: state.queueItems.filter((item) =>
+        item.kind !== 'risk' || item.data.id !== id,
+      ),
+    }))
+    api.resolveRiskEvent(id).catch((err) => {
+      console.error('[리스크 해결] 서버 호출 실패:', err)
+    })
+  },
 
   setLoading: (loading) => set({ isLoading: loading }),
 }))

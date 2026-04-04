@@ -135,7 +135,9 @@ portfolioRoutes.get('/trades', async (c) => {
       exit_price: Number(p.exit_price ?? 0),
       quantity: Number(p.current_qty),
       pnl: Number(p.realized_pnl ?? 0),
-      pnl_pct: 0,
+      pnl_pct: Number(p.entry_price) > 0 && Number(p.current_qty) > 0
+        ? (Number(p.realized_pnl ?? 0) / (Number(p.entry_price) * Number(p.current_qty))) * 100
+        : 0,
       strategy: p.strategy_id ?? '',
       session_type: 'live',
       closed_at: p.exit_time,

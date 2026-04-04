@@ -81,13 +81,13 @@ export const ResearchPage = () => {
       return (res.data ?? []).map((c): ResearchCandidate => ({
         id: String(c.strategy_id ?? ''),
         strategy_name: String(c.strategyName ?? c.strategy_id ?? ''),
-        asset: '',
-        total_return: 0,
+        asset: String(c.asset ?? ''),
+        total_return: Number(c.score ?? 0) * 100,
         sharpe_ratio: Number(c.sharpe ?? 0),
         max_drawdown: Number(c.mdd ?? 0),
         win_rate: Number(c.win_rate ?? 0),
         total_trades: 0,
-        promotion_status: 'none',
+        promotion_status: String(c.promotionStatus ?? 'none') as ResearchCandidate['promotion_status'],
         completed_at: String(c.ranked_at ?? ''),
       }))
     },

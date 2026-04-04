@@ -8,7 +8,7 @@
 
 import { Hono } from 'hono'
 import { supabase } from '../services/database.js'
-import { getSlotStatus, calculateEdgeScore } from '../orchestrator/orchestrator.js'
+import { getSlotStatus, calculateEdgeScore, executeDecision } from '../orchestrator/orchestrator.js'
 import { getCircuitBreakerStatus } from '../risk/risk-manager.js'
 import { getMarketSummary } from '../data/market-summary.js'
 import { authMiddleware } from '../core/auth.js'
@@ -754,22 +754,41 @@ apiRoutes.get('/research/candidates', async (c) => {
 
     // 전략 이름 조회
     const strategyIds = [...new Set((candidates ?? []).map((c) => c.strategy_id))]
-    let strategyNameMap = new Map<string, string>()
+    const strategyNameMap = new Map<string, string>()
+    const assetMap = new Map<string, string>()
+    const promotionMap = new Map<string, string>()
 
     if (strategyIds.length > 0) {
       const { data: strategies } = await supabase
         .from('strategies')
-        .select('id, strategy_id, name')
+        .select('id, strategy_id, name, exchange')
         .in('id', strategyIds)
 
       for (const s of strategies ?? []) {
         strategyNameMap.set(s.id, s.name)
+        assetMap.set(s.id, s.exchange === 'okx' ? 'BTC-USDT' : 'BTC-KRW')
+      }
+
+      // 전략별 최신 연구 결과의 promotion_status
+      const { data: latestRuns } = await supabase
+        .from('research_runs')
+        .select('strategy_id, promotion_status')
+        .in('strategy_id', strategyIds)
+        .eq('status', 'completed')
+        .order('ended_at', { ascending: false })
+
+      for (const r of latestRuns ?? []) {
+        if (!promotionMap.has(r.strategy_id)) {
+          promotionMap.set(r.strategy_id, r.promotion_status ?? 'none')
+        }
       }
     }
 
     const enrichedCandidates = (candidates ?? []).map((candidate) => ({
       ...candidate,
       strategyName: strategyNameMap.get(candidate.strategy_id) ?? null,
+      asset: assetMap.get(candidate.strategy_id) ?? '',
+      promotionStatus: promotionMap.get(candidate.strategy_id) ?? 'none',
     }))
 
     return c.json({
@@ -906,6 +925,87 @@ apiRoutes.post('/notifications/:id/ack', authMiddleware, async (c) => {
     console.error('[API] 알림 읽음 API 오류:', err)
     return c.json({ error: '알림 읽음 처리 실패' }, 500)
   }
+})
+
+// ─── POST /decisions/:id/approve — 판단 승인 ──────────────────
+
+apiRoutes.post('/decisions/:id/approve', async (c) => {
+  const id = c.req.param('id')
+
+  // pending 상태인 판단만 승인 가능
+  const { data: decision, error: fetchErr } = await supabase
+    .from('orchestrator_decisions')
+    .select('id, status, decision_type')
+    .eq('id', id)
+    .single()
+
+  if (fetchErr || !decision) {
+    return c.json({ error: '판단을 찾을 수 없습니다' }, 404)
+  }
+
+  if (decision.status !== 'pending') {
+    return c.json({ error: `승인할 수 없는 상태입니다: ${decision.status}` }, 400)
+  }
+
+  // pending → approved → 즉시 실행
+  await supabase
+    .from('orchestrator_decisions')
+    .update({ status: 'approved' })
+    .eq('id', id)
+
+  const success = await executeDecision(id)
+
+  return c.json({
+    success,
+    id,
+    previousStatus: 'pending',
+    newStatus: success ? 'executed' : 'failed',
+  })
+})
+
+// ─── POST /decisions/:id/reject — 판단 거부 ──────────────────
+
+apiRoutes.post('/decisions/:id/reject', async (c) => {
+  const id = c.req.param('id')
+
+  const { data: decision, error: fetchErr } = await supabase
+    .from('orchestrator_decisions')
+    .select('id, status')
+    .eq('id', id)
+    .single()
+
+  if (fetchErr || !decision) {
+    return c.json({ error: '판단을 찾을 수 없습니다' }, 404)
+  }
+
+  if (decision.status !== 'pending') {
+    return c.json({ error: `거부할 수 없는 상태입니다: ${decision.status}` }, 400)
+  }
+
+  await supabase
+    .from('orchestrator_decisions')
+    .update({ status: 'rejected' })
+    .eq('id', id)
+
+  return c.json({ success: true, id, newStatus: 'rejected' })
+})
+
+// ─── POST /risk/events/:id/resolve — 리스크 이벤트 해결 ──────
+
+apiRoutes.post('/risk/events/:id/resolve', async (c) => {
+  const id = c.req.param('id')
+
+  const { error } = await supabase
+    .from('risk_events')
+    .update({ resolved: true })
+    .eq('id', id)
+    .eq('resolved', false)
+
+  if (error) {
+    return c.json({ error: '리스크 이벤트를 찾을 수 없습니다' }, 404)
+  }
+
+  return c.json({ success: true, id })
 })
 
 export default apiRoutes

@@ -112,11 +112,12 @@ function mapDecisions(data: OperatorHomeResponse): Decision[] {
 
 function mapDecisionType(type: string): Decision['action'] {
   switch (type) {
-    case 'assign': return 'ENTRY'
-    case 'switch': return 'SWAP'
-    case 'retire': return 'EXIT'
+    case 'strategy_assign': return 'ENTRY'
+    case 'strategy_switch': return 'SWAP'
+    case 'strategy_retire': return 'EXIT'
+    case 'go_flat': return 'STOP'
     case 'rebalance': return 'HOLD'
-    default: return 'HOLD'
+    default: return 'WAIT'
   }
 }
 
