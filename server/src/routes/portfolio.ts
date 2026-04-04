@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { createHmac } from 'crypto'
+import jwt from 'jsonwebtoken'
 import { randomUUID } from 'crypto'
 import { supabase } from '../services/database.js'
 
@@ -181,17 +181,11 @@ async function fetchUpbitAccounts(): Promise<UpbitAccount[]> {
   const secretKey = process.env.UPBIT_SECRET_KEY ?? ''
   if (!accessKey || !secretKey) return []
 
-  // JWT 토큰 생성 (업비트 인증 방식)
-  const payload = {
-    access_key: accessKey,
-    nonce: randomUUID(),
-  }
-  const jwtHeader = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
-  const jwtPayload = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const signature = createHmac('sha256', secretKey)
-    .update(`${jwtHeader}.${jwtPayload}`)
-    .digest('base64url')
-  const token = `${jwtHeader}.${jwtPayload}.${signature}`
+  const token = jwt.sign(
+    { access_key: accessKey, nonce: randomUUID() },
+    secretKey,
+    { algorithm: 'HS256' },
+  )
 
   const res = await fetch('https://api.upbit.com/v1/accounts', {
     headers: { Authorization: `Bearer ${token}` },
