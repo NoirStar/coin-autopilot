@@ -17,8 +17,8 @@ import { supabase } from '../services/database.js'
  *  1h: 18000개 ≈ 2년 (실평가 ~740일)
  *  4h: 5000개 ≈ 2.7년 (실평가 ~800일) */
 const CANDLE_LIMITS: Record<string, number> = {
-  '1h': 18000,
-  '4h': 5000,
+  '1h': 18000,  // ~2년 실평가 (워밍업 200 + 17800)
+  '4h': 5000,   // ~2.7년 실평가 (워밍업 200 + 4800)
 }
 const DEFAULT_CANDLE_LIMIT = 5000
 
@@ -102,8 +102,10 @@ export async function runResearchLoop(): Promise<void> {
         continue
       }
 
-      // 3. 백테스트 실행
+      // 3. 백테스트 실행 (이벤트 루프 양보 — API 응답 블로킹 방지)
+      await new Promise((r) => setImmediate(r))
       const result = runBacktest(strategy, allCandles)
+      await new Promise((r) => setImmediate(r))
 
       // 4. 상태 → completed, metrics 저장
       await updateResearchRunCompleted(runId, result)
@@ -169,20 +171,14 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
     return candleMap
   }
 
-  // 2. 알트 전략 (direction: long, 거래소: upbit)이면 DB에 있는 알트 심볼 자동 로드
+  // 2. 알트 전략 (upbit 현물)이면 수집 대상 알트 심볼 로드
+  //    메모리 과부하 방지: 크론에서 수집하는 고정 목록만 사용
   if (strategy.config.assetClass === 'crypto_spot' && exchange === 'upbit') {
-    const { data: altKeys } = await supabase
-      .from('candles')
-      .select('asset_key')
-      .eq('exchange', 'upbit')
-      .eq('timeframe', timeframe)
-      .neq('asset_key', btcKey)
-
-    // 중복 제거
-    const uniqueKeys = [...new Set((altKeys ?? []).map((r) => r.asset_key as string))]
-    for (const key of uniqueKeys) {
+    const altKeys = ['ETH-KRW', 'XRP-KRW', 'SOL-KRW', 'DOGE-KRW']
+    for (const key of altKeys) {
+      if (key === btcKey) continue
       const candles = await loadCandles(exchange, key, timeframe, candleLimit)
-      if (candles.length < 20) continue // 너무 적으면 스킵
+      if (candles.length < 20) continue
       const base = key.split('-')[0]
       candleMap.set(base, candles)
     }
