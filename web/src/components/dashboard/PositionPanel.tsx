@@ -21,7 +21,7 @@ export const PositionPanel = ({ positions }: PositionPanelProps) => {
     <div className="flex-1 min-w-0 overflow-y-auto">
       <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between">
         <span className="text-[12px] font-semibold text-text-secondary">포지션 현황</span>
-        <span className="font-mono text-[10px] text-text-faint">{positions.length}개 열림</span>
+        <span className="text-[12px] text-text-faint"><span className="font-mono">{positions.length}</span>개 열림</span>
       </div>
 
       {positions.length === 0 ? (
@@ -69,16 +69,16 @@ const PositionRow = ({ position: pos }: { position: ActivePosition }) => {
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-medium text-text-primary">{pos.asset}</span>
           <span className={`text-[12px] font-semibold ${sideColor}`}>{sideLabel}</span>
-          <span className="text-[11px] text-text-faint">{pos.strategy}</span>
+          <span className="text-[12px] text-text-faint">{pos.strategy}</span>
         </div>
         <span className={`font-mono text-[13px] font-semibold tabular-nums ${pnlColor}`}>
           {pos.unrealizedPnlPct >= 0 ? '+' : ''}{formatPercent(pos.unrealizedPnlPct)}
         </span>
       </div>
-      <div className="flex items-center gap-4 font-mono text-[11px] text-text-muted">
-        <span>진입 {pos.entryPrice.toLocaleString()}</span>
-        <span>현재 <span className="text-text-secondary">{pos.currentPrice.toLocaleString()}</span></span>
-        <span>SL {pos.stopLoss.toLocaleString()}</span>
+      <div className="flex items-center gap-4 text-[12px] text-text-muted">
+        <span>진입 <span className="font-mono">{pos.entryPrice.toLocaleString()}</span></span>
+        <span>현재 <span className="font-mono text-text-secondary">{pos.currentPrice.toLocaleString()}</span></span>
+        <span>SL <span className="font-mono">{pos.stopLoss.toLocaleString()}</span></span>
         <span className="ml-auto text-text-faint">{formatDuration(pos.holdingSince)}</span>
       </div>
     </div>

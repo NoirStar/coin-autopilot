@@ -94,7 +94,7 @@ export function SettingsPage() {
         <div className="card-surface rounded-md p-4">
           <div className="flex items-center gap-2">
             <Server className="h-3.5 w-3.5 text-text-faint" />
-            <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">서버 상태</h3>
+            <h3 className="text-[12px] font-semibold text-text-muted">서버 상태</h3>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatusItem
@@ -166,7 +166,7 @@ function ApiKeySection({ settings, isLoading }: { settings: UserSettings | undef
     <div className="card-surface rounded-md p-5">
       <div className="flex items-center gap-2">
         <Key className="h-3.5 w-3.5 text-text-faint" />
-        <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">API 키 관리</h3>
+        <h3 className="text-[12px] font-semibold text-text-muted">API 키 관리</h3>
       </div>
       <div className="mt-4 space-y-3">
         <ApiKeyCard
@@ -433,7 +433,7 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="h-3.5 w-3.5 text-text-faint" />
-          <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">리스크 파라미터</h3>
+          <h3 className="text-[12px] font-semibold text-text-muted">리스크 파라미터</h3>
         </div>
         {toast && (
           <span className="flex items-center gap-1 text-[12px] text-profit">
@@ -545,7 +545,7 @@ function AlertSection({ settings, isLoading }: { settings: UserSettings | undefi
     <div className="card-surface rounded-md p-5">
       <div className="flex items-center gap-2">
         <Bell className="h-3.5 w-3.5 text-text-faint" />
-        <h3 className="font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">알림 설정</h3>
+        <h3 className="text-[12px] font-semibold text-text-muted">알림 설정</h3>
       </div>
 
       <div className="mt-4 space-y-3">

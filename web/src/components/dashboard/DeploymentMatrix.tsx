@@ -29,7 +29,7 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
       {/* 섹션 헤더 — 한국어 + 영문 */}
       <div className="px-4 py-2.5 border-b border-border bg-surface flex items-baseline justify-between">
         <span className="text-[12px] font-semibold text-text-secondary">전략 배치 현황</span>
-        <span className="font-mono text-[10px] text-text-faint">{slots.length}개 자산</span>
+        <span className="text-[12px] text-text-faint"><span className="font-mono">{slots.length}</span>개 자산</span>
       </div>
 
       {/* 데스크톱 테이블 컬럼 헤더 */}
@@ -109,13 +109,13 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
                   )}
                 </div>
               </div>
-              <div className="mt-1 text-[11px] text-text-muted truncate">
+              <div className="mt-1 text-[12px] text-text-muted truncate">
                 {slot.rationale}
               </div>
             </div>
 
             {/* 보조 행 — 데스크톱만 */}
-            <div className="hidden sm:block px-4 pb-2 pl-8 font-mono text-[11px] text-text-muted">
+            <div className="hidden sm:block px-4 pb-2 pl-8 text-[12px] text-text-muted">
               {slot.rationaleDetail}
             </div>
           </div>

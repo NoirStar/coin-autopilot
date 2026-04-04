@@ -145,7 +145,7 @@ export const StrategyDetail = () => {
           </div>
           <div className="bg-surface border border-border-subtle rounded-md p-4">
             <p className="text-[13px] text-text-secondary">{slot.rationale}</p>
-            <p className="font-mono text-[11px] text-text-muted mt-2">{slot.rationaleDetail}</p>
+            <p className="text-[12px] text-text-muted mt-2">{slot.rationaleDetail}</p>
           </div>
         </div>
 

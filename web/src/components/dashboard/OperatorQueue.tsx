@@ -33,8 +33,8 @@ export const OperatorQueue = ({ items, onApprove, onReject, onDismiss }: Operato
           확인 필요
         </span>
         {items.length > 0 && (
-          <span className="font-mono text-[11px] font-semibold text-warning">
-            {items.length}건
+          <span className="text-[12px] font-semibold text-warning">
+            <span className="font-mono">{items.length}</span>건
           </span>
         )}
       </div>
@@ -74,9 +74,9 @@ const ApprovalCard = ({
     <div className="px-4 py-3 border-b border-border-subtle">
       {/* 유형 + 만료 */}
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-semibold text-info">{typeLabel}</span>
-        <span className="flex items-center gap-1 text-[10px] text-text-faint">
-          <Clock className="w-2.5 h-2.5" />
+        <span className="text-[12px] font-semibold text-info">{typeLabel}</span>
+        <span className="flex items-center gap-1 text-[12px] text-text-faint">
+          <Clock className="w-3 h-3" />
           {formatTimeLeft(approval.expiresAt)}
         </span>
       </div>
@@ -93,7 +93,7 @@ const ApprovalCard = ({
 
       {/* 승인/거부 시 변경점 */}
       <div className="bg-background rounded px-3 py-2 mb-2.5 space-y-1">
-        <div className="flex items-start gap-2 text-[11px]">
+        <div className="flex items-start gap-2 text-[12px]">
           <span className="text-profit shrink-0">승인 시</span>
           <ArrowRight className="w-3 h-3 text-text-faint shrink-0 mt-0.5" />
           <span className="text-text-secondary">
@@ -103,7 +103,7 @@ const ApprovalCard = ({
             {approval.type === 'session_promote' && '페이퍼에서 실전으로 승격됩니다'}
           </span>
         </div>
-        <div className="flex items-start gap-2 text-[11px]">
+        <div className="flex items-start gap-2 text-[12px]">
           <span className="text-text-muted shrink-0">거부 시</span>
           <ArrowRight className="w-3 h-3 text-text-faint shrink-0 mt-0.5" />
           <span className="text-text-muted">현재 상태가 유지됩니다</span>
@@ -157,9 +157,9 @@ const RiskCard = ({
           style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </div>
-      <div className="flex items-center justify-between text-[11px] text-text-muted mb-2">
-        <span>현재 {alert.currentValue}%</span>
-        <span>한도 {alert.threshold}%</span>
+      <div className="flex items-center justify-between text-[12px] text-text-muted mb-2">
+        <span>현재 <span className="font-mono">{alert.currentValue}%</span></span>
+        <span>한도 <span className="font-mono">{alert.threshold}%</span></span>
       </div>
 
       {onDismiss && (

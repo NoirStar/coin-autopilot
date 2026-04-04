@@ -46,18 +46,18 @@ const ResearchRunRow = ({ run }: { run: ResearchRun }) => {
     run.winRate !== null && run.winRate >= 55 ? 'text-profit' : run.winRate !== null && run.winRate < 45 ? 'text-loss' : 'text-text-secondary'
 
   return (
-    <div className="px-4 py-2 font-mono text-[11px] text-text-muted border-b border-border-subtle hover:bg-surface-hover transition-colors">
-      <span className="text-text-faint mr-2">{formatTime(run.completedAt)}</span>
+    <div className="px-4 py-2 text-[12px] text-text-muted border-b border-border-subtle hover:bg-surface-hover transition-colors">
+      <span className="font-mono text-text-faint mr-2">{formatTime(run.completedAt)}</span>
       <span className="text-text-primary font-medium mr-2">{run.strategy}</span>
       <span className="mr-3">{run.asset}</span>
       {run.winRate !== null && (
         <span className="mr-2.5">
-          승률 <span className={winRateColor}>{run.winRate}%</span>
+          승률 <span className={`font-mono ${winRateColor}`}>{run.winRate}%</span>
         </span>
       )}
       {run.maxDrawdown !== null && (
         <span className="mr-2.5">
-          MDD <span className="text-loss">{run.maxDrawdown}%</span>
+          MDD <span className="font-mono text-loss">{run.maxDrawdown}%</span>
         </span>
       )}
       {run.totalReturn !== null && run.totalReturn < 0 && (

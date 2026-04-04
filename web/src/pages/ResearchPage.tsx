@@ -137,7 +137,7 @@ export const ResearchPage = () => {
                     return (
                       <tr key={run.id} className="border-b border-border-subtle hover:bg-surface-hover transition-colors duration-100">
                         <td className="px-3 py-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${cfg.bg} ${cfg.color}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${cfg.bg} ${cfg.color}`}>
                             <Icon className={`w-3 h-3 ${run.status === 'running' ? 'animate-spin' : ''}`} />
                             {cfg.label}
                           </span>
@@ -162,7 +162,7 @@ export const ResearchPage = () => {
                         }`}>
                           {run.win_rate !== null ? `${run.win_rate.toFixed(1)}%` : '—'}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-[11px] text-text-faint">
+                        <td className="px-3 py-2 text-right font-mono text-[12px] text-text-faint">
                           {formatDate(run.started_at)}
                         </td>
                       </tr>
@@ -219,7 +219,7 @@ export const ResearchPage = () => {
                         </td>
                         <td className="px-3 py-2">
                           {promo?.label && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${promo.bg} ${promo.color}`}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium ${promo.bg} ${promo.color}`}>
                               {promo.label}
                             </span>
                           )}
