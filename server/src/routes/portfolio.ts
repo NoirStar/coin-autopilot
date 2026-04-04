@@ -107,7 +107,7 @@ portfolioRoutes.get('/balance', async (c) => {
 
             for (const coin of krwCoins) {
               const market = `KRW-${coin.currency}`
-              const currentPrice = priceMap.get(market) ?? coin.avgBuyPrice
+              const currentPrice = priceMap.get(market) ?? 0
               const evalKrw = coin.balance * currentPrice
               const costKrw = coin.balance * coin.avgBuyPrice
               const pnl = costKrw > 0 ? ((evalKrw - costKrw) / costKrw) * 100 : 0
@@ -116,7 +116,7 @@ portfolioRoutes.get('/balance', async (c) => {
               upbitHoldings.push({
                 symbol: coin.currency,
                 qty: coin.balance,
-                entryPrice: coin.avgBuyPrice,
+                entryPrice: Math.round(evalKrw),
                 pnl: Math.round(pnl * 100) / 100,
               })
             }
@@ -124,26 +124,17 @@ portfolioRoutes.get('/balance', async (c) => {
         } catch { /* 현재가 실패 시 아래 폴백 */ }
       }
 
-      // 비-KRW 마켓 코인 (BTC 마켓 등)은 매입가 기준 표시
-      for (const coin of nonKrwCoins) {
-        upbitHoldings.push({
-          symbol: `${coin.currency} (BTC)`,
-          qty: coin.balance,
-          entryPrice: coin.avgBuyPrice,
-          pnl: 0,
-        })
-        // BTC 마켓은 KRW 평가금 산출 어려우므로 총자산에 미포함
-      }
+      // 비-KRW 마켓 코인은 제외 (BTC 마켓은 원화 평가 불가)
 
-      // KRW 마켓 현재가도 실패한 경우 매입가 폴백
-      if (upbitHoldings.length === 0 && coinAccounts.length > 0) {
-        for (const coin of coinAccounts) {
+      // 현재가 조회 실패 시 매입가 기준 폴백
+      if (upbitHoldings.length === 0 && krwCoins.length > 0) {
+        for (const coin of krwCoins) {
           const evalKrw = coin.balance * coin.avgBuyPrice
           upbitTotalKrw += evalKrw
           upbitHoldings.push({
             symbol: coin.currency,
             qty: coin.balance,
-            entryPrice: coin.avgBuyPrice,
+            entryPrice: Math.round(evalKrw),
             pnl: 0,
           })
         }

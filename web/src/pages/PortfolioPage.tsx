@@ -334,16 +334,23 @@ function ExchangeCard({ name, type, currency: _currency, configured, connected, 
         {formatBalance(balance)}
       </div>
       {positions.length > 0 ? (
-        <div className="mt-3 space-y-1.5">
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[12px] text-text-faint mb-1.5 pb-1 border-b border-border-subtle">
+            <span>코인</span>
+            <span>평가금</span>
+            <span>수익률</span>
+          </div>
+          <div className="space-y-1.5">
           {positions.map((pos, i) => (
             <div key={i} className="flex items-center justify-between text-[12px]">
               <span className="text-text-secondary">{pos.symbol}</span>
-              <span className="font-mono tabular-nums text-text-muted">{pos.entryPrice.toLocaleString()}</span>
-              <span className={`font-mono tabular-nums ${pos.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {formatPercent(pos.pnl)}
+              <span className="font-mono tabular-nums text-text-muted">{pos.entryPrice > 0 ? `${pos.entryPrice.toLocaleString()}원` : '—'}</span>
+              <span className={`font-mono tabular-nums ${pos.pnl > 0 ? 'text-profit' : pos.pnl < 0 ? 'text-loss' : 'text-text-muted'}`}>
+                {pos.pnl !== 0 ? `${pos.pnl >= 0 ? '+' : ''}${formatPercent(pos.pnl)}` : '—'}
               </span>
             </div>
           ))}
+          </div>
         </div>
       ) : (
         <p className="mt-2 text-[12px] text-text-muted">
