@@ -169,10 +169,11 @@ async function fetchOkxCandles(
   instId: string,
   timeframe: Timeframe,
   limit: number = 100,
+  since?: number,
 ): Promise<Candle[]> {
   const symbol = instId.split('-')[0] // BTC-USDT → BTC
   const tfMap: Record<string, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' }
-  return fetchOkxCandlesCCXT(symbol, tfMap[timeframe] ?? '4h', limit)
+  return fetchOkxCandlesCCXT(symbol, tfMap[timeframe] ?? '4h', limit, since)
 }
 
 // ─── DB 저장/조회 (candles 테이블) ───────────────────────
@@ -260,17 +261,24 @@ export async function backfillCandles(
   } else if (exchange === 'okx') {
     const instId = assetKeyToOkxInstId(assetKey)
     let remaining = totalCandles
+    // since 기반 페이지네이션: 과거부터 수집
+    const tfMs: Record<string, number> = { '1m': 60_000, '5m': 300_000, '15m': 900_000, '1h': 3_600_000, '4h': 14_400_000, '1d': 86_400_000 }
+    const intervalMs = tfMs[timeframe] ?? 14_400_000
+    let since = Date.now() - totalCandles * intervalMs
 
     while (remaining > 0) {
-      const batch = await fetchOkxCandles(instId, timeframe, Math.min(remaining, 100))
+      const batchSize = Math.min(remaining, 300)
+      const batch = await fetchOkxCandles(instId, timeframe, batchSize, since)
       if (batch.length === 0) break
 
       const saved = await saveCandlesToDb(exchange, assetKey, timeframe, batch)
       totalSaved += saved
       remaining -= batch.length
 
+      // 다음 페이지: 마지막 캔들 시간 + 1 interval
+      since = batch[batch.length - 1].openTime.getTime() + intervalMs
       await sleep(100)
-      if (batch.length < 100) break // 데이터 끝
+      if (batch.length < batchSize) break
     }
   }
 

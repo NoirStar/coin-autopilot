@@ -114,30 +114,61 @@ async function snapshotEquity(): Promise<void> {
   }
 }
 
-/** BTC 캔들이 충분한지 확인하고, 부족하면 backfill */
-async function ensureMinimumCandles(): Promise<void> {
-  const MIN_CANDLES = 210 // EMA200 + 여유분
-
+/** 특정 캔들 수가 충분한지 확인 */
+async function candleCount(assetKey: string, exchange: string, timeframe: string): Promise<number> {
   const { count } = await supabase
     .from('candles')
     .select('id', { count: 'exact', head: true })
-    .eq('asset_key', 'BTC-KRW')
-    .eq('timeframe', '4h')
+    .eq('asset_key', assetKey)
+    .eq('exchange', exchange)
+    .eq('timeframe', timeframe)
+  return count ?? 0
+}
 
-  if ((count ?? 0) < MIN_CANDLES) {
-    console.log(`[크론] BTC-KRW 4h 캔들 ${count ?? 0}개 — backfill 시작 (최소 ${MIN_CANDLES}개 필요)`)
-    // 업비트 BTC 6개월 + OKX BTC 6개월 병렬 수집
-    await Promise.all([
-      backfillCandles('upbit', 'BTC-KRW', '4h', 6),
-      backfillCandles('okx', 'BTC-USDT', '4h', 6),
-    ])
-    // 나머지 알트코인도 backfill
-    for (const key of ['ETH-KRW', 'XRP-KRW', 'SOL-KRW', 'DOGE-KRW']) {
-      await backfillCandles('upbit', key, '4h', 6)
+/** 캔들이 충분한지 확인하고, 부족하면 backfill */
+async function ensureMinimumCandles(): Promise<void> {
+  const MIN_CANDLES = 210 // EMA200 + 여유분
+
+  // 전략이 사용하는 모든 (exchange, asset_key, timeframe) 조합
+  const targets: Array<{ exchange: 'upbit' | 'okx'; key: string; tf: '4h' | '1h' }> = [
+    // 4h 타임프레임 (upbit)
+    { exchange: 'upbit', key: 'BTC-KRW', tf: '4h' },
+    { exchange: 'upbit', key: 'ETH-KRW', tf: '4h' },
+    { exchange: 'upbit', key: 'XRP-KRW', tf: '4h' },
+    { exchange: 'upbit', key: 'SOL-KRW', tf: '4h' },
+    { exchange: 'upbit', key: 'DOGE-KRW', tf: '4h' },
+    // 4h 타임프레임 (okx) — btc_ema_crossover, btc_bollinger_reversion
+    { exchange: 'okx', key: 'BTC-USDT', tf: '4h' },
+    { exchange: 'okx', key: 'ETH-USDT', tf: '4h' },
+    // 1h 타임프레임 (okx) — btc_macd_momentum, btc_donchian_breakout
+    { exchange: 'okx', key: 'BTC-USDT', tf: '1h' },
+    { exchange: 'okx', key: 'ETH-USDT', tf: '1h' },
+    // 1h 타임프레임 (upbit) — alt_detection
+    { exchange: 'upbit', key: 'BTC-KRW', tf: '1h' },
+  ]
+
+  let needsBackfill = false
+  for (const t of targets) {
+    const cnt = await candleCount(t.key, t.exchange, t.tf)
+    if (cnt < MIN_CANDLES) {
+      needsBackfill = true
+      break
     }
-    await backfillCandles('okx', 'ETH-USDT', '4h', 6)
-    console.log('[크론] backfill 완료')
   }
+
+  if (!needsBackfill) return
+
+  console.log(`[크론] 캔들 부족 감지 — backfill 시작`)
+
+  for (const t of targets) {
+    const cnt = await candleCount(t.key, t.exchange, t.tf)
+    if (cnt < MIN_CANDLES) {
+      console.log(`[크론] ${t.exchange}/${t.key} ${t.tf}: ${cnt}개 → backfill`)
+      await backfillCandles(t.exchange, t.key, t.tf, 6)
+    }
+  }
+
+  console.log('[크론] backfill 완료')
 }
 
 /** 메인 파이프라인 실행 (크론 + 서버 시작 시 공용) */

@@ -56,12 +56,13 @@ export async function checkOkxConnection(): Promise<boolean> {
 export async function fetchOkxCandles(
   symbol: string,
   timeframe: string,
-  limit: number = 300
+  limit: number = 300,
+  since?: number,
 ): Promise<Candle[]> {
   const okx = getOkxExchange()
   const pair = `${symbol}/USDT:USDT`
 
-  const ohlcv = await okx.fetchOHLCV(pair, timeframe, undefined, limit)
+  const ohlcv = await okx.fetchOHLCV(pair, timeframe, since, limit)
 
   return ohlcv.map((bar) => ({
     openTime: new Date(Number(bar[0])),
