@@ -31,20 +31,19 @@ async function snapshotEquity(): Promise<void> {
     let liveUnrealized = 0
     let liveRealized = 0
 
-    const isLive = process.env.LIVE_TRADING === 'true'
-    if (isLive) {
-      // OKX 실계좌 잔고 직접 조회
+    let usedExchangeApi = false
+    if (process.env.LIVE_TRADING === 'true') {
       try {
         const { fetchBalance } = await import('../exchange/okx-client.js')
         const bal = await fetchBalance()
         liveEquity = bal.total
+        usedExchangeApi = true
       } catch (err) {
         console.warn('[스냅샷] OKX 잔고 조회 실패, DB 기반 폴백:', err)
-        isLive // fall through to DB fallback below
       }
     }
 
-    if (!isLive || liveEquity === 0) {
+    if (!usedExchangeApi || liveEquity === 0) {
       // DB 기반 live 포지션 합산
       const { data: openLive } = await supabase
         .from('live_positions')
@@ -118,9 +117,9 @@ async function snapshotEquity(): Promise<void> {
 /** 메인 파이프라인 실행 (크론 + 서버 시작 시 공용) */
 async function runMainPipeline(): Promise<void> {
   console.log(`[크론] ═══ 4H 파이프라인 시작: ${new Date().toISOString()} ═══`)
-  // 1. 캔들 수집 (업비트 + OKX, 4H 타임프레임)
-  await collectLatestCandles('upbit', ['BTC', 'ETH', 'XRP', 'SOL', 'DOGE'], '4h')
-  await collectLatestCandles('okx', ['BTC', 'ETH'], '4h')
+  // 1. 캔들 수집 (업비트 KRW 마켓 + OKX USDT 마켓, 4H 타임프레임)
+  await collectLatestCandles('upbit', ['BTC-KRW', 'ETH-KRW', 'XRP-KRW', 'SOL-KRW', 'DOGE-KRW'], '4h')
+  await collectLatestCandles('okx', ['BTC-USDT', 'ETH-USDT'], '4h')
 
   // 2. 연구 루프 (백테스트 → 승격 평가)
   await runResearchLoop()
