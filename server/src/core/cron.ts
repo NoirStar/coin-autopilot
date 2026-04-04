@@ -143,8 +143,12 @@ async function ensureMinimumCandles(): Promise<void> {
     // 1h 타임프레임 (okx) — btc_macd_momentum, btc_donchian_breakout
     { exchange: 'okx', key: 'BTC-USDT', tf: '1h' },
     { exchange: 'okx', key: 'ETH-USDT', tf: '1h' },
-    // 1h 타임프레임 (upbit) — alt_detection
+    // 1h 타임프레임 (upbit) — alt_detection + alt_mean_reversion 연구용
     { exchange: 'upbit', key: 'BTC-KRW', tf: '1h' },
+    { exchange: 'upbit', key: 'ETH-KRW', tf: '1h' },
+    { exchange: 'upbit', key: 'XRP-KRW', tf: '1h' },
+    { exchange: 'upbit', key: 'SOL-KRW', tf: '1h' },
+    { exchange: 'upbit', key: 'DOGE-KRW', tf: '1h' },
   ]
 
   let needsBackfill = false
@@ -178,9 +182,12 @@ async function runMainPipeline(): Promise<void> {
   // 0. 최초 실행 시 캔들 부족하면 자동 backfill
   await ensureMinimumCandles()
 
-  // 1. 캔들 증분 수집 (업비트 KRW 마켓 + OKX USDT 마켓, 4H 타임프레임)
-  await collectLatestCandles('upbit', ['BTC-KRW', 'ETH-KRW', 'XRP-KRW', 'SOL-KRW', 'DOGE-KRW'], '4h')
+  // 1. 캔들 증분 수집
+  const upbitKeys = ['BTC-KRW', 'ETH-KRW', 'XRP-KRW', 'SOL-KRW', 'DOGE-KRW']
+  await collectLatestCandles('upbit', upbitKeys, '4h')
+  await collectLatestCandles('upbit', upbitKeys, '1h')
   await collectLatestCandles('okx', ['BTC-USDT', 'ETH-USDT'], '4h')
+  await collectLatestCandles('okx', ['BTC-USDT', 'ETH-USDT'], '1h')
 
   // 2. 연구 루프 (백테스트 → 승격 평가)
   await runResearchLoop()

@@ -126,14 +126,33 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
   const btcCandles = await loadCandles(exchange, btcKey, timeframe, CANDLE_LIMIT)
   candleMap.set('BTC', btcCandles)
 
-  // 전략 파라미터에 추가 심볼이 정의된 경우 로드
+  // 1. 전략 파라미터에 심볼 목록이 있으면 사용
   const symbols = strategy.config.params.symbols
-  if (Array.isArray(symbols)) {
+  if (Array.isArray(symbols) && symbols.length > 0) {
     for (const sym of symbols as unknown as string[]) {
-      if (sym === btcKey) continue // BTC 중복 방지
+      if (sym === btcKey) continue
       const candles = await loadCandles(exchange, sym, timeframe, CANDLE_LIMIT)
-      // asset_key에서 base currency 추출 (예: "ETH-KRW" → "ETH")
       const base = sym.split('-')[0]
+      candleMap.set(base, candles)
+    }
+    return candleMap
+  }
+
+  // 2. 알트 전략 (direction: long, 거래소: upbit)이면 DB에 있는 알트 심볼 자동 로드
+  if (strategy.config.assetClass === 'crypto_spot' && exchange === 'upbit') {
+    const { data: altKeys } = await supabase
+      .from('candles')
+      .select('asset_key')
+      .eq('exchange', 'upbit')
+      .eq('timeframe', timeframe)
+      .neq('asset_key', btcKey)
+
+    // 중복 제거
+    const uniqueKeys = [...new Set((altKeys ?? []).map((r) => r.asset_key as string))]
+    for (const key of uniqueKeys) {
+      const candles = await loadCandles(exchange, key, timeframe, CANDLE_LIMIT)
+      if (candles.length < 20) continue // 너무 적으면 스킵
+      const base = key.split('-')[0]
       candleMap.set(base, candles)
     }
   }
