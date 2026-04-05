@@ -162,3 +162,44 @@ export function safeEvaluateExits(
     return []
   }
 }
+
+/**
+ * 인스턴스 기반 안전 평가 (싱글턴 아닌 전략 인스턴스용)
+ *
+ * factory.createStrategyInstance()로 생성된 인스턴스 등,
+ * 레지스트리에 등록되지 않은 전략을 안전하게 실행하기 위한 변형.
+ * paper-engine/execution-engine이 active_param_set_id가 반영된
+ * 독립 인스턴스를 사용할 때 호출한다.
+ */
+export function safeEvaluateOn(
+  strategy: Strategy,
+  candles: CandleMap,
+  regime: RegimeState,
+): StrategySignal[] {
+  try {
+    return strategy.evaluate(candles, regime)
+  } catch (err) {
+    console.error(
+      `[레지스트리] 전략 평가 오류 (${strategy.config.id}):`,
+      err instanceof Error ? err.message : err,
+    )
+    return []
+  }
+}
+
+export function safeEvaluateExitsOn(
+  strategy: Strategy,
+  candles: CandleMap,
+  regime: RegimeState,
+  positions: OpenPosition[],
+): ExitSignal[] {
+  try {
+    return strategy.evaluateExits(candles, regime, positions)
+  } catch (err) {
+    console.error(
+      `[레지스트리] 전략 청산 평가 오류 (${strategy.config.id}):`,
+      err instanceof Error ? err.message : err,
+    )
+    return []
+  }
+}

@@ -1,9 +1,11 @@
 import { supabase } from '../services/database.js'
 import { calculatePnlPct } from '../services/pnl-calculator.js'
-import { getStrategy, safeEvaluate, safeEvaluateExits } from '../strategy/registry.js'
+import { safeEvaluateOn, safeEvaluateExitsOn } from '../strategy/registry.js'
+import { createStrategyInstance } from '../strategy/factory.js'
 import { detectRegime } from '../data/regime-detector.js'
 import { loadCandles, fetchUpbitKrwSymbols } from '../data/candle-collector.js'
 import type {
+  Strategy,
   CandleMap,
   Candle,
   RegimeState,
@@ -190,6 +192,69 @@ export async function runPaperTradingCycle(): Promise<void> {
   console.log('[V2 가상매매] 사이클 완료')
 }
 
+// ─── 전략 로드 (active_param_set_id 반영) ────────────────────
+
+/**
+ * strategies.active_param_set_id가 설정되어 있으면 해당 파라미터를
+ * 적용한 전략 인스턴스를 생성해서 반환한다. 설정 안 되었으면
+ * DEFAULT_PARAMS로 인스턴스를 생성.
+ *
+ * orphan FK 처리 (Open Question 3 결정):
+ * - active_param_set_id가 설정되었지만 strategy_parameters에 row가 없는
+ *   경우 → null 반환 + CRITICAL 로그. 세션 실행을 중단한다.
+ *   "검증되지 않은 파라미터로 운용하지 않는다"는 원칙.
+ *
+ * DB 레벨에서는 ON DELETE RESTRICT로 orphan이 생기지 않도록 방지하지만,
+ * 만에 하나의 케이스(soft-delete, migration 버그 등)를 방어한다.
+ *
+ * @param strategyDbId strategies.id (UUID)
+ * @param strategyIdKey strategies.strategy_id (텍스트 키)
+ * @returns 전략 인스턴스, orphan이면 null
+ */
+async function loadStrategyForSession(
+  strategyDbId: string,
+  strategyIdKey: string,
+): Promise<Strategy | null> {
+  const { data: strategyRow, error } = await supabase
+    .from('strategies')
+    .select('active_param_set_id')
+    .eq('id', strategyDbId)
+    .single()
+
+  if (error || !strategyRow) {
+    console.error(
+      `[V2 가상매매] 전략 행 조회 실패 (${strategyDbId}):`,
+      error?.message,
+    )
+    return null
+  }
+
+  let paramOverrides: Record<string, unknown> | undefined
+
+  if (strategyRow.active_param_set_id) {
+    // active_param_set_id가 있으면 반드시 strategy_parameters에 존재해야 함
+    const { data: paramSet, error: psErr } = await supabase
+      .from('strategy_parameters')
+      .select('param_set')
+      .eq('id', strategyRow.active_param_set_id)
+      .single()
+
+    if (psErr || !paramSet) {
+      // orphan FK: DB 일관성 깨짐. 명시적 실패.
+      console.error(
+        `[V2 가상매매] CRITICAL: active_param_set_id=${strategyRow.active_param_set_id}가 ` +
+        `strategy_parameters에 없음. 전략=${strategyIdKey}. 세션 실행 중단.`,
+      )
+      return null
+    }
+
+    paramOverrides = paramSet.param_set as Record<string, unknown>
+  }
+  // active_param_set_id가 null이면 DEFAULT_PARAMS로 동작 (정상 경로)
+
+  return createStrategyInstance(strategyIdKey, paramOverrides)
+}
+
 // ─── 세션 처리 ───────────────────────────────────────────────
 
 async function processSession(
@@ -201,10 +266,12 @@ async function processSession(
   const strategyMeta = session.strategies
   const strategyId = strategyMeta?.strategy_id ?? ''
 
-  // V2 레지스트리에서 전략 조회
-  const strategy = getStrategy(strategyId)
+  // active_param_set_id를 반영한 전략 인스턴스 로드
+  const strategy = await loadStrategyForSession(session.strategy_id, strategyId)
   if (!strategy) {
-    console.log(`[V2 가상매매] 세션 ${sessionId}: 미등록 전략 ${strategyId}`)
+    console.log(
+      `[V2 가상매매] 세션 ${sessionId}: 전략 로드 실패 (${strategyId}). 스킵.`,
+    )
     return
   }
 
@@ -258,7 +325,7 @@ async function processSession(
     }
   })
 
-  const exitSignals = safeEvaluateExits(strategyId, candleMap, regime, posArray)
+  const exitSignals = safeEvaluateExitsOn(strategy, candleMap, regime, posArray)
 
   // ── 청산 처리 ──
   for (const exit of exitSignals) {
@@ -379,7 +446,7 @@ async function processSession(
   }
 
   // ── 진입 시그널 평가 (safeEvaluate) ──
-  const entrySignals = safeEvaluate(strategyId, candleMap, regime)
+  const entrySignals = safeEvaluateOn(strategy, candleMap, regime)
   const currentOpenCount = positions.filter((p) => p.status === 'open').length - exitSignals.length
   const maxPositions = strategy.config.params.maxPositions ?? 3
 

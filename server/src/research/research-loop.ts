@@ -363,40 +363,41 @@ async function evaluateAndPromote(
     return false
   }
 
-  // 전략 상태 업데이트
-  const { error: updateError } = await supabase
-    .from('strategies')
-    .update({
-      status: 'paper_candidate',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', strategyUuid)
+  // 원자적 승격 — RPC function 호출
+  //
+  // promote_strategy_with_params는 단일 트랜잭션 안에서 다음을 수행한다:
+  //   1. strategy_parameters에 upsert (해시 기반 중복 방지)
+  //   2. strategies.active_param_set_id + status = 'paper_candidate' 갱신
+  //   3. research_promotions 이력 저장
+  //
+  // Supabase 클라이언트는 다중 테이블 트랜잭션을 지원하지 않으므로
+  // PL/pgSQL RPC를 사용한다. migration: 20260405_active_params.sql
+  const reason =
+    `Sharpe=${result.sharpeRatio}, MDD=${result.maxDrawdown}%, ` +
+    `승률=${result.winRate}%, 거래=${result.totalTrades}건`
 
-  if (updateError) {
-    console.error('[연구루프] 전략 상태 업데이트 오류:', updateError.message)
+  const { data: paramSetId, error: rpcError } = await supabase.rpc(
+    'promote_strategy_with_params',
+    {
+      p_strategy_id: strategyUuid,
+      p_param_set: strategy.config.params,
+      p_run_id: runId,
+      p_from_status: currentStatus ?? 'research_only',
+      p_reason: reason,
+    },
+  )
+
+  if (rpcError) {
+    console.error(
+      `[연구루프] ${strategy.config.id} 승격 RPC 오류:`,
+      rpcError.message,
+    )
     return false
-  }
-
-  // 승격 이력 저장
-  const { error: promoError } = await supabase
-    .from('research_promotions')
-    .insert({
-      research_run_id: runId,
-      from_status: currentStatus ?? 'research_only',
-      to_status: 'paper_candidate',
-      reason:
-        `Sharpe=${result.sharpeRatio}, MDD=${result.maxDrawdown}%, ` +
-        `승률=${result.winRate}%, 거래=${result.totalTrades}건`,
-    })
-
-  if (promoError) {
-    console.error('[연구루프] 승격 이력 저장 오류:', promoError.message)
   }
 
   console.log(
     `[연구루프] ${strategy.config.id} 승격! → paper_candidate | ` +
-    `Sharpe=${result.sharpeRatio}, MDD=${result.maxDrawdown}%, ` +
-    `승률=${result.winRate}%, 거래=${result.totalTrades}건`
+    `param_set_id=${paramSetId} | ${reason}`
   )
 
   return true

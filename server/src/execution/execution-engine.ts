@@ -611,6 +611,62 @@ export async function checkPaperToLivePromotion(strategyDbId: string): Promise<{
 
 // ─── 판단 유형별 핸들러 ───────────────────────────────────────
 
+/**
+ * 전략 배치/실행에 사용할 파라미터를 로드한다.
+ *
+ * active_param_set_id가 설정되어 있으면 strategy_parameters에서 읽고,
+ * 없으면 default_params로 fallback한다.
+ *
+ * orphan FK 처리: active_param_set_id는 있지만 strategy_parameters에
+ * row가 없으면 null 반환 (실전 진입 중단). 검증되지 않은 파라미터로
+ * 실전 운용하지 않는다.
+ */
+async function loadActiveParams(strategyDbId: string): Promise<{
+  strategy_id: string
+  exchange: string
+  direction: string
+  params: Record<string, number>
+} | null> {
+  const { data: strategy } = await supabase
+    .from('strategies')
+    .select('strategy_id, exchange, direction, default_params, active_param_set_id')
+    .eq('id', strategyDbId)
+    .single()
+
+  if (!strategy) {
+    console.error(`[V2실전] 전략 ${strategyDbId} 정보 조회 실패`)
+    return null
+  }
+
+  let params = (strategy.default_params ?? {}) as Record<string, number>
+
+  if (strategy.active_param_set_id) {
+    const { data: paramSet } = await supabase
+      .from('strategy_parameters')
+      .select('param_set')
+      .eq('id', strategy.active_param_set_id)
+      .single()
+
+    if (!paramSet) {
+      // orphan FK: DB 일관성 깨짐. 실전 진입 중단.
+      console.error(
+        `[V2실전] CRITICAL: 전략 ${strategy.strategy_id}의 active_param_set_id=` +
+        `${strategy.active_param_set_id}가 strategy_parameters에 없음. 실전 진입 중단.`,
+      )
+      return null
+    }
+
+    params = paramSet.param_set as Record<string, number>
+  }
+
+  return {
+    strategy_id: strategy.strategy_id as string,
+    exchange: strategy.exchange as string,
+    direction: strategy.direction as string,
+    params,
+  }
+}
+
 /** 새 전략 배치 → 해당 전략의 포지션 진입 */
 async function handleLiveAssign(decision: Record<string, unknown>): Promise<void> {
   const strategyDbId = decision.to_strategy_id as string
@@ -619,15 +675,10 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
     return
   }
 
-  // 전략 정보 조회
-  const { data: strategy } = await supabase
-    .from('strategies')
-    .select('strategy_id, exchange, direction, default_params')
-    .eq('id', strategyDbId)
-    .single()
-
+  // 전략 정보 + active_param_set 로드 (orphan FK 체크 포함)
+  const strategy = await loadActiveParams(strategyDbId)
   if (!strategy) {
-    console.error(`[V2실전] 전략 ${strategyDbId} 정보 조회 실패`)
+    // loadActiveParams 내부에서 에러 로그 출력됨
     return
   }
 
@@ -652,7 +703,7 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
   // 계좌 잔고 조회 → 포지션 크기 계산
   const balance = await fetchBalance()
   const allocatedCapital = balance.total * (allocationPct / 100)
-  const params = (strategy.default_params ?? {}) as Record<string, number>
+  const params = strategy.params
   const leverage = params.leverage ?? DEFAULT_LEVERAGE
 
   // BTC 기본 진입 (Phase 7 초기는 BTC 단일 자산)
