@@ -1,5 +1,6 @@
 import { computeDetectionScore } from '../detector/composite-scorer.js'
 import { calcATRPercent } from '../indicator/indicator-engine.js'
+import { getBtcKey } from './utils/asset-keys.js'
 import { registerStrategy } from './registry.js'
 import type {
   Strategy,
@@ -50,7 +51,8 @@ class AltDetectionV2 implements Strategy {
     const signals: StrategySignal[] = []
     const { scoreThreshold, maxPositions } = this.config.params
 
-    const btcCandles = candles.get('BTC')
+    const btcKey = getBtcKey(this.config.exchange)
+    const btcCandles = candles.get(btcKey)
     if (!btcCandles || btcCandles.length < 21) return []
 
     const btcPrices = btcCandles.map((c) => c.close)
@@ -66,7 +68,7 @@ class AltDetectionV2 implements Strategy {
     const kstOffset = 9 * 60 * 60 * 1000
 
     for (const [symbol, altCandles] of candles) {
-      if (symbol === 'BTC') continue
+      if (symbol === btcKey) continue
       if (signals.length >= maxPositions) break
       if (altCandles.length < 21) continue
 

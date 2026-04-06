@@ -1,5 +1,6 @@
 import { calcEMA, calcRSI, calcBollingerBands, calcATRPercent } from '../indicator/indicator-engine.js'
 import { calcATRStop } from './utils/atr-stop.js'
+import { getBtcEthKeys } from './utils/asset-keys.js'
 import { registerStrategy } from './registry.js'
 import type {
   Strategy,
@@ -60,7 +61,7 @@ class BtcBollingerReversionV2 implements Strategy {
     const signals: StrategySignal[] = []
     const { bbPeriod, bbStdDev, rsiPeriod, rsiOversold, rsiOverbought, trendEma, leverage, volumeMultiplier } = this.config.params
 
-    for (const symbol of ['BTC', 'ETH']) {
+    for (const symbol of getBtcEthKeys(this.config.exchange)) {
       const symbolCandles = candles.get(symbol)
       if (!symbolCandles || symbolCandles.length < trendEma + 1) continue
 

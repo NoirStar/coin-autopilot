@@ -8,6 +8,7 @@ import type {
   RegimeState,
 } from '../core/types.js'
 import { detectRegime } from '../data/regime-detector.js'
+import { getBtcKey } from '../strategy/utils/asset-keys.js'
 
 // ─── 백테스트 설정 ─────────────────────────────────────────────
 
@@ -70,7 +71,8 @@ export function runBacktest(
   const baseConfig = isFutures ? { ...DEFAULT_CONFIG, ...FUTURES_CONFIG } : DEFAULT_CONFIG
   const cfg = { ...baseConfig, ...config }
 
-  const btcCandles = allCandles.get('BTC')
+  const btcKey = getBtcKey(strategy.config.exchange)
+  const btcCandles = allCandles.get(btcKey)
   if (!btcCandles || btcCandles.length < 201) {
     return emptyResult(strategy)
   }

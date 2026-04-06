@@ -87,7 +87,7 @@ export async function runResearchLoop(): Promise<void> {
       // 1. 캔들 로드
       const allCandles = await loadCandlesForStrategy(strategy)
       const btcKey = BTC_KEYS[strategy.config.exchange] ?? 'BTC-KRW'
-      const btcCandles = allCandles.get('BTC')
+      const btcCandles = allCandles.get(btcKey)
 
       if (!btcCandles || btcCandles.length < 201) {
         console.warn(`[연구루프] ${sid} — BTC 캔들 부족 (${btcCandles?.length ?? 0}개), 스킵`)
@@ -153,9 +153,10 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
   const candleMap: CandleMap = new Map()
 
   // BTC 캔들은 항상 로드 (레짐 판단 + 대부분 전략에서 필요)
+  // 심볼 키는 거래소별 전체 키(예: 'BTC-KRW', 'BTC-USDT')로 통일 — paper/execution과 동일
   const btcKey = BTC_KEYS[exchange] ?? 'BTC-KRW'
   const btcCandles = await loadCandles(exchange, btcKey, timeframe, candleLimit)
-  candleMap.set('BTC', btcCandles)
+  candleMap.set(btcKey, btcCandles)
 
   // 1. 전략 파라미터에 심볼 목록이 있으면 사용
   const symbols = strategy.config.params.symbols
@@ -163,8 +164,7 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
     for (const sym of symbols as unknown as string[]) {
       if (sym === btcKey) continue
       const candles = await loadCandles(exchange, sym, timeframe, candleLimit)
-      const base = sym.split('-')[0]
-      candleMap.set(base, candles)
+      candleMap.set(sym, candles)
     }
     return candleMap
   }
@@ -177,8 +177,7 @@ async function loadCandlesForStrategy(strategy: Strategy): Promise<CandleMap> {
       if (key === btcKey) continue
       const candles = await loadCandles(exchange, key, timeframe, candleLimit)
       if (candles.length < 20) continue
-      const base = key.split('-')[0]
-      candleMap.set(base, candles)
+      candleMap.set(key, candles)
     }
   }
 

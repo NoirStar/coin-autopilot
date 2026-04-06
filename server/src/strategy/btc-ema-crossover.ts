@@ -1,5 +1,6 @@
 import { calcEMA, calcADX, calcATRPercent } from '../indicator/indicator-engine.js'
 import { calcATRStop } from './utils/atr-stop.js'
+import { getBtcEthKeys } from './utils/asset-keys.js'
 import { registerStrategy } from './registry.js'
 import type {
   Strategy,
@@ -58,8 +59,8 @@ class BtcEmaCrossoverV2 implements Strategy {
     const signals: StrategySignal[] = []
     const { fastEma, slowEma, trendEma, adxThreshold, leverage, volumeMultiplier } = this.config.params
 
-    // BTC와 ETH 모두 평가
-    for (const symbol of ['BTC', 'ETH']) {
+    // BTC와 ETH 모두 평가 (exchange별 asset_key 사용)
+    for (const symbol of getBtcEthKeys(this.config.exchange)) {
       const symbolCandles = candles.get(symbol)
       if (!symbolCandles || symbolCandles.length < trendEma + 1) continue
 

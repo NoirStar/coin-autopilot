@@ -1,5 +1,6 @@
 import { calcDonchianChannel, calcATRPercent } from '../indicator/indicator-engine.js'
 import { calcATRStop } from './utils/atr-stop.js'
+import { getBtcEthKeys } from './utils/asset-keys.js'
 import { registerStrategy } from './registry.js'
 import type {
   Strategy,
@@ -58,7 +59,7 @@ class BtcDonchianBreakoutV2 implements Strategy {
     const signals: StrategySignal[] = []
     const { donchianPeriod, atrPeriod, volumeMultiplier, leverage } = this.config.params
 
-    for (const symbol of ['BTC', 'ETH']) {
+    for (const symbol of getBtcEthKeys(this.config.exchange)) {
       const symbolCandles = candles.get(symbol)
       if (!symbolCandles || symbolCandles.length < donchianPeriod + 2) continue
 

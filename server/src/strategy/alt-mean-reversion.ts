@@ -1,5 +1,6 @@
 import { calcRSI, calcATRPercent, calcAltBtcZScore } from '../indicator/indicator-engine.js'
 import { calcATRStop } from './utils/atr-stop.js'
+import { getBtcKey } from './utils/asset-keys.js'
 import { registerStrategy } from './registry.js'
 import type {
   Strategy,
@@ -48,7 +49,8 @@ class AltMeanReversionV2 implements Strategy {
     // Risk-Off면 시그널 없음
     if (regime !== 'risk_on') return []
 
-    const btcCandles = candles.get('BTC')
+    const btcKey = getBtcKey(this.config.exchange)
+    const btcCandles = candles.get(btcKey)
     if (!btcCandles || btcCandles.length === 0) return []
 
     const btcCloses = btcCandles.map((c) => c.close)
@@ -56,7 +58,7 @@ class AltMeanReversionV2 implements Strategy {
     const { zScoreEntry, rsiMax, maxPositions, zScorePeriod } = this.config.params
 
     for (const [symbol, altCandles] of candles) {
-      if (symbol === 'BTC') continue
+      if (symbol === btcKey) continue
       if (signals.length >= maxPositions) break
 
       if (altCandles.length < zScorePeriod) continue
@@ -96,7 +98,8 @@ class AltMeanReversionV2 implements Strategy {
     regime: RegimeState,
     openPositions: OpenPosition[],
   ): ExitSignal[] {
-    const btcCandles = candles.get('BTC')
+    const btcKey = getBtcKey(this.config.exchange)
+    const btcCandles = candles.get(btcKey)
     if (!btcCandles) return []
 
     const btcCloses = btcCandles.map((c) => c.close)
