@@ -31,8 +31,8 @@
 
 ## 검증 / 운영 준비
 
-- [ ] DB 인덱스 성능 검증
-- [ ] 실전 전환 전 리스크/승인 파라미터 재확정
+- [x] DB 인덱스 성능 검증 — research_runs, orchestrator_slots, paper_sessions, live_positions, strategies 등 8개 인덱스 추가
+- [x] 실전 전환 전 리스크 파라미터 확정 — 동시 포지션 한도(3), 포지션 크기 상한($5K), 레버리지 상한(3x) 추가. 환경변수로 조정 가능.
 
 ## 연구 파이프라인 (2단계, /plan-eng-review 2026-04-05에서 스코프 축소됨)
 

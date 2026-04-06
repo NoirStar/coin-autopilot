@@ -52,6 +52,15 @@ const MAX_POSITION_RISK_PCT = 0.01 // 1%
 /** 기본 손절 비율 */
 const DEFAULT_STOP_LOSS_PCT = 0.03 // 3%
 
+/** 최대 동시 포지션 수 (환경변수 MAX_CONCURRENT_POSITIONS, 기본 3) */
+const MAX_CONCURRENT_POSITIONS = Number(process.env.MAX_CONCURRENT_POSITIONS ?? 3)
+
+/** 단일 포지션 최대 크기 USD (환경변수 MAX_POSITION_USD, 기본 $5,000) */
+const MAX_POSITION_USD = Number(process.env.MAX_POSITION_USD ?? 5000)
+
+/** 최대 레버리지 (환경변수 MAX_LEVERAGE, 기본 3x) */
+const MAX_LEVERAGE = Number(process.env.MAX_LEVERAGE ?? 3)
+
 // ─── 실전 매매 활성화 체크 ────────────────────────────────────
 
 /** 실전 매매 허용 여부 확인 */
@@ -704,7 +713,26 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
   const balance = await fetchBalance()
   const allocatedCapital = balance.total * (allocationPct / 100)
   const params = strategy.params
-  const leverage = params.leverage ?? DEFAULT_LEVERAGE
+  const rawLeverage = params.leverage ?? DEFAULT_LEVERAGE
+
+  // 레버리지 상한 검증
+  const leverage = Math.min(rawLeverage, MAX_LEVERAGE)
+  if (rawLeverage > MAX_LEVERAGE) {
+    console.warn(`[V2실전] 레버리지 ${rawLeverage}x → ${MAX_LEVERAGE}x 상한 적용`)
+  }
+
+  // 동시 포지션 수 제한
+  const { count: openCount } = await supabase
+    .from('live_positions')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'open')
+
+  if ((openCount ?? 0) >= MAX_CONCURRENT_POSITIONS) {
+    console.log(
+      `[V2실전] 동시 포지션 ${openCount}개 >= 한도 ${MAX_CONCURRENT_POSITIONS}개, 진입 스킵`
+    )
+    return
+  }
 
   // BTC 기본 진입 (Phase 7 초기는 BTC 단일 자산)
   const symbol = 'BTC'
@@ -715,12 +743,19 @@ async function handleLiveAssign(decision: Record<string, unknown>): Promise<void
     await setMarginMode(symbol, DEFAULT_MARGIN_MODE)
 
     const price = await fetchOkxPrice(symbol)
-    const positionUsd = calculatePositionSize(
+    let positionUsd = calculatePositionSize(
       allocatedCapital,
       MAX_POSITION_RISK_PCT,
       DEFAULT_STOP_LOSS_PCT,
       leverage,
     )
+
+    // 단일 포지션 크기 절대값 상한
+    if (positionUsd > MAX_POSITION_USD) {
+      console.warn(`[V2실전] 포지션 크기 $${positionUsd.toFixed(2)} → $${MAX_POSITION_USD} 상한 적용`)
+      positionUsd = MAX_POSITION_USD
+    }
+
     const amount = positionUsd / price
 
     if (amount <= 0 || positionUsd < 10) {
