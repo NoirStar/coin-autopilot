@@ -259,10 +259,13 @@ async function saveResearchRunMetrics(
   )
   const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0
 
-  // 총 수수료 비율
-  const totalFees = result.trades.reduce((sum, t) => sum + t.fees, 0)
+  // 평균 수수료 비율 (%) — feePct 단위 통일됨
+  const avgFeePct = result.trades.length > 0
+    ? result.trades.reduce((sum, t) => sum + t.feePct, 0) / result.trades.length
+    : 0
+  // costRatio: 수수료가 수익 대비 얼마나 먹는지 (%)
   const costRatio = result.totalReturn !== 0
-    ? totalFees / Math.abs(result.totalReturn)
+    ? (avgFeePct * result.totalTrades) / Math.abs(result.totalReturn)
     : 0
 
   const { error } = await supabase

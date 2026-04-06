@@ -7,7 +7,7 @@ import type {
   BacktestTrade,
   RegimeState,
 } from '../core/types.js'
-import { detectRegime } from '../data/regime-detector.js'
+import { precomputeRegimes } from '../data/regime-detector.js'
 import { getBtcKey } from '../strategy/utils/asset-keys.js'
 
 // ─── 백테스트 설정 ─────────────────────────────────────────────
@@ -87,18 +87,28 @@ export function runBacktest(
   // 열린 포지션 추적
   const openPositions: Map<string, InternalPosition> = new Map()
 
-  for (let i = 200; i < candleCount - 1; i++) {
-    // V2 레짐 판단: detectRegime는 BTC 캔들 슬라이스만 받음
-    const btcSlice = btcCandles.slice(0, i + 1)
-    const regime: RegimeState = detectRegime(btcSlice)
+  // ── 최적화 1: 레짐 사전 계산 (O(n)에 한 번) ──
+  const regimes = precomputeRegimes(btcCandles)
 
-    // 캔들 슬라이스
-    const slicedCandles: CandleMap = new Map()
-    for (const [symbol, candles] of allCandles) {
-      if (candles.length > i) {
-        slicedCandles.set(symbol, candles.slice(0, i + 1))
+  // ── 최적화 2: 증분 캔들 맵 (slice 대신 push) ──
+  // 워밍업 구간(0..200)의 캔들을 미리 넣고, 루프에서 1개씩 push
+  const growingCandles: CandleMap = new Map()
+  for (const [symbol, candles] of allCandles) {
+    const warmup = candles.slice(0, 201)  // 워밍업 복사 1회
+    growingCandles.set(symbol, warmup)
+  }
+
+  for (let i = 200; i < candleCount - 1; i++) {
+    // 증분 확장: i > 200이면 각 심볼에 캔들 1개 push (amortized O(1))
+    if (i > 200) {
+      for (const [symbol, candles] of allCandles) {
+        if (candles.length > i) {
+          growingCandles.get(symbol)!.push(candles[i])
+        }
       }
     }
+
+    const regime = regimes[i]
 
     // peak 가격 업데이트 (트레일링 스탑용)
     for (const [symbol, pos] of openPositions) {
@@ -123,7 +133,7 @@ export function runBacktest(
       peakPrice: pos.peakPrice,
     }))
 
-    const exitSignals = strategy.evaluateExits(slicedCandles, regime, openPosArray)
+    const exitSignals = strategy.evaluateExits(growingCandles, regime, openPosArray)
 
     for (const exit of exitSignals) {
       const pos = openPositions.get(exit.symbol)
@@ -153,6 +163,9 @@ export function runBacktest(
       // 에쿼티 업데이트: 청산 비율만큼
       equity = equity.add(exitAllocation.mul(1 + netPnlPct))
 
+      // 수수료 비율 (%) = feeRate * 2(진입+청산) * leverage * 100
+      const tradeFeesPct = cfg.feeRate * 2 * pos.leverage * 100
+
       trades.push({
         symbol: exit.symbol,
         direction: pos.side === 'long' ? 'buy' : 'sell',
@@ -162,7 +175,7 @@ export function runBacktest(
         exitTime: symbolCandles[i + 1].openTime,
         pnlPct: Math.round(netPnlPct * 10000) / 100,
         reason: exit.reason,
-        fees: exitAllocation.mul(cfg.feeRate * 2 * pos.leverage).toNumber(),
+        feePct: Math.round(tradeFeesPct * 100) / 100,
       })
 
       if (exitRatio >= 1.0) {
@@ -174,7 +187,7 @@ export function runBacktest(
     }
 
     // 진입 평가
-    const entrySignals = strategy.evaluate(slicedCandles, regime)
+    const entrySignals = strategy.evaluate(growingCandles, regime)
 
     for (const signal of entrySignals) {
       if (openPositions.has(signal.symbol)) continue
@@ -243,6 +256,7 @@ export function runBacktest(
       : (pos.entryPrice - lastCandle.close) / pos.entryPrice
     const netPnl = rawPnl * pos.leverage - cfg.feeRate * 2 * pos.leverage
     equity = equity.add(pos.allocation.mul(1 + netPnl))
+    const endFeePct = cfg.feeRate * 2 * pos.leverage * 100
     trades.push({
       symbol,
       direction: pos.side === 'long' ? 'buy' : 'sell',
@@ -252,7 +266,7 @@ export function runBacktest(
       exitTime: lastCandle.openTime,
       pnlPct: Math.round(netPnl * 10000) / 100,
       reason: 'backtest_end',
-      fees: 0,
+      feePct: Math.round(endFeePct * 100) / 100,
     })
   }
 

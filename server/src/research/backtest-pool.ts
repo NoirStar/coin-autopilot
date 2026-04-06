@@ -13,9 +13,13 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 import type { CandleMap, BacktestResult } from '../core/types.js'
 
-// Worker 스크립트 경로 (컴파일된 JS)
+// Worker 경로 — 항상 tsc 컴파일된 JS를 실행
+// dev(tsx): src/research/ → dist/research/backtest-worker.js
+// prod(node): dist/research/ → dist/research/backtest-worker.js
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const WORKER_PATH = path.join(__dirname, 'backtest-worker.js')
+const WORKER_PATH = __dirname.includes('/src/')
+  ? path.resolve(__dirname, '../../dist/research/backtest-worker.js')
+  : path.join(__dirname, 'backtest-worker.js')
 
 // ─── 직렬화 ─────────────────────────────────────────────────
 
@@ -60,7 +64,7 @@ function deserializeResult(raw: Record<string, unknown>): BacktestResult {
     exitTime: new Date(t.exitTime as string),
     pnlPct: t.pnlPct as number,
     reason: t.reason as string,
-    fees: t.fees as number,
+    feePct: t.feePct as number,
   }))
 
   return {

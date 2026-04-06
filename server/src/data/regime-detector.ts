@@ -125,6 +125,58 @@ function classifyRegime(
   return 'neutral'
 }
 
+/**
+ * BTC 캔들 전체에 대해 레짐을 일괄 계산 (백테스트 최적화용)
+ *
+ * 지표(EMA200, RSI14, ATR%14)를 한 번만 계산하고,
+ * 각 인덱스에서의 레짐을 배열로 반환한다.
+ * 인덱스 i의 레짐 = btcCandles[0..i]까지의 데이터 기반 판정.
+ *
+ * @returns RegimeState[] — regimes[i]는 btcCandles[i] 시점의 레짐
+ */
+export function precomputeRegimes(btcCandles: Candle[]): RegimeState[] {
+  const n = btcCandles.length
+  const regimes: RegimeState[] = new Array(n).fill('risk_off')
+
+  if (n < EMA_PERIOD + 1) return regimes
+
+  const closes = btcCandles.map((c) => c.close)
+  const highs = btcCandles.map((c) => c.high)
+  const lows = btcCandles.map((c) => c.low)
+
+  // 지표를 한 번만 계산 — 전체 배열 기반
+  const emaValues = calcEMA(closes, EMA_PERIOD)
+  const rsiValues = calcRSI(closes, RSI_PERIOD)
+  const atrPctValues = calcATRPercent(highs, lows, closes, ATR_PERIOD)
+
+  // EMA 배열은 closes 길이 - (period-1) 만큼, offset = period - 1
+  // RSI 배열은 closes 길이 - period 만큼, offset = period
+  // ATR% 배열은 closes 길이 - period 만큼, offset = period
+  const emaOffset = EMA_PERIOD - 1
+  const rsiOffset = RSI_PERIOD
+  const atrOffset = ATR_PERIOD
+
+  for (let i = EMA_PERIOD; i < n; i++) {
+    const emaIdx = i - emaOffset
+    const rsiIdx = i - rsiOffset
+    const atrIdx = i - atrOffset
+
+    if (emaIdx < 0 || emaIdx >= emaValues.length) continue
+    if (rsiIdx < 0 || rsiIdx >= rsiValues.length) continue
+    if (atrIdx < 0 || atrIdx >= atrPctValues.length) continue
+
+    const ema = emaValues[emaIdx]
+    const rsi = rsiValues[rsiIdx]
+    const atrPct = atrPctValues[atrIdx]
+
+    if (ema === undefined || rsi === undefined || atrPct === undefined) continue
+
+    regimes[i] = classifyRegime(closes[i], ema, rsi, atrPct)
+  }
+
+  return regimes
+}
+
 // ─── DB 저장 + 통합 함수 ────────────────────────────────────
 
 /**

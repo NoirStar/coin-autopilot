@@ -37,9 +37,9 @@
 ## 연구 파이프라인 (2단계, /plan-eng-review 2026-04-05에서 스코프 축소됨)
 
 - [ ] **연구 파이프라인 재설계** — param-explorer + validation-engine + research-orchestrator. IS/OOS/WF 3-fold 검증. 이전 디자인 문서: `~/.gstack/projects/NoirStar-coin-autopilot/namwoo-main-design-20260405-001026.md`. 의존: 1단계 폐루프 구축 + 운용에서 param_set 사용 확인.
-- [ ] **백테스트 엔진 O(n²) → O(n) 최적화** — backtest-engine.ts:88-94가 매 캔들마다 슬라이스를 새로 만들고 지표를 재계산하는 구조. 스트리밍 지표 계산으로 전환. 2단계 그리드 탐색의 전제. Codex #3.
-- [ ] **심볼 키 완전 통일** — 연구/페이퍼/실전 엔진의 심볼 키 형식 통일 (`BTC` vs `BTC-USDT` vs `BTC-KRW`). 기존 전략 6개 모두 심볼 접근 코드 수정 필요. Codex #7. 1단계에서 부분 완화된 상태.
-- [ ] **Expected Value 단위 통일** — BacktestResult에서 `pnlPct`(%) 와 `fees`(통화)가 섞여 있어서 EV 계산이 spot/futures 간 비교 의미 없음. `feePct`로 저장 통일. 2단계 시작 전 필수. Codex #8.
+- [x] **백테스트 엔진 O(n²) → O(n) 최적화** — precomputeRegimes()로 레짐 사전 계산 + 증분 push 기반 캔들 맵으로 slice 제거. 전략 내부 지표 계산은 O(i)이지만 할당 비용 대폭 절감.
+- [x] **심볼 키 완전 통일** — `getBtcKey()`/`getBtcEthKeys()` 헬퍼 도입, 전략 6개 + research-loop + backtest-engine 전체 통일. 76b0969.
+- [x] **Expected Value 단위 통일** — `BacktestTrade.fees`(통화) → `feePct`(%)로 변경. pnlPct와 동일 단위로 spot/futures 비교 가능.
 
 ## 나중으로 이연
 

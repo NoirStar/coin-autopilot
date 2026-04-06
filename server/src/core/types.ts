@@ -211,7 +211,7 @@ export interface BacktestTrade {
   exitTime: Date
   pnlPct: number
   reason: string
-  fees: number
+  feePct: number       // 수수료 비율 (%), pnlPct와 동일 단위
 }
 
 export interface BacktestResult {
