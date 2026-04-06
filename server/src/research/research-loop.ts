@@ -9,6 +9,7 @@ import { VALIDATION_THRESHOLDS } from '../core/types.js'
 import { getAllStrategies } from '../strategy/registry.js'
 import { loadCandles } from '../data/candle-collector.js'
 import { runBacktestInWorker } from './backtest-pool.js'
+import { runResearchPipeline } from './research-orchestrator.js'
 import { supabase } from '../services/database.js'
 
 // ─── 상수 ──────────────────────────────────────────────────────
@@ -33,15 +34,105 @@ const BTC_KEYS: Record<string, string> = {
 /**
  * 자동 연구 파이프라인 — 크론 스케줄러에서 호출하는 진입점
  *
- * 등록된 전략 전체를 순회하며:
- *   1. 캔들 데이터 로드 (candles)
- *   2. 백테스트 실행
- *   3. research_run + metrics DB 저장
- *   4. 검증 기준 평가 → 통과 시 paper_candidate 승격
+ * RESEARCH_MODE 환경변수로 동작 모드 선택:
+ *   'pipeline' (기본): 파라미터 그리드 탐색 + IS/OOS/WF 검증 후 승격
+ *   'legacy': 기존 단일 파라미터 백테스트 (하위 호환)
  *
  * 개별 전략 오류는 격리하여 전체 루프를 중단하지 않음.
  */
 export async function runResearchLoop(): Promise<void> {
+  const mode = process.env.RESEARCH_MODE ?? 'pipeline'
+
+  if (mode === 'pipeline') {
+    return runPipelineMode()
+  }
+  return runLegacyMode()
+}
+
+/**
+ * 파이프라인 모드: param-explorer + validation-engine + research-orchestrator
+ */
+async function runPipelineMode(): Promise<void> {
+  const strategies = getAllStrategies()
+  if (strategies.length === 0) {
+    console.log('[연구루프] 등록된 전략 없음 — 스킵')
+    return
+  }
+
+  console.log(`[연구루프] 파이프라인 모드 시작 — ${strategies.length}개 전략 대상`)
+  const startTime = Date.now()
+
+  let successCount = 0
+  let failCount = 0
+  let promotedCount = 0
+
+  // 쿨다운 체크
+  const cooldownHours = Number(process.env.RESEARCH_COOLDOWN_H ?? 3)
+  const cooldownSince = cooldownHours > 0
+    ? new Date(Date.now() - cooldownHours * 60 * 60 * 1000).toISOString()
+    : null
+
+  for (const strategy of strategies) {
+    const sid = strategy.config.id
+    try {
+      if (cooldownSince) {
+        const strategyUuid = await getStrategyUuid(sid)
+        if (strategyUuid) {
+          const { count } = await supabase
+            .from('research_runs')
+            .select('id', { count: 'exact', head: true })
+            .eq('strategy_id', strategyUuid)
+            .eq('status', 'completed')
+            .gte('ended_at', cooldownSince)
+
+          if ((count ?? 0) > 0) {
+            console.log(`[연구루프] ${sid} — 최근 ${cooldownHours}시간 이내 완료됨, 스킵`)
+            continue
+          }
+        }
+      }
+
+      // 캔들 로드
+      const allCandles = await loadCandlesForStrategy(strategy)
+      const btcKey = BTC_KEYS[strategy.config.exchange] ?? 'BTC-KRW'
+      const btcCandles = allCandles.get(btcKey)
+
+      if (!btcCandles || btcCandles.length < 201) {
+        console.warn(`[연구루프] ${sid} — BTC 캔들 부족 (${btcCandles?.length ?? 0}개), 스킵`)
+        continue
+      }
+
+      // 파이프라인 실행
+      const result = await runResearchPipeline(strategy, allCandles)
+
+      console.log(
+        `[연구루프] ${sid} 파이프라인 완료 | ` +
+        `그리드=${result.gridSize} | 스크리닝=${result.screeningPassed} | ` +
+        `검증=${result.validationPassed} | 승격=${result.promoted}`
+      )
+
+      if (result.promoted) promotedCount++
+      successCount++
+    } catch (err) {
+      failCount++
+      console.error(
+        `[연구루프] ${sid} 파이프라인 오류:`,
+        err instanceof Error ? err.message : err,
+      )
+    }
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+  console.log(
+    `[연구루프] 파이프라인 완료 — 성공=${successCount}, 실패=${failCount}, ` +
+    `승격=${promotedCount}, 소요=${elapsed}s`
+  )
+}
+
+/**
+ * 레거시 모드: 기존 단일 파라미터 백테스트 + 단순 threshold 승격
+ */
+async function runLegacyMode(): Promise<void> {
   const strategies = getAllStrategies()
   if (strategies.length === 0) {
     console.log('[연구루프] 등록된 전략 없음 — 스킵')
