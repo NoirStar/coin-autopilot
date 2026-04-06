@@ -25,7 +25,7 @@
 
 ## 다음 작업
 
-- [ ] 접근성 보강
+- [x] 접근성 보강 — ARIA labels, role="switch", htmlFor+id 연결, aria-live 토스트, aria-labelledby 모달, 메뉴 버튼 aria-expanded
 
 - [x] 펀딩비/OI/김프/롱숏비율 수집 (`market-summary.ts`, OKX+Upbit API)
 

@@ -36,7 +36,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ toast: addToast }}>
       {children}
       {/* 토스트 컨테이너 */}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2" role="region" aria-live="polite" aria-label="알림">
         {toasts.map((t) => (
           <ToastItem key={t.id} item={t} onDismiss={() => removeToast(t.id)} />
         ))}
@@ -73,7 +73,7 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span className="flex-1 text-[12px] text-text-primary">{item.message}</span>
-      <button onClick={onDismiss} className="shrink-0 text-text-faint hover:text-text-muted">
+      <button onClick={onDismiss} aria-label="닫기" className="shrink-0 text-text-faint hover:text-text-muted">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>

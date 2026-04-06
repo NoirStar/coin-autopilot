@@ -31,6 +31,8 @@ export function AppLayout() {
         <div className="flex items-center h-10 px-4 border-b border-border-subtle lg:hidden">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label={sidebarOpen ? '메뉴 닫기' : '메뉴 열기'}
+            aria-expanded={sidebarOpen}
             className="p-1 text-text-muted hover:text-text-primary"
           >
             <Menu className="h-5 w-5" />

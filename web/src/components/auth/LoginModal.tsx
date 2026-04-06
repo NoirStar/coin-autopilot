@@ -41,7 +41,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
       {/* backdrop */}
       <div
         className="absolute inset-0 bg-[#0a0a0ccc]"
@@ -58,7 +58,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
           <X className="h-4 w-4" />
         </button>
 
-        <h2 className="text-lg font-semibold text-text-primary">로그인</h2>
+        <h2 id="login-modal-title" className="text-lg font-semibold text-text-primary">로그인</h2>
         <p className="mt-1 text-[12px] text-text-muted">
           로그인하면 백테스트와 가상매매를 이용할 수 있습니다.
         </p>

@@ -282,8 +282,9 @@ function ApiKeyCard({ exchange, label, description, configured, permissions, sho
       {showForm && (
         <div className="mt-3 space-y-2.5 border-t border-border-subtle pt-3">
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-text-muted">Access Key</label>
+            <label htmlFor={`access-key-${exchange}`} className="mb-1 block text-[12px] font-medium text-text-muted">Access Key</label>
             <input
+              id={`access-key-${exchange}`}
               type="text"
               value={accessKey}
               onChange={(e) => setAccessKey(e.target.value)}
@@ -292,9 +293,10 @@ function ApiKeyCard({ exchange, label, description, configured, permissions, sho
             />
           </div>
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-text-muted">Secret Key</label>
+            <label htmlFor={`secret-key-${exchange}`} className="mb-1 block text-[12px] font-medium text-text-muted">Secret Key</label>
             <div className="relative">
               <input
+                id={`secret-key-${exchange}`}
                 type={showSecret ? 'text' : 'password'}
                 value={secretKey}
                 onChange={(e) => setSecretKey(e.target.value)}
@@ -304,6 +306,7 @@ function ApiKeyCard({ exchange, label, description, configured, permissions, sho
               <button
                 type="button"
                 onClick={() => setShowSecret(!showSecret)}
+                aria-label={showSecret ? '비밀번호 숨기기' : '비밀번호 보기'}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-text-faint hover:text-text-muted"
               >
                 {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -312,8 +315,9 @@ function ApiKeyCard({ exchange, label, description, configured, permissions, sho
           </div>
           {showPassphrase && (
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-text-muted">Passphrase</label>
+              <label htmlFor={`passphrase-${exchange}`} className="mb-1 block text-[12px] font-medium text-text-muted">Passphrase</label>
               <input
+                id={`passphrase-${exchange}`}
                 type="password"
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
@@ -456,6 +460,8 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
             {editing ? (
               <input
                 type="number"
+                id={`risk-${param.key}`}
+                aria-label={param.label}
                 value={values[param.key]}
                 min={param.min}
                 max={param.max}
@@ -570,6 +576,7 @@ function AlertSection({ settings, isLoading }: { settings: UserSettings | undefi
               <ToggleSwitch
                 checked={condition.value}
                 onChange={(v) => alertMutation.mutate({ [condition.key]: v })}
+                label={condition.label}
               />
             </label>
           ))}
@@ -587,14 +594,17 @@ function AlertChannelRow({ name, enabled, onToggle }: {
   return (
     <div className="flex items-center justify-between">
       <span className="text-[12px] text-text-secondary">{name} 알림</span>
-      <ToggleSwitch checked={enabled} onChange={onToggle} />
+      <ToggleSwitch checked={enabled} onChange={onToggle} label={`${name} 알림`} />
     </div>
   )
 }
 
-function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
       onClick={() => onChange(!checked)}
       className={`relative h-5 w-9 rounded-full transition-colors ${
         checked ? 'bg-profit' : 'bg-[var(--border)]'

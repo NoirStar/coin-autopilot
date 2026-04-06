@@ -48,6 +48,7 @@ export const DeploymentMatrix = ({ slots }: DeploymentMatrixProps) => {
             key={slot.id}
             role="button"
             tabIndex={0}
+            aria-label={`전략 ${slot.strategy.shortName} ${slot.asset} 상세 보기`}
             onClick={() => navigate(`/strategy/${slot.id}`)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/strategy/${slot.id}`) } }}
             className={`border-b border-border-subtle border-l-2 ${style.borderClass} hover:bg-surface-hover focus-visible:ring-1 focus-visible:ring-text-muted focus-visible:outline-none transition-colors duration-100 cursor-pointer`}
