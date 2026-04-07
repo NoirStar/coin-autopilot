@@ -52,7 +52,7 @@ const formatDate = (iso: string | null): string => {
 }
 
 export const ResearchPage = () => {
-  const { data: runs, isLoading: runsLoading } = useQuery<ResearchRun[]>({
+  const { data: runs, isLoading: runsLoading, isError: runsError } = useQuery<ResearchRun[]>({
     queryKey: ['research-runs'],
     queryFn: async () => {
       const res = await api.request<{ data: Array<Record<string, unknown>> }>('/api/dash/research/runs')
@@ -74,7 +74,7 @@ export const ResearchPage = () => {
     refetchInterval: 30000,
   })
 
-  const { data: candidates, isLoading: candidatesLoading } = useQuery<ResearchCandidate[]>({
+  const { data: candidates, isLoading: candidatesLoading, isError: candidatesError } = useQuery<ResearchCandidate[]>({
     queryKey: ['research-candidates'],
     queryFn: async () => {
       const res = await api.request<{ data: Array<Record<string, unknown>>; rankedAt: string | null }>('/api/dash/research/candidates')
@@ -113,6 +113,8 @@ export const ResearchPage = () => {
 
           {runsLoading ? (
             <LoadingState />
+          ) : runsError ? (
+            <ErrorState message="연구 실행 이력을 불러올 수 없습니다" />
           ) : !runs || runs.length === 0 ? (
             <EmptyState message="실행된 연구가 없습니다" />
           ) : (
@@ -182,6 +184,8 @@ export const ResearchPage = () => {
 
           {candidatesLoading ? (
             <LoadingState />
+          ) : candidatesError ? (
+            <ErrorState message="후보 전략 랭킹을 불러올 수 없습니다" />
           ) : !candidates || candidates.length === 0 ? (
             <EmptyState message="후보 전략이 없습니다" />
           ) : (
@@ -241,6 +245,14 @@ const LoadingState = () => (
   <div className="flex items-center justify-center py-12">
     <Loader2 className="w-5 h-5 text-text-muted animate-spin" />
     <span className="ml-2 text-[13px] text-text-muted">불러오는 중...</span>
+  </div>
+)
+
+const ErrorState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center py-12 border border-dashed border-loss/30 rounded-md">
+    <XCircle className="w-8 h-8 text-loss/50 mb-2" />
+    <span className="text-[13px] text-text-secondary">{message}</span>
+    <span className="text-[12px] text-text-muted mt-1">API 서버 연결을 확인하세요</span>
   </div>
 )
 
