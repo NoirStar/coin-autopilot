@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/index.ts",
+    "dev": "tsc && tsx watch --env-file=.env src/index.ts",
     "dev:public": "bash ./scripts/start-public-with-vercel-sync.sh",
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsc && tsup src/index.ts --format esm --dts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
     "@hono/node-server": "^1.14.3",
     "@supabase/supabase-js": "^2.49.4",
     "ccxt": "^4.5.45",
@@ -19,6 +20,7 @@
     "hono": "^4.7.10",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^3.0.3",
+    "openai": "^6.33.0",
     "technicalindicators": "^3.1.0",
     "uuid": "^13.0.0",
     "ws": "^8.20.0",

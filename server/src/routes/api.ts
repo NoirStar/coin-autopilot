@@ -12,6 +12,8 @@ import { getSlotStatus, calculateEdgeScore, executeDecision } from '../orchestra
 import { getCircuitBreakerStatus } from '../risk/risk-manager.js'
 import { getMarketSummary } from '../data/market-summary.js'
 import { authMiddleware } from '../core/auth.js'
+import { executeReview, type TriggerReason, type ReviewType } from '../research/ai-reviewer.js'
+import { isAiEnabled, getAiProvider } from '../services/ai-client.js'
 
 const apiRoutes = new Hono()
 
@@ -692,7 +694,7 @@ apiRoutes.get('/research/runs', async (c) => {
       .from('research_runs')
       .select(`
         id, strategy_id, market_scope, parameter_set,
-        status, promotion_status,
+        status, promotion_status, pipeline_mode, ai_review_id,
         started_at, ended_at, created_at
       `)
       .order('created_at', { ascending: false })
@@ -710,7 +712,7 @@ apiRoutes.get('/research/runs', async (c) => {
     if (runIds.length > 0) {
       const { data: metrics } = await supabase
         .from('research_run_metrics')
-        .select('research_run_id, total_return, max_drawdown, win_rate, sharpe, profit_factor, trade_count')
+        .select('research_run_id, total_return, max_drawdown, win_rate, sharpe, profit_factor, trade_count, expected_value, cost_ratio, avg_hold_hours')
         .in('research_run_id', runIds)
 
       for (const m of metrics ?? []) {
@@ -725,7 +727,7 @@ apiRoutes.get('/research/runs', async (c) => {
     if (strategyIds.length > 0) {
       const { data: strategies } = await supabase
         .from('strategies')
-        .select('id, strategy_id, name')
+        .select('id, strategy_id, name, active_param_set_id')
         .in('id', strategyIds)
 
       for (const s of strategies ?? []) {
@@ -733,16 +735,58 @@ apiRoutes.get('/research/runs', async (c) => {
       }
     }
 
+    // 세그먼트 요약 (pipeline 모드 실행만)
+    const pipelineRunIds = (runs ?? []).filter((r) => r.pipeline_mode === 'pipeline').map((r) => r.id)
+    const segmentMap = new Map<string, Array<Record<string, unknown>>>()
+
+    if (pipelineRunIds.length > 0) {
+      const { data: segments } = await supabase
+        .from('research_run_segments')
+        .select('research_run_id, segment_name, segment_role, total_return, max_drawdown, expected_value, win_rate, trade_count, sharpe')
+        .in('research_run_id', pipelineRunIds)
+
+      for (const seg of segments ?? []) {
+        const existing = segmentMap.get(seg.research_run_id) ?? []
+        existing.push(seg)
+        segmentMap.set(seg.research_run_id, existing)
+      }
+    }
+
     const enrichedRuns = (runs ?? []).map((run) => ({
       ...run,
       strategyName: strategyNameMap.get(run.strategy_id) ?? null,
       metrics: metricsMap.get(run.id) ?? null,
+      segments: segmentMap.get(run.id) ?? null,
     }))
 
     return c.json({ data: enrichedRuns })
   } catch (err) {
     console.error('[API] 연구 실행 이력 API 오류:', err)
     return c.json({ error: '연구 실행 이력 로드 실패' }, 500)
+  }
+})
+
+// ─── GET /research/runs/:id/segments — 연구 실행 검증 구간 상세 ──
+
+apiRoutes.get('/research/runs/:id/segments', async (c) => {
+  try {
+    const runId = c.req.param('id')
+
+    const { data: segments, error } = await supabase
+      .from('research_run_segments')
+      .select('*')
+      .eq('research_run_id', runId)
+      .order('start_date', { ascending: true })
+
+    if (error) {
+      console.error('[API] 검증 구간 조회 오류:', error.message)
+      return c.json({ error: '검증 구간 조회 실패' }, 500)
+    }
+
+    return c.json({ data: segments ?? [] })
+  } catch (err) {
+    console.error('[API] 검증 구간 API 오류:', err)
+    return c.json({ error: '검증 구간 로드 실패' }, 500)
   }
 })
 
@@ -1028,6 +1072,183 @@ apiRoutes.post('/risk/events/:id/resolve', async (c) => {
   }
 
   return c.json({ success: true, id })
+})
+
+// ─── POST /research/runs/:id/ai-review — AI 리뷰 요청 ───────────
+
+apiRoutes.post('/research/runs/:id/ai-review', async (c) => {
+  try {
+    const runId = c.req.param('id')
+
+    // 연구 실행 + 메트릭 조회
+    const { data: run } = await supabase
+      .from('research_runs')
+      .select('id, strategy_id, parameter_set, status')
+      .eq('id', runId)
+      .single()
+
+    if (!run) {
+      return c.json({ error: '연구 실행을 찾을 수 없습니다' }, 404)
+    }
+
+    if (run.status !== 'completed') {
+      return c.json({ error: '완료된 연구 실행만 리뷰할 수 있습니다' }, 400)
+    }
+
+    // 전략 정보
+    const { data: strategy } = await supabase
+      .from('strategies')
+      .select('id, strategy_id, name')
+      .eq('id', run.strategy_id)
+      .single()
+
+    if (!strategy) {
+      return c.json({ error: '전략을 찾을 수 없습니다' }, 404)
+    }
+
+    // 메트릭
+    const { data: metrics } = await supabase
+      .from('research_run_metrics')
+      .select('*')
+      .eq('research_run_id', runId)
+      .single()
+
+    if (!metrics) {
+      return c.json({ error: '메트릭이 없습니다' }, 404)
+    }
+
+    // 검증 구간
+    const { data: segments } = await supabase
+      .from('research_run_segments')
+      .select('segment_name, segment_role, total_return, max_drawdown, expected_value, win_rate, trade_count, sharpe')
+      .eq('research_run_id', runId)
+
+    // 리뷰 실행
+    const result = await executeReview({
+      triggerReason: 'manual_request',
+      reviewType: 'research_analysis',
+      strategyId: run.strategy_id,
+      researchRunId: runId,
+      metrics: {
+        strategyName: strategy.name,
+        paramSet: run.parameter_set ?? {},
+        totalReturn: metrics.total_return,
+        maxDrawdown: metrics.max_drawdown,
+        sharpe: metrics.sharpe,
+        winRate: metrics.win_rate,
+        expectedValue: metrics.expected_value ?? 0,
+        profitFactor: metrics.profit_factor,
+        tradeCount: metrics.trade_count,
+        avgHoldHours: metrics.avg_hold_hours,
+        costRatio: metrics.cost_ratio,
+      },
+      segments: (segments ?? []).map((s) => ({
+        name: s.segment_name,
+        role: s.segment_role,
+        totalReturn: s.total_return,
+        maxDrawdown: s.max_drawdown,
+        expectedValue: s.expected_value,
+        winRate: s.win_rate,
+        tradeCount: s.trade_count,
+        sharpe: s.sharpe,
+      })),
+    })
+
+    return c.json({ data: result })
+  } catch (err) {
+    console.error('[API] AI 리뷰 요청 오류:', err)
+    return c.json({ error: 'AI 리뷰 요청 실패' }, 500)
+  }
+})
+
+// ─── GET /research/ai-reviews — AI 리뷰 목록 ───────────────────
+
+apiRoutes.get('/research/ai-reviews', async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') ?? '20', 10)
+    const strategyId = c.req.query('strategy_id')
+
+    let query = supabase
+      .from('ai_reviews')
+      .select(`
+        id, research_run_id, strategy_id,
+        trigger_reason, review_type,
+        summary, analysis,
+        model_id, input_tokens, output_tokens, latency_ms,
+        status, error_message,
+        created_at, completed_at
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (strategyId) {
+      query = query.eq('strategy_id', strategyId)
+    }
+
+    const { data: reviews, error } = await query
+
+    if (error) {
+      console.error('[API] AI 리뷰 목록 조회 오류:', error.message)
+      return c.json({ error: 'AI 리뷰 목록 조회 실패' }, 500)
+    }
+
+    // 전략 이름 매핑
+    const strategyIds = [...new Set((reviews ?? []).map((r) => r.strategy_id).filter(Boolean))]
+    const nameMap = new Map<string, string>()
+
+    if (strategyIds.length > 0) {
+      const { data: strategies } = await supabase
+        .from('strategies')
+        .select('id, name')
+        .in('id', strategyIds)
+
+      for (const s of strategies ?? []) {
+        nameMap.set(s.id, s.name)
+      }
+    }
+
+    const enriched = (reviews ?? []).map((r) => ({
+      ...r,
+      strategyName: nameMap.get(r.strategy_id) ?? null,
+    }))
+
+    return c.json({ data: enriched })
+  } catch (err) {
+    console.error('[API] AI 리뷰 목록 API 오류:', err)
+    return c.json({ error: 'AI 리뷰 목록 로드 실패' }, 500)
+  }
+})
+
+// ─── GET /research/ai-reviews/:id — AI 리뷰 상세 ────────────────
+
+apiRoutes.get('/research/ai-reviews/:id', async (c) => {
+  try {
+    const reviewId = c.req.param('id')
+
+    const { data: review, error } = await supabase
+      .from('ai_reviews')
+      .select('*')
+      .eq('id', reviewId)
+      .single()
+
+    if (error || !review) {
+      return c.json({ error: 'AI 리뷰를 찾을 수 없습니다' }, 404)
+    }
+
+    return c.json({ data: review })
+  } catch (err) {
+    console.error('[API] AI 리뷰 상세 API 오류:', err)
+    return c.json({ error: 'AI 리뷰 상세 로드 실패' }, 500)
+  }
+})
+
+// ─── GET /research/ai-status — AI 활성화 상태 ────────────────────
+
+apiRoutes.get('/research/ai-status', (c) => {
+  return c.json({
+    enabled: isAiEnabled(),
+    provider: getAiProvider(),
+  })
 })
 
 export default apiRoutes

@@ -14,10 +14,17 @@ const { api } = await import('@/services/api')
 const makeResponse = (overrides?: Partial<OperatorHomeResponse>): OperatorHomeResponse => ({
   system: { server: 'connected', database: 'connected', lastCollectedAt: '2026-04-04T10:00:00Z' },
   hero: {
-    totalEquity: 10000,
-    todayPnl: { realized: 100, unrealized: 50, total: 150 },
-    liveCount: 2,
-    paperCount: 1,
+    live: {
+      totalEquity: 10000,
+      todayPnl: { realized: 100, unrealized: 50, total: 150 },
+      count: 2,
+      active: true,
+    },
+    paper: {
+      totalEquity: 5000,
+      todayPnl: { realized: 30, unrealized: 10, total: 40 },
+      count: 1,
+    },
     pendingApprovals: 0,
     riskLevel: 'normal',
     edgeScore: 72,
@@ -42,7 +49,7 @@ const makeResponse = (overrides?: Partial<OperatorHomeResponse>): OperatorHomeRe
     {
       id: 'dec-1',
       slotId: 'slot-1',
-      type: 'assign',
+      type: 'strategy_assign',
       status: 'executed',
       fromStrategy: null,
       toStrategy: 'btc_ema',
@@ -70,11 +77,8 @@ describe('orchestration-store', () => {
       },
       heroSummary: {
         edgeScore: 0,
-        liveCount: 0,
-        paperCount: 0,
-        totalEquity: 0,
-        todayPnl: 0,
-        todayPnlPct: 0,
+        live: { totalEquity: 0, todayPnl: 0, todayPnlPct: 0, count: 0, active: false },
+        paper: { totalEquity: 0, todayPnl: 0, todayPnlPct: 0, count: 0 },
         pendingApprovals: 0,
         riskLevel: 'normal',
       },
@@ -99,13 +103,13 @@ describe('orchestration-store', () => {
     expect(state.isLoading).toBe(false)
     expect(state.error).toBeNull()
     expect(state.systemStatus.server).toBe('connected')
-    expect(state.heroSummary.totalEquity).toBe(10000)
+    expect(state.heroSummary.live.totalEquity).toBe(10000)
     expect(state.heroSummary.edgeScore).toBe(72)
-    expect(state.heroSummary.todayPnl).toBe(150)
+    expect(state.heroSummary.live.todayPnl).toBe(150)
     expect(state.assetSlots).toHaveLength(1)
     expect(state.assetSlots[0].asset).toBe('BTC-USDT')
     expect(state.decisions).toHaveLength(1)
-    expect(state.decisions[0].action).toBe('ENTRY') // assign → ENTRY 매핑
+    expect(state.decisions[0].action).toBe('ENTRY') // strategy_assign → ENTRY 매핑
   })
 
   it('fetchOperatorHome 실패 시 error 상태가 설정된다', async () => {
@@ -120,7 +124,7 @@ describe('orchestration-store', () => {
   })
 
   it('edgeScore null이면 0으로 매핑된다', async () => {
-    const mockData = makeResponse({ hero: { ...makeResponse().hero, edgeScore: null } })
+    const mockData = makeResponse({ hero: { ...makeResponse().hero, edgeScore: null as unknown as number } })
     vi.mocked(api.getOperatorHome).mockResolvedValue(mockData)
 
     await useOrchestrationStore.getState().fetchOperatorHome()
@@ -163,12 +167,12 @@ describe('orchestration-store', () => {
     expect(useOrchestrationStore.getState().market.crypto.volatility).toBe('high')
   })
 
-  it('decision type assign→ENTRY, switch→SWAP, retire→EXIT 매핑', async () => {
+  it('decision type strategy_assign→ENTRY, strategy_switch→SWAP, strategy_retire→EXIT 매핑', async () => {
     const mockData = makeResponse({
       decisions: [
-        { id: '1', slotId: 's1', type: 'assign', status: 'executed', fromStrategy: null, toStrategy: 'a', regime: 'risk_on', reason: '', createdAt: '', executedAt: null },
-        { id: '2', slotId: 's1', type: 'switch', status: 'executed', fromStrategy: 'a', toStrategy: 'b', regime: 'risk_on', reason: '', createdAt: '', executedAt: null },
-        { id: '3', slotId: 's1', type: 'retire', status: 'executed', fromStrategy: 'a', toStrategy: null, regime: 'risk_off', reason: '', createdAt: '', executedAt: null },
+        { id: '1', slotId: 's1', type: 'strategy_assign', status: 'executed', fromStrategy: null, toStrategy: 'a', regime: 'risk_on', reason: '', createdAt: '', executedAt: null },
+        { id: '2', slotId: 's1', type: 'strategy_switch', status: 'executed', fromStrategy: 'a', toStrategy: 'b', regime: 'risk_on', reason: '', createdAt: '', executedAt: null },
+        { id: '3', slotId: 's1', type: 'strategy_retire', status: 'executed', fromStrategy: 'a', toStrategy: null, regime: 'risk_off', reason: '', createdAt: '', executedAt: null },
       ],
     })
     vi.mocked(api.getOperatorHome).mockResolvedValue(mockData)

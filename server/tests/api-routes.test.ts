@@ -25,6 +25,15 @@ vi.mock('../src/core/auth.js', () => ({
   authMiddleware: vi.fn(async (_c: unknown, next: () => Promise<void>) => next()),
 }))
 
+// AI mock (SDK 로드 방지)
+vi.mock('../src/research/ai-reviewer.js', () => ({
+  executeReview: vi.fn(() => Promise.resolve({ reviewId: '', status: 'skipped' })),
+}))
+vi.mock('../src/services/ai-client.js', () => ({
+  isAiEnabled: vi.fn(() => false),
+  getAiProvider: vi.fn(() => null),
+}))
+
 /** Supabase 체인 빌더 헬퍼 */
 function chainBuilder(data: unknown = [], count: number | null = null) {
   const chain: Record<string, unknown> = {}
@@ -68,6 +77,13 @@ async function getApp() {
       longShortRatio: 1.1, kimchiPremium: 1.5, updatedAt: new Date().toISOString(),
     })),
   }))
+  vi.doMock('../src/research/ai-reviewer.js', () => ({
+    executeReview: vi.fn(() => Promise.resolve({ reviewId: '', status: 'skipped', summary: null, analysis: null, modelId: null, inputTokens: 0, outputTokens: 0, latencyMs: 0 })),
+  }))
+  vi.doMock('../src/services/ai-client.js', () => ({
+    isAiEnabled: vi.fn(() => false),
+    getAiProvider: vi.fn(() => null),
+  }))
 
   const { default: apiRoutes } = await import('../src/routes/api.js')
   const { Hono } = await import('hono')
@@ -110,7 +126,8 @@ describe('GET /api/dash/operator/home', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.hero.totalEquity).toBe(0)
+    expect(body.hero.live.totalEquity).toBe(0)
+    expect(body.hero.paper.totalEquity).toBe(0)
     expect(body.decisions).toEqual([])
   })
 })

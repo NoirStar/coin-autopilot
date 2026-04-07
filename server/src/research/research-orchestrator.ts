@@ -6,6 +6,7 @@
  *   Phase 2 (Full Validation): IS/OOS + Walk-Forward 검증
  *   Phase 3 (Promotion): 통과한 파라미터를 paper_candidate로 승격
  *
+ * 모든 백테스트는 워커 풀에서 병렬 실행되어 메인 스레드를 차단하지 않는다.
  * 기존 research-loop.ts의 크론 스케줄러가 이 모듈을 호출한다.
  */
 
@@ -15,10 +16,12 @@ import type {
   BacktestResult,
   StrategyStatus,
 } from '../core/types.js'
-import { createStrategyInstance } from '../strategy/factory.js'
 import { generateGrid, type ParamSet } from './param-explorer.js'
-import { runFullValidation, calculateExpectedValue, type ValidationResult, type SegmentResult } from './validation-engine.js'
-import { runBacktest } from './backtest-engine.js'
+import { calculateExpectedValue, type ValidationResult, type SegmentResult } from './validation-engine.js'
+import { runFullValidationInPool } from './validation-pool.js'
+import { BacktestWorkerPool, serializeCandleMap, type BacktestTask } from './worker-pool.js'
+import { evaluateTrigger, executeReview, type TriggerReason } from './ai-reviewer.js'
+import { isAiEnabled } from '../services/ai-client.js'
 import { supabase } from '../services/database.js'
 
 // ─── 상수 ──────────────────────────────────────────────────────
@@ -54,6 +57,8 @@ interface PipelineResult {
 /**
  * 단일 전략에 대한 연구 파이프라인 실행
  *
+ * 모든 백테스트는 워커 풀에서 병렬 실행된다.
+ *
  * @param baseStrategy 기본 전략 인스턴스 (DEFAULT_PARAMS)
  * @param allCandles 전체 캔들 데이터 (full validation용)
  * @returns PipelineResult
@@ -82,9 +87,9 @@ export async function runResearchPipeline(
 
   console.log(`[파이프라인] ${sid} — 그리드 ${grid.length}개 조합 생성`)
 
-  // 1. Screening: 짧은 백테스트로 후보 필터링
+  // 1. Screening: 짧은 백테스트로 후보 필터링 (워커 풀 병렬)
   const screeningCandles = sliceCandlesForScreening(allCandles, baseStrategy.config.timeframe)
-  const screeningResults = runScreening(sid, grid, screeningCandles)
+  const screeningResults = await runScreening(sid, grid, screeningCandles)
   result.screeningPassed = screeningResults.length
 
   if (screeningResults.length === 0) {
@@ -94,8 +99,8 @@ export async function runResearchPipeline(
 
   console.log(`[파이프라인] ${sid} — 스크리닝 통과 ${screeningResults.length}/${grid.length}개`)
 
-  // 2. Full Validation: IS/OOS + Walk-Forward
-  const validationResults = runValidationPhase(sid, screeningResults, allCandles)
+  // 2. Full Validation: IS/OOS + Walk-Forward (워커 풀 병렬)
+  const validationResults = await runValidationPhase(sid, screeningResults, allCandles)
   result.validationPassed = validationResults.length
 
   if (validationResults.length === 0) {
@@ -120,6 +125,13 @@ export async function runResearchPipeline(
   const promoted = await saveAndPromote(baseStrategy, best, allCandles)
   result.promoted = promoted
 
+  // 5. AI 리뷰 자동 트리거 (비동기, 파이프라인 블로킹 없음)
+  if (isAiEnabled()) {
+    triggerAiReviewIfNeeded(baseStrategy, best, validationResults).catch((err) => {
+      console.error(`[파이프라인] ${sid} AI 리뷰 트리거 오류:`, err)
+    })
+  }
+
   return result
 }
 
@@ -134,33 +146,45 @@ interface ScreeningCandidate {
 }
 
 /**
- * 짧은 백테스트로 후보를 걸러낸다
+ * 짧은 백테스트로 후보를 걸러낸다 (워커 풀 병렬)
  */
-function runScreening(
+async function runScreening(
   strategyId: string,
   grid: ParamSet[],
   screeningCandles: CandleMap,
-): ScreeningCandidate[] {
+): Promise<ScreeningCandidate[]> {
+  const pool = BacktestWorkerPool.getInstance()
+  const serializedCandles = serializeCandleMap(screeningCandles)
+
+  // 모든 그리드 조합을 배치로 실행
+  const tasks = grid.map((paramSet) => ({
+    strategyId,
+    serializedCandles,
+    paramOverrides: paramSet,
+  }))
+
+  const batchResults = await pool.runBatch(tasks)
+
+  // 결과 필터링
   const candidates: ScreeningCandidate[] = []
 
-  for (const paramSet of grid) {
-    const instance = createStrategyInstance(strategyId, paramSet)
-    if (!instance) continue
+  for (let i = 0; i < batchResults.length; i++) {
+    const btResult = batchResults[i]
+    if (!btResult) continue
 
-    const result = runBacktest(instance, screeningCandles)
-    const ev = calculateExpectedValue(result)
+    const ev = calculateExpectedValue(btResult)
 
     if (
       ev > SCREENING_CRITERIA.minEv &&
-      result.totalTrades >= SCREENING_CRITERIA.minTrades &&
-      result.maxDrawdown < SCREENING_CRITERIA.maxMdd
+      btResult.totalTrades >= SCREENING_CRITERIA.minTrades &&
+      btResult.maxDrawdown < SCREENING_CRITERIA.maxMdd
     ) {
       candidates.push({
-        paramSet,
+        paramSet: grid[i],
         ev,
-        trades: result.totalTrades,
-        mdd: result.maxDrawdown,
-        totalReturn: result.totalReturn,
+        trades: btResult.totalTrades,
+        mdd: btResult.maxDrawdown,
+        totalReturn: btResult.totalReturn,
       })
     }
   }
@@ -210,39 +234,41 @@ interface ValidatedCandidate {
 }
 
 /**
- * IS/OOS + Walk-Forward 검증 실행
+ * IS/OOS + Walk-Forward 검증 실행 (워커 풀 병렬)
  */
-function runValidationPhase(
+async function runValidationPhase(
   strategyId: string,
   candidates: ScreeningCandidate[],
   allCandles: CandleMap,
-): ValidatedCandidate[] {
-  const passed: ValidatedCandidate[] = []
+): Promise<ValidatedCandidate[]> {
+  // 모든 후보의 검증을 병렬 실행
+  const validationPromises = candidates.map((candidate) =>
+    runFullValidationInPool(strategyId, candidate.paramSet, allCandles)
+      .then((validation): ValidatedCandidate | null => {
+        if (validation.overallPass) {
+          const wfEvs = validation.walkForward.map((r) => r.expectedValue).sort((a, b) => a - b)
+          const medianEv = wfEvs.length > 0 ? wfEvs[Math.floor(wfEvs.length / 2)] : 0
 
-  for (const candidate of candidates) {
-    const instance = createStrategyInstance(strategyId, candidate.paramSet)
-    if (!instance) continue
-
-    const validation = runFullValidation(instance, allCandles)
-
-    if (validation.overallPass) {
-      const wfEvs = validation.walkForward.map((r) => r.expectedValue).sort((a, b) => a - b)
-      const medianEv = wfEvs.length > 0 ? wfEvs[Math.floor(wfEvs.length / 2)] : 0
-
-      passed.push({
-        paramSet: candidate.paramSet,
-        oosEv: validation.isOos.oos.expectedValue,
-        wfMedianEv: medianEv,
-        validation,
+          return {
+            paramSet: candidate.paramSet,
+            oosEv: validation.isOos.oos.expectedValue,
+            wfMedianEv: medianEv,
+            validation,
+          }
+        }
+        console.log(
+          `[파이프라인] ${strategyId} 검증 실패: ${validation.reasons.join(', ')}`
+        )
+        return null
       })
-    } else {
-      console.log(
-        `[파이프라인] ${strategyId} 검증 실패: ${validation.reasons.join(', ')}`
-      )
-    }
-  }
+      .catch((err) => {
+        console.error(`[파이프라인] ${strategyId} 검증 오류:`, err.message)
+        return null
+      })
+  )
 
-  return passed
+  const results = await Promise.all(validationPromises)
+  return results.filter((r): r is ValidatedCandidate => r !== null)
 }
 
 // ─── Phase 3: DB 저장 + 승격 ──────────────────────────────────
@@ -291,11 +317,9 @@ async function saveAndPromote(
 
   const runId = runData.id
 
-  // 검증 결과를 전체 백테스트 메트릭으로 저장
-  const instance = createStrategyInstance(sid, best.paramSet)
-  if (!instance) return false
-
-  const fullResult = runBacktest(instance, allCandles)
+  // 최적 파라미터로 전체 백테스트 (워커에서 실행)
+  const pool = BacktestWorkerPool.getInstance()
+  const fullResult = await pool.runBacktest(sid, allCandles, best.paramSet)
   const fullEv = calculateExpectedValue(fullResult)
 
   // research_run_metrics 저장
@@ -337,7 +361,6 @@ async function saveAndPromote(
   // research_run_segments 저장
   const segments: Array<{
     segment: SegmentResult
-    paramSetId?: string
   }> = [
     { segment: best.validation.isOos.is },
     { segment: best.validation.isOos.oos },
@@ -401,4 +424,106 @@ async function saveAndPromote(
   )
 
   return true
+}
+
+// ─── AI 리뷰 자동 트리거 ──────────────────────────────────────
+
+/**
+ * 파이프라인 결과를 평가하여 AI 리뷰가 필요하면 자동 실행
+ *
+ * 비동기로 실행되어 파이프라인 흐름을 차단하지 않는다.
+ * 이벤트 기반 호출이므로 매 파이프라인마다 AI를 부르지 않는다.
+ */
+async function triggerAiReviewIfNeeded(
+  baseStrategy: Strategy,
+  best: ValidatedCandidate,
+  allCandidates: ValidatedCandidate[],
+): Promise<void> {
+  const sid = baseStrategy.config.id
+
+  // 비교 후보 요약 구성
+  const candidateSummaries = allCandidates.map((c) => ({
+    strategyName: sid,
+    paramSet: c.paramSet,
+    oosEv: c.oosEv,
+    wfMedianEv: c.wfMedianEv,
+    sharpe: c.validation.isOos.oos.sharpe,
+    maxDrawdown: c.validation.isOos.oos.maxDrawdown,
+    tradeCount: c.validation.isOos.oos.tradeCount,
+  }))
+
+  // 최적 후보 메트릭
+  const bestMetrics = {
+    strategyName: sid,
+    paramSet: best.paramSet,
+    totalReturn: best.validation.isOos.oos.totalReturn,
+    maxDrawdown: best.validation.isOos.oos.maxDrawdown,
+    sharpe: best.validation.isOos.oos.sharpe,
+    winRate: best.validation.isOos.oos.winRate,
+    expectedValue: best.oosEv,
+    profitFactor: 0,
+    tradeCount: best.validation.isOos.oos.tradeCount,
+    avgHoldHours: 0,
+    costRatio: 0,
+  }
+
+  // 트리거 조건 평가
+  const triggerReason = evaluateTrigger(candidateSummaries, bestMetrics)
+  if (!triggerReason) return
+
+  console.log(`[파이프라인] ${sid} AI 리뷰 트리거: ${triggerReason}`)
+
+  // 전략 DB UUID 조회
+  const { data: strategyRow } = await supabase
+    .from('strategies')
+    .select('id')
+    .eq('strategy_id', sid)
+    .single()
+
+  if (!strategyRow) return
+
+  // 최근 연구 실행 ID
+  const { data: latestRun } = await supabase
+    .from('research_runs')
+    .select('id')
+    .eq('strategy_id', strategyRow.id)
+    .eq('status', 'completed')
+    .order('ended_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  // 리뷰 실행
+  const reviewType = triggerReason === 'ambiguous_ranking' ? 'strategy_comparison' as const
+    : triggerReason === 'param_re_explore' ? 'param_proposal' as const
+    : 'research_analysis' as const
+
+  const segments = [
+    best.validation.isOos.is,
+    best.validation.isOos.oos,
+    ...best.validation.walkForward,
+  ].map((seg) => ({
+    name: seg.segment.name,
+    role: seg.segment.role,
+    totalReturn: seg.totalReturn,
+    maxDrawdown: seg.maxDrawdown,
+    expectedValue: seg.expectedValue,
+    winRate: seg.winRate,
+    tradeCount: seg.tradeCount,
+    sharpe: seg.sharpe,
+  }))
+
+  const result = await executeReview({
+    triggerReason,
+    reviewType,
+    strategyId: strategyRow.id,
+    researchRunId: latestRun?.id,
+    metrics: bestMetrics,
+    segments,
+    comparisonCandidates: triggerReason === 'ambiguous_ranking' ? candidateSummaries : undefined,
+  })
+
+  console.log(
+    `[파이프라인] ${sid} AI 리뷰 완료: status=${result.status}, ` +
+    `tokens=${result.inputTokens}+${result.outputTokens}, ${result.latencyMs}ms`
+  )
 }
