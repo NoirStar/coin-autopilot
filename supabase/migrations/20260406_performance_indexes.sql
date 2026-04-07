@@ -29,5 +29,5 @@ CREATE INDEX IF NOT EXISTS idx_risk_events_created
   ON risk_events(created_at DESC);
 
 -- notifications: 사용자별 조회
-CREATE INDEX IF NOT EXISTS idx_notifications_created
-  ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_sent
+  ON notifications(sent_at DESC);
