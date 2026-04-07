@@ -35,7 +35,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors duration-100 ${
+              `flex items-center gap-2.5 rounded-md px-3 py-2.5 min-h-[44px] text-[13px] font-medium transition-colors duration-100 ${
                 isActive
                   ? 'bg-surface-hover text-text-primary border-l-2 border-text-secondary'
                   : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
