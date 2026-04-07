@@ -119,6 +119,11 @@ export const api = {
   getResearchRuns: () => request('/api/dash/research/runs'),
   getResearchCandidates: () => request('/api/dash/research/candidates'),
 
+  // AI 리뷰
+  getAiReviews: (limit?: number) => request(`/api/dash/research/ai-reviews${limit ? `?limit=${limit}` : ''}`),
+  getAiStatus: () => request<{ enabled: boolean; provider: string | null }>('/api/dash/research/ai-status'),
+  requestAiReview: (runId: string) => request(`/api/dash/research/runs/${runId}/ai-review`, { method: 'POST' }),
+
   // 판단 승인/거부
   approveDecision: (id: string) =>
     request(`/api/dash/decisions/${id}/approve`, { method: 'POST' }),
