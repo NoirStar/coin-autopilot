@@ -48,7 +48,23 @@
       "Bash(git commit:*)",
       "Bash(ls /mnt/c/Dev/coin-autopilot/web/vitest.config.*)",
       "Bash(ls /mnt/c/Dev/coin-autopilot/server/vitest.config.*)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(curl -s http://localhost:3001/api/portfolio/balance)",
+      "Bash(grep -n \"registerStrategy\" src/strategy/*.ts)",
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(~/.claude/skills/gstack/bin/gstack-config get:*)",
+      "Bash(~/.claude/skills/gstack/bin/gstack-learnings-search --limit 10)",
+      "Bash(ls /mnt/c/Dev/coin-autopilot/server/src/**/*.test.* /mnt/c/Dev/coin-autopilot/test/ /mnt/c/Dev/coin-autopilot/tests/)",
+      "Bash(~/.claude/skills/gstack/bin/gstack-review-read:*)",
+      "Bash(~/.claude/skills/gstack/bin/gstack-learnings-log '{\"skill\":\"plan-eng-review\",\"type\":\"architecture\",\"key\":\"param_set_runtime_closed_loop\",\"insight\":\"연구에서 승격된 param_set이 실제 운용\\(paper-engine, execution-engine\\)에 도달하는 경로가 없으면 검증 파이프라인은 무의미. 폐루프 확인: strategy_parameters 저장 → strategies.active_param_set_id → loadStrategyForSession이 DB에서 읽음 → createStrategyInstance가 오버라이드 적용. 이 경로가 먼저 있어야 연구 로직이 의미를 가짐.\",\"confidence\":10,\"source\":\"cross-model\",\"files\":[\"server/src/paper/paper-engine.ts\",\"server/src/execution/execution-engine.ts\",\"server/src/strategy/registry.ts\"]}')",
+      "Bash(~/.claude/skills/gstack/bin/gstack-learnings-log '{\"skill\":\"plan-eng-review\",\"type\":\"pitfall\",\"key\":\"supabase_multi_table_transaction\",\"insight\":\"@supabase/supabase-js 클라이언트는 다중 테이블 원자 갱신을 지원하지 않는다. strategies + strategy_parameters + research_promotions를 동시에 업데이트하려면 PL/pgSQL RPC function이 필요. 디자인 문서에서 \\\\\"동일 트랜잭션으로 승격\\\\\" 같은 표현은 이 구현 방법을 명시하지 않으면 희망사항.\",\"confidence\":10,\"source\":\"cross-model\",\"files\":[\"server/src/services/database.ts\"]}')",
+      "Bash(~/.claude/skills/gstack/bin/gstack-learnings-log '{\"skill\":\"plan-eng-review\",\"type\":\"pitfall\",\"key\":\"train_serve_symbol_skew\",\"insight\":\"연구 루프는 BTC/ETH \\(base only\\)를 사용하고 paper-engine은 BTC-USDT/BTC-KRW를 사용. 같은 전략이 연구와 운용에서 서로 다른 심볼 키를 받는 구조. 2단계 연구 파이프라인 이전에 해결 필요. research-loop.ts:158,175와 paper-engine.ts:217,228 참조.\",\"confidence\":9,\"source\":\"cross-model\",\"files\":[\"server/src/research/research-loop.ts\",\"server/src/paper/paper-engine.ts\"]}')",
+      "Bash(grep -A2 '\"test\"' ls /mnt/c/Dev/coin-autopilot/server/vitest.config* ls /mnt/c/Dev/coin-autopilot/server/tests/)",
+      "Bash(grep -n \"candles\\\\.get\\\\|candleMap\\\\.get\\\\|allCandles\\\\.get\" src/strategy/*.ts)",
+      "Bash(echo \"exit=$?\")",
+      "Read(//tmp/**)",
+      "Bash(grep:*)"
     ]
   }
 }
