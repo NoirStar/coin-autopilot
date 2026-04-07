@@ -27,11 +27,13 @@ import {
   evaluateTrigger,
   executeReview,
   suggestionsToGrid,
+  shouldReExplore,
   canCallAi,
   getPreviousBestEv,
   type ReviewResult,
   type CandidateSummary,
   type ReviewMetrics,
+  type ParamSuggestion,
 } from './ai-reviewer.js'
 import { isAiEnabled } from '../services/ai-client.js'
 import { supabase } from '../services/database.js'
@@ -160,10 +162,10 @@ export async function runResearchPipeline(
     if (aiResult) {
       result.aiReviewId = aiResult.reviewId
 
-      // AI가 재탐색 파라미터를 제안하고 confidence가 높으면 → 재탐색 루프
-      if (aiResult.analysis?.paramSuggestions && aiResult.analysis.paramSuggestions.length > 0) {
+      // AI confidence 게이트 + 재탐색 루프
+      if (aiResult.analysis && shouldReExplore(aiResult.analysis)) {
         const reExploreResult = await runAiReExplore(
-          baseStrategy, aiResult.analysis.paramSuggestions, allCandles,
+          baseStrategy, aiResult.analysis.paramSuggestions!, best.paramSet, allCandles,
         )
         if (reExploreResult && reExploreResult.oosEv > best.oosEv) {
           console.log(
@@ -257,13 +259,14 @@ async function handleValidationWipeout(
     failureReasons,
   })
 
-  if (reviewResult.status !== 'completed' || !reviewResult.analysis?.paramSuggestions) {
+  if (reviewResult.status !== 'completed' || !reviewResult.analysis || !shouldReExplore(reviewResult.analysis)) {
     return { validationPassed: 0, best: null, aiReviewId: reviewResult.reviewId }
   }
 
-  // AI 제안으로 재탐색
+  // AI 제안으로 재탐색 (스크리닝 상위 후보의 파라미터를 베이스로)
+  const bestScreeningParams = topCandidates[0]?.paramSet ?? {}
   const reExploreResult = await runAiReExplore(
-    baseStrategy, reviewResult.analysis.paramSuggestions, allCandles,
+    baseStrategy, reviewResult.analysis.paramSuggestions!, bestScreeningParams, allCandles,
   )
 
   return {
@@ -375,17 +378,18 @@ async function runPrePromotionReview(
 /**
  * AI의 paramSuggestions로 새 그리드를 만들어 스크리닝+검증 재실행
  *
+ * @param bestParamSet 현재 최적 파라미터 (DEFAULT_PARAMS가 아닌 검증 통과 파라미터)
  * @returns 검증 통과 최적 후보 또는 null
  */
 async function runAiReExplore(
   baseStrategy: Strategy,
-  suggestions: Array<{ key: string; currentRange: [number, number]; suggestedRange: [number, number]; reason: string }>,
+  suggestions: ParamSuggestion[],
+  bestParamSet: Record<string, number>,
   allCandles: CandleMap,
 ): Promise<ValidatedCandidate | null> {
   const sid = baseStrategy.config.id
-  const baseParams = baseStrategy.config.params as Record<string, number>
 
-  const newGrid = suggestionsToGrid(suggestions, baseParams)
+  const newGrid = suggestionsToGrid(suggestions, bestParamSet, sid)
   if (newGrid.length === 0) {
     console.log(`[파이프라인] ${sid} AI 제안 그리드 변환 실패 — 재탐색 스킵`)
     return null

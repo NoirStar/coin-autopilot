@@ -21,6 +21,8 @@ export interface AiRequest {
   system: string
   userMessage: string
   maxTokens?: number
+  /** 타임아웃 (ms). 기본 60초 */
+  timeoutMs?: number
 }
 
 export interface AiResponse {
@@ -42,6 +44,7 @@ const DEFAULT_MODELS: Record<Provider, string> = {
 }
 
 const DEFAULT_MAX_TOKENS = 2048
+const DEFAULT_TIMEOUT_MS = 60_000
 
 // ─── 벤더별 클라이언트 ────────────────────────────────────────
 
@@ -105,10 +108,22 @@ export async function callAi(request: AiRequest): Promise<AiResponse | null> {
   const provider = resolveProvider()
   if (!provider) return null
 
-  if (provider === 'anthropic') {
-    return callAnthropic(request)
-  }
-  return callOpenAI(request)
+  const timeoutMs = request.timeoutMs ?? Number(process.env.AI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS)
+
+  const callFn = provider === 'anthropic' ? callAnthropic : callOpenAI
+
+  // 타임아웃 레이스
+  const result = await Promise.race([
+    callFn(request),
+    new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.error(`[AI] 호출 타임아웃 (${timeoutMs}ms)`)
+        resolve(null)
+      }, timeoutMs)
+    }),
+  ])
+
+  return result
 }
 
 // ─── Anthropic 구현 ───────────────────────────────────────────

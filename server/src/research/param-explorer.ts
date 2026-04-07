@@ -143,3 +143,12 @@ export function generateGrid(strategyId: string): ParamSet[] {
 export function getExplorerStrategyIds(): string[] {
   return Object.keys(PARAM_SPECS)
 }
+
+/**
+ * 전략의 제약 조건 함수 반환 (없으면 null)
+ *
+ * AI 재탐색 그리드에도 동일한 제약을 적용하기 위해 사용.
+ */
+export function getConstraints(strategyId: string): ((params: Record<string, number>) => boolean) | null {
+  return PARAM_SPECS[strategyId]?.constraints ?? null
+}

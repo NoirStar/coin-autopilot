@@ -17,6 +17,7 @@
  */
 
 import { callAi, isAiEnabled, type AiResponse } from '../services/ai-client.js'
+import { getConstraints } from './param-explorer.js'
 import { supabase } from '../services/database.js'
 
 // ─── 타입 ─────────────────────────────────────────────────────
@@ -195,7 +196,7 @@ export async function canCallAi(
     .select('id', { count: 'exact', head: true })
     .eq('strategy_id', strategyId)
     .eq('trigger_reason', triggerReason)
-    .in('status', ['completed', 'processing'])
+    .in('status', ['pending', 'processing', 'completed'])
     .gte('created_at', cooldownSince)
 
   if ((duplicateCount ?? 0) > 0) {
@@ -209,7 +210,7 @@ export async function canCallAi(
   const { data: todayReviews } = await supabase
     .from('ai_reviews')
     .select('input_tokens, output_tokens')
-    .eq('status', 'completed')
+    .in('status', ['completed', 'processing'])
     .gte('created_at', todayStart.toISOString())
 
   const todayTokens = (todayReviews ?? []).reduce(
@@ -325,38 +326,63 @@ export async function executeReview(input: ReviewInput): Promise<ReviewResult> {
 
 // ─── AI 제안 → 그리드 변환 ────────────────────────────────────
 
+/** AI 재탐색 실행을 위한 최소 confidence */
+const MIN_RE_EXPLORE_CONFIDENCE = 0.4
+
+/**
+ * AI 재탐색 게이트: confidence가 충분한지 판단
+ */
+export function shouldReExplore(analysis: AiAnalysis): boolean {
+  if (!analysis.paramSuggestions || analysis.paramSuggestions.length === 0) return false
+  return analysis.confidence >= MIN_RE_EXPLORE_CONFIDENCE
+}
+
 /**
  * AI의 paramSuggestions를 실제 파라미터 그리드로 변환
  *
- * suggestedRange [min, max]에서 5~7단계로 균등 분할하여
- * 새로운 탐색 그리드를 생성한다.
+ * suggestedRange [min, max]에서 5~7단계로 균등 분할.
+ * 전략별 제약조건(fastEma < slowEma 등)을 적용하여 무의미한 조합 제거.
  *
+ * @param suggestions AI가 제안한 파라미터 범위
+ * @param baseParams 현재 최적 파라미터 (DEFAULT_PARAMS가 아님!)
+ * @param strategyId 전략 ID (제약조건 조회용)
  * @returns 새 그리드 (빈 배열이면 적용 불가)
  */
 export function suggestionsToGrid(
   suggestions: ParamSuggestion[],
   baseParams: Record<string, number>,
+  strategyId?: string,
 ): Array<Record<string, number>> {
   if (suggestions.length === 0) return []
 
-  // 각 제안 파라미터의 값 배열 생성
   const paramRanges: Array<{ key: string; values: number[] }> = []
 
   for (const sug of suggestions) {
-    const [min, max] = sug.suggestedRange
-    if (min >= max || min === 0 && max === 0) continue
+    const [rawMin, rawMax] = sug.suggestedRange
 
-    // 정수/실수 판단: baseParams의 기존 값이 정수면 정수, 아니면 소수 1자리
-    const isInteger = Number.isInteger(baseParams[sug.key] ?? min)
-    const steps = isInteger ? Math.min(7, max - min + 1) : 5
+    // 범위 방어: NaN, Infinity, 역전된 범위
+    const min = Number.isFinite(rawMin) ? rawMin : 0
+    const max = Number.isFinite(rawMax) ? rawMax : 0
+    if (min >= max) continue
+
+    // 정수/실수 판단: baseParams의 기존 값이 정수면 정수
+    const baseVal = baseParams[sug.key]
+    const isInteger = baseVal != null ? Number.isInteger(baseVal) : Number.isInteger(min)
+
+    // 정수일 때: 가능한 값 개수 제한, 실수일 때: 5단계
+    const maxSteps = isInteger ? Math.min(7, Math.floor(max - min) + 1) : 5
+    const steps = Math.max(2, maxSteps)
     const values: number[] = []
 
     for (let i = 0; i < steps; i++) {
-      const val = min + (max - min) * (i / (steps - 1))
-      values.push(isInteger ? Math.round(val) : Math.round(val * 10) / 10)
+      const ratio = steps > 1 ? i / (steps - 1) : 0
+      const val = min + (max - min) * ratio
+      const rounded = isInteger ? Math.round(val) : Math.round(val * 10) / 10
+      if (Number.isFinite(rounded)) {
+        values.push(rounded)
+      }
     }
 
-    // 중복 제거
     const unique = [...new Set(values)]
     if (unique.length > 0) {
       paramRanges.push({ key: sug.key, values: unique })
@@ -365,7 +391,7 @@ export function suggestionsToGrid(
 
   if (paramRanges.length === 0) return []
 
-  // 카르테시안 프로덕트
+  // 카르테시안 프로덕트 (baseParams를 베이스로)
   let combos: Array<Record<string, number>> = [{ ...baseParams }]
 
   for (const range of paramRanges) {
@@ -378,7 +404,17 @@ export function suggestionsToGrid(
     combos = expanded
   }
 
-  // 최대 50개로 제한 (재탐색은 원래 그리드보다 작아야 함)
+  // 전략별 제약조건 적용
+  if (strategyId) {
+    const constraints = getConstraints(strategyId)
+    if (constraints) {
+      combos = combos.filter(constraints)
+    }
+  }
+
+  if (combos.length === 0) return []
+
+  // 최대 50개로 제한
   const maxSize = 50
   if (combos.length > maxSize) {
     const step = combos.length / maxSize
