@@ -72,12 +72,12 @@ const PositionRow = ({ position: pos }: { position: ActivePosition }) => {
           <span className="text-[12px] text-text-faint">{pos.strategy}</span>
         </div>
         <span className={`font-mono text-[13px] font-semibold tabular-nums ${pnlColor}`}>
-          {pos.unrealizedPnlPct >= 0 ? '+' : ''}{formatPercent(pos.unrealizedPnlPct)}
+          {formatPercent(pos.unrealizedPnlPct)}
         </span>
       </div>
       <div className="flex items-center gap-4 text-[12px] text-text-muted">
         <span>진입 <span className="font-mono">{pos.entryPrice.toLocaleString()}</span></span>
-        <span>현재 <span className="font-mono text-text-secondary">{pos.currentPrice.toLocaleString()}</span></span>
+        <span>현재 <span className={`font-mono ${pnlColor}`}>{pos.currentPrice.toLocaleString()}</span></span>
         <span>SL <span className="font-mono">{pos.stopLoss.toLocaleString()}</span></span>
         <span className="ml-auto text-text-faint">{formatDuration(pos.holdingSince)}</span>
       </div>

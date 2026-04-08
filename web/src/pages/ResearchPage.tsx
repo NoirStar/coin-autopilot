@@ -177,8 +177,8 @@ export const ResearchPage = () => {
           ) : !runs || runs.length === 0 ? (
             <EmptyState message="실행된 연구가 없습니다" />
           ) : (
-            <div className="border border-border-subtle rounded-md overflow-hidden">
-              <table className="w-full">
+            <div className="border border-border-subtle rounded-md overflow-x-auto">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-border-subtle">
                     <th className="text-left px-3 py-2 font-mono text-[10px] font-semibold text-text-faint tracking-widest uppercase">STATUS</th>
@@ -198,7 +198,7 @@ export const ResearchPage = () => {
                     return (
                       <tr key={run.id} className="border-b border-border-subtle hover:bg-surface-hover transition-colors duration-100">
                         <td className="px-3 py-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${cfg.bg} ${cfg.color}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap ${cfg.bg} ${cfg.color}`}>
                             <Icon className={`w-3 h-3 ${run.status === 'running' ? 'animate-spin' : ''}`} />
                             {cfg.label}
                           </span>
