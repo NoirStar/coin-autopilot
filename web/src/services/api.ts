@@ -106,6 +106,7 @@ export const api = {
   // Settings
   getSettings: () => request('/api/settings'),
   getAgentStatus: () => request('/api/settings/agent-status'),
+  getRuntimeConfig: () => request('/api/settings/runtime-config'),
   updateRiskProfile: (data: unknown) => request('/api/settings/risk-profile', { method: 'PUT', body: JSON.stringify(data) }),
   updateAlerts: (data: unknown) => request('/api/settings/alerts', { method: 'PUT', body: JSON.stringify(data) }),
   saveApiKeys: (data: { exchange: string; accessKey: string; secretKey: string; passphrase?: string }) =>

@@ -12,6 +12,7 @@ import {
   Bell,
   Shield,
   Server,
+  Info,
 } from 'lucide-react'
 import { api } from '../services/api'
 import { useSettingsStore } from '../stores/settings-store'
@@ -49,6 +50,30 @@ interface AgentStatusResponse {
   wsConnections: Record<string, boolean>
 }
 
+/** 서버 환경변수 기반 런타임 설정 */
+interface RuntimeConfig {
+  risk: {
+    dailyLossLimitPct: number
+    circuitBreakerPct: number
+    maxPositions: number
+    maxPositionSize: number
+    maxLeverage: number
+  }
+  exchanges: {
+    upbit: boolean
+    okx: boolean
+  }
+  alerts: {
+    telegram: boolean
+    discord: boolean
+  }
+  ai: {
+    enabled: boolean
+    provider: string | null
+    model: string | null
+  }
+}
+
 const DEFAULT_RISK = {
   daily_max_loss_pct: 2.0,
   position_max_loss_pct: 0.30,
@@ -68,6 +93,11 @@ export function SettingsPage() {
     queryKey: ['agent-status'],
     queryFn: () => api.getAgentStatus() as Promise<AgentStatusResponse>,
     refetchInterval: 30_000,
+  })
+
+  const { data: runtimeConfig } = useQuery<RuntimeConfig>({
+    queryKey: ['runtime-config'],
+    queryFn: () => api.getRuntimeConfig() as Promise<RuntimeConfig>,
   })
 
   const settings = settingsResponse?.data
@@ -119,13 +149,13 @@ export function SettingsPage() {
       )}
 
       {/* API 키 관리 */}
-      <ApiKeySection settings={settings} isLoading={isLoading} />
+      <ApiKeySection settings={settings} isLoading={isLoading} runtimeConfig={runtimeConfig} />
 
       {/* 리스크 파라미터 */}
-      <RiskParameterSection key={settings ? JSON.stringify(settings) : 'loading'} settings={settings} isLoading={isLoading} />
+      <RiskParameterSection key={settings ? JSON.stringify(settings) : 'loading'} settings={settings} isLoading={isLoading} runtimeConfig={runtimeConfig} />
 
       {/* 알림 설정 */}
-      <AlertSection settings={settings} isLoading={isLoading} />
+      <AlertSection settings={settings} isLoading={isLoading} runtimeConfig={runtimeConfig} />
 
       {/* 위험 영역 */}
       <DangerZone />
@@ -147,7 +177,7 @@ function StatusItem({ label, value, active }: { label: string; value: string; ac
   )
 }
 
-function ApiKeySection({ settings, isLoading }: { settings: UserSettings | undefined; isLoading: boolean }) {
+function ApiKeySection({ settings, isLoading, runtimeConfig }: { settings: UserSettings | undefined; isLoading: boolean; runtimeConfig: RuntimeConfig | undefined }) {
   const queryClient = useQueryClient()
 
   if (isLoading) {
@@ -187,9 +217,28 @@ function ApiKeySection({ settings, isLoading }: { settings: UserSettings | undef
           onSaved={() => queryClient.invalidateQueries({ queryKey: ['user-settings'] })}
         />
       </div>
-      <p className="mt-4 text-[12px] text-text-muted">
-        API 키는 서버에 암호화되어 저장됩니다. 출금 권한은 절대 부여하지 마세요.
-      </p>
+      <div className="mt-4 space-y-1.5">
+        <div className="flex items-start gap-1.5 text-[12px] text-text-muted">
+          <Info className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>API 키는 서버 환경변수(.env)로 관리됩니다. 환경변수에 설정된 키가 우선 적용됩니다.</span>
+        </div>
+        {runtimeConfig && (
+          <div className="flex items-center gap-3 text-[12px] text-text-muted">
+            <span className="flex items-center gap-1">
+              업비트: {runtimeConfig.exchanges.upbit
+                ? <span className="text-profit">연결됨</span>
+                : <span className="text-text-faint">미설정</span>}
+            </span>
+            <span className="flex items-center gap-1">
+              OKX: {runtimeConfig.exchanges.okx
+                ? <span className="text-profit">연결됨</span>
+                : <span className="text-text-faint">미설정</span>}
+            </span>
+            <span className="text-text-faint">(환경변수 기준)</span>
+          </div>
+        )}
+        <p className="text-[12px] text-text-muted">출금 권한은 절대 부여하지 마세요.</p>
+      </div>
     </div>
   )
 }
@@ -368,7 +417,7 @@ function ApiKeyCard({ exchange, label, description, configured, permissions, sho
   )
 }
 
-function RiskParameterSection({ settings, isLoading }: { settings: UserSettings | undefined; isLoading: boolean }) {
+function RiskParameterSection({ settings, isLoading, runtimeConfig }: { settings: UserSettings | undefined; isLoading: boolean; runtimeConfig: RuntimeConfig | undefined }) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [values, setValues] = useState(() => settings ? {
@@ -441,6 +490,18 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
         )}
       </div>
 
+      {runtimeConfig && (
+        <div className="mt-3 flex items-start gap-1.5 rounded border border-border-subtle bg-secondary px-3 py-2 text-[12px] text-text-muted">
+          <Info className="mt-0.5 h-3 w-3 shrink-0" />
+          <div>
+            <p>현재 서버에 적용 중인 값은 환경변수 기준입니다.</p>
+            <p className="mt-1 font-mono-trading text-[11px] text-text-faint">
+              DAILY_LOSS_LIMIT: {runtimeConfig.risk.dailyLossLimitPct}% · CIRCUIT_BREAKER: {runtimeConfig.risk.circuitBreakerPct}% · MAX_POSITIONS: {runtimeConfig.risk.maxPositions} · MAX_LEVERAGE: {runtimeConfig.risk.maxLeverage}x
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 space-y-3">
         {params.map((param) => (
           <div key={param.key} className="flex items-center justify-between border-b border-border-subtle pb-2.5">
@@ -510,7 +571,7 @@ function RiskParameterSection({ settings, isLoading }: { settings: UserSettings 
   )
 }
 
-function AlertSection({ settings, isLoading }: { settings: UserSettings | undefined; isLoading: boolean }) {
+function AlertSection({ settings, isLoading, runtimeConfig }: { settings: UserSettings | undefined; isLoading: boolean; runtimeConfig: RuntimeConfig | undefined }) {
   const queryClient = useQueryClient()
 
   const alertMutation = useMutation({
@@ -546,6 +607,18 @@ function AlertSection({ settings, isLoading }: { settings: UserSettings | undefi
       <div className="flex items-center gap-2">
         <Bell className="h-3.5 w-3.5 text-text-faint" />
         <h3 className="text-[12px] font-semibold text-text-muted">알림 설정</h3>
+      </div>
+
+      <div className="mt-3 flex items-start gap-1.5 text-[12px] text-text-muted">
+        <Info className="mt-0.5 h-3 w-3 shrink-0" />
+        <div>
+          <span>알림 연결은 서버 환경변수(.env)로 관리됩니다.</span>
+          {runtimeConfig && (
+            <span className="ml-2 text-text-faint">
+              Telegram: {runtimeConfig.alerts.telegram ? '연결됨' : '미설정'} · Discord: {runtimeConfig.alerts.discord ? '연결됨' : '미설정'}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 space-y-3">

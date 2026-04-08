@@ -4,10 +4,20 @@ import { scoreMultipleCoins, computeDetectionScore } from '../detector/composite
 import { fetchUpbitKrwSymbols, fetchUpbitKoreanNameMap, assetKeyToUpbitMarket } from '../data/candle-collector.js'
 import { supabase } from '../services/database.js'
 import { notifyStrongBuySignals } from '../services/telegram-notifier.js'
+import { authMiddleware } from '../core/auth.js'
 import type { Candle } from '../core/types.js'
 import type { OrderbookSnapshot } from '../detector/orderbook-imbalance.js'
 
 export const detectionRoutes = new Hono()
+
+/* ── 스캔 보호: 쿨다운 캐시 + 중복 실행 잠금 ── */
+
+/** 최근 스캔 결과 인메모리 캐시 */
+let lastScanResult: { data: unknown; timestamp: number } | null = null
+const SCAN_COOLDOWN_MS = 5 * 60 * 1000 // 5분
+
+/** 스캔 실행 중 잠금 플래그 */
+let scanInProgress = false
 
 const UPBIT_API = 'https://api.upbit.com/v1'
 
@@ -250,19 +260,46 @@ detectionRoutes.get('/cached', async (c) => {
   }
 })
 
-/** POST /api/detection/refresh — 수동 갱신 (전체 스캔 + 캐시 저장) */
-detectionRoutes.post('/refresh', async (c) => {
+/** POST /api/detection/refresh — 수동 갱신 (전체 스캔 + 캐시 저장, 인증 필요) */
+detectionRoutes.post('/refresh', authMiddleware, async (c) => {
+  // 중복 실행 방지
+  if (scanInProgress) {
+    return c.json({ error: '스캔이 이미 진행 중입니다' }, 429)
+  }
+
+  // 쿨다운: 최근 5분 내 스캔 결과가 있으면 캐시 반환
+  if (lastScanResult && Date.now() - lastScanResult.timestamp < SCAN_COOLDOWN_MS) {
+    const remaining = SCAN_COOLDOWN_MS - (Date.now() - lastScanResult.timestamp)
+    return c.json({ data: lastScanResult.data, cached: true, cooldownRemainingMs: remaining })
+  }
+
+  scanInProgress = true
   try {
     const result = await runFullScan()
+    lastScanResult = { data: result, timestamp: Date.now() }
     return c.json(result)
   } catch (err) {
     console.error('[갱신] 스캔 오류:', err)
     return c.json({ error: '스캔 실패' }, 500)
+  } finally {
+    scanInProgress = false
   }
 })
 
-/** GET /api/detection/scan/stream — SSE 스트리밍 전체 알트코인 스캔 */
-detectionRoutes.get('/scan/stream', async (c) => {
+/** GET /api/detection/scan/stream — SSE 스트리밍 전체 알트코인 스캔 (인증 필요) */
+detectionRoutes.get('/scan/stream', authMiddleware, async (c) => {
+  // 중복 실행 방지
+  if (scanInProgress) {
+    return c.json({ error: '스캔이 이미 진행 중입니다' }, 429)
+  }
+
+  // 쿨다운: 최근 5분 내 스캔 결과가 있으면 캐시 반환
+  if (lastScanResult && Date.now() - lastScanResult.timestamp < SCAN_COOLDOWN_MS) {
+    const remaining = SCAN_COOLDOWN_MS - (Date.now() - lastScanResult.timestamp)
+    return c.json({ data: lastScanResult.data, cached: true, cooldownRemainingMs: remaining })
+  }
+
+  scanInProgress = true
   return streamSSE(c, async (stream) => {
     const startTime = Date.now()
     try {
@@ -375,17 +412,19 @@ detectionRoutes.get('/scan/stream', async (c) => {
         reasoning: r.reasoning,
       }))
 
-      // 캐시 저장
+      // 캐시 저장 (DB + 인메모리)
       await saveScanToCache(inputs.length, results.length, mappedResults, durationMs)
 
+      const completeData = {
+        scannedAt: now.toISOString(),
+        totalScanned: inputs.length,
+        detected: results.length,
+        results: mappedResults,
+      }
+      lastScanResult = { data: completeData, timestamp: Date.now() }
+
       await stream.writeSSE({
-        data: JSON.stringify({
-          type: 'complete',
-          scannedAt: now.toISOString(),
-          totalScanned: inputs.length,
-          detected: results.length,
-          results: mappedResults,
-        }),
+        data: JSON.stringify({ type: 'complete', ...completeData }),
         event: 'complete',
       })
     } catch (err) {
@@ -394,18 +433,35 @@ detectionRoutes.get('/scan/stream', async (c) => {
         data: JSON.stringify({ type: 'error', message: '탐지 스캔 실패' }),
         event: 'scan-error',
       })
+    } finally {
+      scanInProgress = false
     }
   })
 })
 
-/** GET /api/detection/scan — 전체 알트코인 스캔 (공개, 폴백) */
-detectionRoutes.get('/scan', async (c) => {
+/** GET /api/detection/scan — 전체 알트코인 스캔 (인증 필요) */
+detectionRoutes.get('/scan', authMiddleware, async (c) => {
+  // 중복 실행 방지
+  if (scanInProgress) {
+    return c.json({ error: '스캔이 이미 진행 중입니다' }, 429)
+  }
+
+  // 쿨다운: 최근 5분 내 스캔 결과가 있으면 캐시 반환
+  if (lastScanResult && Date.now() - lastScanResult.timestamp < SCAN_COOLDOWN_MS) {
+    const remaining = SCAN_COOLDOWN_MS - (Date.now() - lastScanResult.timestamp)
+    return c.json({ data: lastScanResult.data, cached: true, cooldownRemainingMs: remaining })
+  }
+
+  scanInProgress = true
   try {
     const result = await runFullScan()
+    lastScanResult = { data: result, timestamp: Date.now() }
     return c.json(result)
   } catch (err) {
     console.error('탐지 스캔 오류:', err)
     return c.json({ error: '탐지 스캔 실패' }, 500)
+  } finally {
+    scanInProgress = false
   }
 })
 

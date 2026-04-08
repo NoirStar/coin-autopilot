@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { supabase } from '../services/database.js'
 import { authMiddleware } from '../core/auth.js'
+import { invalidateRiskParamsCache } from '../risk/risk-manager.js'
 
 export const settingsRoutes = new Hono()
 
@@ -86,6 +87,9 @@ settingsRoutes.put('/risk-profile', authMiddleware, async (c) => {
   if (error) {
     return c.json({ error: '설정 저장 실패' }, 500)
   }
+
+  // 리스크 파라미터 캐시 무효화 — 변경 즉시 반영
+  invalidateRiskParamsCache()
 
   return c.json({ success: true })
 })
@@ -221,6 +225,32 @@ settingsRoutes.delete('/api-keys/:exchange', authMiddleware, async (c) => {
   }
 
   return c.json({ success: true })
+})
+
+/** GET /api/settings/runtime-config — 실제 런타임에 적용 중인 환경변수 기반 설정 (무인증) */
+settingsRoutes.get('/runtime-config', async (c) => {
+  return c.json({
+    risk: {
+      dailyLossLimitPct: Number(process.env.DAILY_LOSS_LIMIT_PCT ?? 5),
+      circuitBreakerPct: Number(process.env.CIRCUIT_BREAKER_PCT ?? 10),
+      maxPositions: Number(process.env.MAX_CONCURRENT_POSITIONS ?? 3),
+      maxPositionSize: Number(process.env.MAX_POSITION_SIZE ?? 5000),
+      maxLeverage: Number(process.env.MAX_LEVERAGE ?? 3),
+    },
+    exchanges: {
+      upbit: !!process.env.UPBIT_ACCESS_KEY,
+      okx: !!process.env.OKX_API_KEY,
+    },
+    alerts: {
+      telegram: !!process.env.TELEGRAM_BOT_TOKEN,
+      discord: !!process.env.DISCORD_WEBHOOK_URL,
+    },
+    ai: {
+      enabled: !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY,
+      provider: process.env.AI_PROVIDER ?? (process.env.OPENAI_API_KEY ? 'openai' : process.env.ANTHROPIC_API_KEY ? 'anthropic' : null),
+      model: process.env.AI_MODEL ?? null,
+    },
+  })
 })
 
 /** GET /api/settings/agent-status — 에이전트 상태 (무인증) */

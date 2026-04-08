@@ -27,26 +27,109 @@ const DEFAULT_DAILY_LOSS_LIMIT_PCT = 3
 /** 기본 서킷 브레이커 한도 (%) */
 const DEFAULT_CIRCUIT_BREAKER_PCT = 10
 
-// ─── 환경변수 기반 설정 ───────────────────────────────────────
+// ─── 리스크 파라미터 (환경변수 우선, DB 폴백) ────────────────
 
-/** 일일 손실 한도 (환경변수 오버라이드) */
-function getDailyLossLimitPct(): number {
-  const envVal = process.env.DAILY_LOSS_LIMIT_PCT
-  if (envVal) {
-    const parsed = parseFloat(envVal)
-    if (!isNaN(parsed) && parsed > 0) return parsed
-  }
-  return DEFAULT_DAILY_LOSS_LIMIT_PCT
+interface RiskParams {
+  dailyLossLimitPct: number
+  circuitBreakerPct: number
 }
 
-/** 서킷 브레이커 한도 (환경변수 오버라이드) */
-function getCircuitBreakerPct(): number {
-  const envVal = process.env.CIRCUIT_BREAKER_PCT
-  if (envVal) {
-    const parsed = parseFloat(envVal)
-    if (!isNaN(parsed) && parsed > 0) return parsed
+/** 캐시된 DB 리스크 파라미터 */
+let cachedDbParams: RiskParams | null = null
+/** 캐시 만료 시각 (5분 TTL) */
+let cacheExpiresAt = 0
+/** DB 캐시 TTL (ms) */
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+/**
+ * 리스크 파라미터 로드: 환경변수 우선, DB 폴백
+ *
+ * 환경변수가 설정돼 있으면 DB 조회 없이 즉시 반환.
+ * 환경변수가 없는 항목만 user_settings 테이블에서 가져온다.
+ * DB 결과는 5분간 캐시하여 매 리스크 체크마다 쿼리하지 않는다.
+ */
+async function loadRiskParams(): Promise<RiskParams> {
+  // 1. 환경변수 확인
+  const envDaily = process.env.DAILY_LOSS_LIMIT_PCT
+    ? parseFloat(process.env.DAILY_LOSS_LIMIT_PCT)
+    : null
+  const envCb = process.env.CIRCUIT_BREAKER_PCT
+    ? parseFloat(process.env.CIRCUIT_BREAKER_PCT)
+    : null
+
+  // 유효하지 않은 값은 null 처리
+  const fromEnv = {
+    dailyLossLimitPct: (envDaily != null && !isNaN(envDaily) && envDaily > 0) ? envDaily : null,
+    circuitBreakerPct: (envCb != null && !isNaN(envCb) && envCb > 0) ? envCb : null,
   }
-  return DEFAULT_CIRCUIT_BREAKER_PCT
+
+  // 환경변수가 모두 설정돼 있으면 DB 조회 불필요
+  if (fromEnv.dailyLossLimitPct != null && fromEnv.circuitBreakerPct != null) {
+    return {
+      dailyLossLimitPct: fromEnv.dailyLossLimitPct,
+      circuitBreakerPct: fromEnv.circuitBreakerPct,
+    }
+  }
+
+  // 2. 캐시가 유효하면 재사용
+  const now = Date.now()
+  if (cachedDbParams && now < cacheExpiresAt) {
+    return {
+      dailyLossLimitPct: fromEnv.dailyLossLimitPct ?? cachedDbParams.dailyLossLimitPct,
+      circuitBreakerPct: fromEnv.circuitBreakerPct ?? cachedDbParams.circuitBreakerPct,
+    }
+  }
+
+  // 3. DB 폴백 — user_settings에서 리스크 설정 조회
+  try {
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('daily_max_loss_pct, mdd_stop_pct')
+      .limit(1)
+      .single()
+
+    if (!error && data) {
+      cachedDbParams = {
+        dailyLossLimitPct: Number(data.daily_max_loss_pct) || DEFAULT_DAILY_LOSS_LIMIT_PCT,
+        circuitBreakerPct: Number(data.mdd_stop_pct) || DEFAULT_CIRCUIT_BREAKER_PCT,
+      }
+      cacheExpiresAt = now + CACHE_TTL_MS
+      console.log(
+        `[V2리스크] DB 리스크 파라미터 로드: 일일한도=${cachedDbParams.dailyLossLimitPct}%, ` +
+        `서킷브레이커=${cachedDbParams.circuitBreakerPct}%`,
+      )
+    } else {
+      // DB 조회 실패 시 기본값 사용
+      if (error) {
+        console.warn('[V2리스크] user_settings 조회 실패, 기본값 사용:', error.message)
+      }
+      cachedDbParams = {
+        dailyLossLimitPct: DEFAULT_DAILY_LOSS_LIMIT_PCT,
+        circuitBreakerPct: DEFAULT_CIRCUIT_BREAKER_PCT,
+      }
+      // 실패 시 캐시 TTL을 짧게 (1분) 설정하여 재시도 빈도 확보
+      cacheExpiresAt = now + 60_000
+    }
+  } catch (err) {
+    console.error('[V2리스크] user_settings 조회 중 예외:', err)
+    cachedDbParams = {
+      dailyLossLimitPct: DEFAULT_DAILY_LOSS_LIMIT_PCT,
+      circuitBreakerPct: DEFAULT_CIRCUIT_BREAKER_PCT,
+    }
+    cacheExpiresAt = now + 60_000
+  }
+
+  return {
+    dailyLossLimitPct: fromEnv.dailyLossLimitPct ?? cachedDbParams.dailyLossLimitPct,
+    circuitBreakerPct: fromEnv.circuitBreakerPct ?? cachedDbParams.circuitBreakerPct,
+  }
+}
+
+/** 캐시 무효화 — 설정 변경 시 외부에서 호출 가능 */
+export function invalidateRiskParamsCache(): void {
+  cachedDbParams = null
+  cacheExpiresAt = 0
+  console.log('[V2리스크] 리스크 파라미터 캐시 무효화')
 }
 
 // ─── 리스크 체크 메인 ─────────────────────────────────────────
@@ -67,9 +150,11 @@ export async function runRiskCheck(): Promise<void> {
   console.log('[V2리스크] ═══ 리스크 체크 시작 ═══')
 
   try {
+    // 리스크 파라미터 로드 (환경변수 우선, DB 폴백)
+    const params = await loadRiskParams()
+
     // 서킷 브레이커 먼저 확인 (더 심각한 조건)
-    const cbPct = getCircuitBreakerPct()
-    const cbTriggered = await checkCircuitBreaker(cbPct)
+    const cbTriggered = await checkCircuitBreaker(params.circuitBreakerPct)
 
     if (cbTriggered) {
       // 서킷 브레이커 트리거 시 일일 손실 한도 체크 불필요
@@ -78,8 +163,7 @@ export async function runRiskCheck(): Promise<void> {
     }
 
     // 일일 손실 한도 확인
-    const dailyLimitPct = getDailyLossLimitPct()
-    await checkDailyLossLimit(dailyLimitPct)
+    await checkDailyLossLimit(params.dailyLossLimitPct)
 
     console.log('[V2리스크] ═══ 리스크 체크 종료 ═══')
   } catch (err) {
@@ -294,13 +378,20 @@ export async function checkCircuitBreaker(maxDrawdownPct: number): Promise<boole
 
 // ─── 대시보드 API ─────────────────────────────────────────────
 
-/** 서킷 브레이커 상태 조회 (대시보드용) */
-export async function getCircuitBreakerStatus(): Promise<{
-  currentLossPct: number
-  limitPct: number
-  triggered: boolean
-}> {
-  const limitPct = getCircuitBreakerPct()
+/** 서킷 브레이커 상태 캐시 — 거래소 API 호출 비용/지연 절감 */
+type CbStatus = { currentLossPct: number; limitPct: number; triggered: boolean }
+let cbCache: { data: CbStatus; expiresAt: number } | null = null
+const CB_CACHE_TTL = 60_000 // 60초
+
+/** 서킷 브레이커 상태 조회 (대시보드용, 60초 TTL 캐시) */
+export async function getCircuitBreakerStatus(): Promise<CbStatus> {
+  // 캐시가 유효하면 거래소 호출 없이 즉시 반환
+  if (cbCache && Date.now() < cbCache.expiresAt) {
+    return cbCache.data
+  }
+
+  const params = await loadRiskParams()
+  const limitPct = params.circuitBreakerPct
 
   // 현재 잔고 조회
   let totalEquity = 0
@@ -308,7 +399,7 @@ export async function getCircuitBreakerStatus(): Promise<{
     const balance = await fetchBalance()
     totalEquity = balance.total
   } catch {
-    // 잔고 조회 실패 시 기본값 반환
+    // 잔고 조회 실패 시 기본값 반환 (캐시하지 않음 — 다음 요청에서 재시도)
     return { currentLossPct: 0, limitPct, triggered: false }
   }
 
@@ -344,7 +435,12 @@ export async function getCircuitBreakerStatus(): Promise<{
 
   const triggered = currentLossPct >= limitPct
 
-  return { currentLossPct, limitPct, triggered }
+  const result: CbStatus = { currentLossPct, limitPct, triggered }
+
+  // 성공 시에만 캐시 저장
+  cbCache = { data: result, expiresAt: Date.now() + CB_CACHE_TTL }
+
+  return result
 }
 
 // ─── 내부 헬퍼 ────────────────────────────────────────────────
