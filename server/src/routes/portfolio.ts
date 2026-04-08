@@ -232,7 +232,7 @@ portfolioRoutes.get('/trades', async (c) => {
       symbol: p.asset_key,
       direction: p.side,
       entry_price: Number(p.entry_price),
-      exit_price: Number(p.exit_price ?? 0),
+      exit_price: Number(p.exit_price ?? p.entry_price ?? 0),
       quantity: Number(p.current_qty),
       pnl: Number(p.realized_pnl ?? 0),
       pnl_pct: Number(p.entry_price) > 0 && Number(p.current_qty) > 0

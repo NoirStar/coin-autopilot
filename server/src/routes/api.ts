@@ -995,7 +995,7 @@ apiRoutes.post('/notifications/:id/ack', authMiddleware, async (c) => {
 
 // ─── POST /decisions/:id/approve — 판단 승인 ──────────────────
 
-apiRoutes.post('/decisions/:id/approve', async (c) => {
+apiRoutes.post('/decisions/:id/approve', authMiddleware, async (c) => {
   const id = c.req.param('id')
 
   // pending 상태인 판단만 승인 가능
@@ -1031,7 +1031,7 @@ apiRoutes.post('/decisions/:id/approve', async (c) => {
 
 // ─── POST /decisions/:id/reject — 판단 거부 ──────────────────
 
-apiRoutes.post('/decisions/:id/reject', async (c) => {
+apiRoutes.post('/decisions/:id/reject', authMiddleware, async (c) => {
   const id = c.req.param('id')
 
   const { data: decision, error: fetchErr } = await supabase
@@ -1058,7 +1058,7 @@ apiRoutes.post('/decisions/:id/reject', async (c) => {
 
 // ─── POST /risk/events/:id/resolve — 리스크 이벤트 해결 ──────
 
-apiRoutes.post('/risk/events/:id/resolve', async (c) => {
+apiRoutes.post('/risk/events/:id/resolve', authMiddleware, async (c) => {
   const id = c.req.param('id')
 
   const { error } = await supabase

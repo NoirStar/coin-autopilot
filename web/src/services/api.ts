@@ -58,6 +58,7 @@ const AUTH_METHODS = ['PUT', 'POST', 'DELETE']
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   // AbortSignal 제거 — 탭 이동 시 진행 중인 요청이 취소되지 않도록
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { signal: _signal, ...restOptions } = options ?? {}
   const hasBody = restOptions?.body != null
   const method = (restOptions?.method ?? 'GET').toUpperCase()
@@ -241,6 +242,7 @@ export interface OperatorHomeResponse {
   }
   circuitBreaker: {
     triggered: boolean
-    dailyLossPct: number
+    currentLossPct: number
+    limitPct: number
   }
 }

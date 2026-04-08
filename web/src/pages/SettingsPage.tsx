@@ -122,7 +122,7 @@ export function SettingsPage() {
       <ApiKeySection settings={settings} isLoading={isLoading} />
 
       {/* 리스크 파라미터 */}
-      <RiskParameterSection settings={settings} isLoading={isLoading} />
+      <RiskParameterSection key={settings ? JSON.stringify(settings) : 'loading'} settings={settings} isLoading={isLoading} />
 
       {/* 알림 설정 */}
       <AlertSection settings={settings} isLoading={isLoading} />
@@ -371,19 +371,13 @@ function ApiKeyCard({ exchange, label, description, configured, permissions, sho
 function RiskParameterSection({ settings, isLoading }: { settings: UserSettings | undefined; isLoading: boolean }) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
-  const [values, setValues] = useState(DEFAULT_RISK)
+  const [values, setValues] = useState(() => settings ? {
+    daily_max_loss_pct: settings.daily_max_loss_pct,
+    position_max_loss_pct: settings.position_max_loss_pct,
+    mdd_warning_pct: settings.mdd_warning_pct,
+    mdd_stop_pct: settings.mdd_stop_pct,
+  } : DEFAULT_RISK)
   const [toast, setToast] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (settings) {
-      setValues({
-        daily_max_loss_pct: settings.daily_max_loss_pct,
-        position_max_loss_pct: settings.position_max_loss_pct,
-        mdd_warning_pct: settings.mdd_warning_pct,
-        mdd_stop_pct: settings.mdd_stop_pct,
-      })
-    }
-  }, [settings])
 
   const saveMutation = useMutation({
     mutationFn: () => api.updateRiskProfile({

@@ -265,10 +265,10 @@ export function PortfolioPage() {
   )
 }
 
-function ExchangeCard({ name, type, currency: _currency, configured, connected, balance, positions, isLoading, onGoToSettings, formatBalance }: {
+function ExchangeCard({ name, type, configured, connected, balance, positions, isLoading, onGoToSettings, formatBalance }: {
   name: string
   type: string
-  currency: string
+  currency?: string
   configured: boolean
   connected?: boolean
   balance: number
