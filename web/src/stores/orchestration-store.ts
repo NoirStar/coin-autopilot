@@ -8,6 +8,7 @@ import type {
   MarketCondition,
   RiskLevel,
   ConnectionStatus,
+  AiAlert,
 } from '@/types/orchestration'
 import { api } from '@/services/api'
 import type { OperatorHomeResponse } from '@/services/api'
@@ -20,6 +21,7 @@ interface OrchestrationState {
   decisions: Decision[]
   positions: ActivePosition[]
   market: MarketCondition
+  aiAlerts: AiAlert[]
   isLoading: boolean
   error: string | null
   lastFetchedAt: string | null
@@ -126,16 +128,16 @@ function mapPositions(data: OperatorHomeResponse): ActivePosition[] {
     id: String(p.id ?? ''),
     asset: String(p.asset_key ?? ''),
     venue: 'okx_swap',
-    strategy: '',
+    strategy: String(p.strategy_id ?? ''),
     tradeMode: source,
     side: (p.side as ActivePosition['side']) ?? 'flat',
     entryPrice: Number(p.entry_price ?? 0),
-    currentPrice: Number(p.peak_price ?? p.entry_price ?? 0),
+    currentPrice: Number(p.currentPrice ?? p.entry_price ?? 0),
     stopLoss: Number(p.stop_price ?? 0),
     takeProfit: 0,
     qty: Number(p.current_qty ?? 0),
     unrealizedPnl: Number(p.unrealized_pnl ?? 0),
-    unrealizedPnlPct: 0,
+    unrealizedPnlPct: Number(p.pnlPct ?? 0),
     holdingSince: String(p.entry_time ?? ''),
   })
   return [
@@ -156,6 +158,18 @@ function mapMarket(data: OperatorHomeResponse): MarketCondition {
     },
     krStock: null,
   }
+}
+
+function mapAiAlerts(data: OperatorHomeResponse): AiAlert[] {
+  return (data.aiAlerts ?? []).map((a) => ({
+    id: a.id,
+    strategyName: a.strategyName,
+    triggerReason: a.triggerReason,
+    summary: a.summary,
+    confidence: a.confidence,
+    hasParamSuggestions: a.hasParamSuggestions,
+    createdAt: a.createdAt,
+  }))
 }
 
 const emptyMarket: MarketCondition = {
@@ -187,6 +201,7 @@ export const useOrchestrationStore = create<OrchestrationState>((set) => ({
   decisions: [],
   positions: [],
   market: emptyMarket,
+  aiAlerts: [],
   isLoading: true,
   error: null,
   lastFetchedAt: null,
@@ -210,6 +225,7 @@ export const useOrchestrationStore = create<OrchestrationState>((set) => ({
         decisions: mapDecisions(data),
         positions: mapPositions(data),
         market: mapMarket(data),
+        aiAlerts: mapAiAlerts(data),
         isLoading: false,
         error: null,
         lastFetchedAt: new Date().toISOString(),

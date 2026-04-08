@@ -47,6 +47,7 @@ async function buildOperatorHomeData(): Promise<unknown> {
       researchQueuedResult,
       researchCompletedResult,
       topCandidatesResult,
+      recentAiReviewsResult,
     ] = await Promise.all([
       // 1. 최신 레짐
       supabase
@@ -84,7 +85,7 @@ async function buildOperatorHomeData(): Promise<unknown> {
       // 7. 열린 실전 포지션 (미실현 손익)
       supabase
         .from('live_positions')
-        .select('id, asset_key, exchange, side, entry_price, current_qty, peak_price, unrealized_pnl, realized_pnl, stop_price, leverage, margin_mode, entry_time, status')
+        .select('id, asset_key, exchange, side, entry_price, current_qty, peak_price, unrealized_pnl, realized_pnl, stop_price, leverage, margin_mode, strategy_id, entry_time, status')
         .eq('status', 'open')
         .order('entry_time', { ascending: false }),
 
@@ -140,6 +141,15 @@ async function buildOperatorHomeData(): Promise<unknown> {
         .select('id, strategy_id, market_scope, status, promotion_status, started_at, ended_at')
         .eq('status', 'completed')
         .order('ended_at', { ascending: false })
+        .limit(5),
+
+      // 16. 최근 24시간 완료된 AI 리뷰 (대시보드 알림용, 최대 5개)
+      supabase
+        .from('ai_reviews')
+        .select('id, strategy_id, trigger_reason, summary, analysis, created_at')
+        .eq('status', 'completed')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
         .limit(5),
     ])
 
@@ -283,10 +293,31 @@ async function buildOperatorHomeData(): Promise<unknown> {
         })),
       },
 
-      // 열린 포지션
+      // 열린 포지션 (pnlPct, currentPrice 계산 포함)
       positions: {
-        live: (openLiveResult.data ?? []).map((p) => ({ ...p, source: 'live' as const })),
-        paper: (openPaperResult.data ?? []).map((p) => ({ ...p, source: 'paper' as const })),
+        live: (openLiveResult.data ?? []).map((p) => {
+          const entry = Number(p.entry_price ?? 0)
+          const qty = Number(p.current_qty ?? 0)
+          const uPnl = Number(p.unrealized_pnl ?? 0)
+          const notional = entry * qty
+          const pnlPct = notional !== 0 ? (uPnl / notional) * 100 : 0
+          // 현재가 역산: long → entry + pnl/qty, short → entry - pnl/qty
+          const currentPrice = qty !== 0
+            ? (p.side === 'long' ? entry + uPnl / qty : entry - uPnl / qty)
+            : entry
+          return { ...p, pnlPct, currentPrice, source: 'live' as const }
+        }),
+        paper: (openPaperResult.data ?? []).map((p) => {
+          const entry = Number(p.entry_price ?? 0)
+          const qty = Number(p.current_qty ?? 0)
+          const uPnl = Number(p.unrealized_pnl ?? 0)
+          const notional = entry * qty
+          const pnlPct = notional !== 0 ? (uPnl / notional) * 100 : 0
+          const currentPrice = qty !== 0
+            ? (p.side === 'long' ? entry + uPnl / qty : entry - uPnl / qty)
+            : entry
+          return { ...p, pnlPct, currentPrice, source: 'paper' as const }
+        }),
       },
 
       // 시장 상황 (거래소 실데이터 + 레짐)
@@ -329,6 +360,38 @@ async function buildOperatorHomeData(): Promise<unknown> {
 
       // 서킷 브레이커
       circuitBreaker: cb,
+
+      // AI 리뷰 알림 (최근 24시간 완료분)
+      aiAlerts: await (async () => {
+        const reviews = recentAiReviewsResult.data ?? []
+        if (reviews.length === 0) return []
+
+        // 전략 이름 매핑
+        const aiStrategyIds = [...new Set(reviews.map((r) => r.strategy_id).filter(Boolean))]
+        const aiNameMap = new Map<string, string>()
+        if (aiStrategyIds.length > 0) {
+          const { data: aiStrategies } = await supabase
+            .from('strategies')
+            .select('id, name')
+            .in('id', aiStrategyIds)
+          for (const s of aiStrategies ?? []) {
+            aiNameMap.set(s.id, s.name)
+          }
+        }
+
+        return reviews.map((r) => {
+          const analysis = r.analysis as Record<string, unknown> | null
+          return {
+            id: r.id,
+            strategyName: aiNameMap.get(r.strategy_id) ?? r.strategy_id,
+            triggerReason: r.trigger_reason,
+            summary: r.summary ?? '',
+            confidence: Number(analysis?.confidence ?? 0),
+            hasParamSuggestions: Array.isArray(analysis?.paramSuggestions) && (analysis.paramSuggestions as unknown[]).length > 0,
+            createdAt: r.created_at,
+          }
+        })
+      })(),
     }
 
     return response

@@ -141,6 +141,17 @@ export interface ResearchSummary {
   topCandidates: ResearchRun[]
 }
 
+// ── AI 리뷰 알림 (대시보드용) ──
+export interface AiAlert {
+  id: string
+  strategyName: string
+  triggerReason: string
+  summary: string
+  confidence: number
+  hasParamSuggestions: boolean
+  createdAt: string
+}
+
 // ── 오퍼레이터 큐 아이템 (승인 + 리스크 통합) ──
 export type QueueItem =
   | { kind: 'approval'; data: Approval }

@@ -1,8 +1,9 @@
-import type { QueueItem, Approval, RiskAlert } from '@/types/orchestration'
-import { AlertTriangle, Clock, ArrowRight } from 'lucide-react'
+import type { QueueItem, Approval, RiskAlert, AiAlert } from '@/types/orchestration'
+import { AlertTriangle, Clock, ArrowRight, Brain } from 'lucide-react'
 
 interface OperatorQueueProps {
   items: QueueItem[]
+  aiAlerts?: AiAlert[]
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
   onDismiss?: (id: string) => void
@@ -24,7 +25,17 @@ const approvalTypeLabels: Record<string, string> = {
   session_promote: '세션 승격',
 }
 
-export const OperatorQueue = ({ items, onApprove, onReject, onDismiss }: OperatorQueueProps) => {
+const triggerReasonLabels: Record<string, string> = {
+  validation_wipeout: '검증 실패',
+  high_ev_high_mdd: '높은 MDD',
+  performance_collapse: '성과 급락',
+  regime_shift: '레짐 전환',
+  manual: '수동 요청',
+}
+
+export const OperatorQueue = ({ items, aiAlerts = [], onApprove, onReject, onDismiss }: OperatorQueueProps) => {
+  const totalCount = items.length + aiAlerts.length
+
   return (
     <div className="w-full lg:w-[260px] shrink-0 border-t lg:border-t-0 lg:border-l border-border-subtle flex flex-col">
       {/* 헤더 */}
@@ -32,9 +43,9 @@ export const OperatorQueue = ({ items, onApprove, onReject, onDismiss }: Operato
         <span className="text-[12px] font-semibold text-text-secondary">
           확인 필요
         </span>
-        {items.length > 0 && (
+        {totalCount > 0 && (
           <span className="text-[12px] font-semibold text-warning">
-            <span className="font-mono">{items.length}</span>건
+            <span className="font-mono">{totalCount}</span>건
           </span>
         )}
       </div>
@@ -48,7 +59,21 @@ export const OperatorQueue = ({ items, onApprove, onReject, onDismiss }: Operato
           return <RiskCard key={item.data.id} alert={item.data} onDismiss={onDismiss} />
         })}
 
-        {items.length === 0 && (
+        {/* AI 분석 알림 */}
+        {aiAlerts.length > 0 && (
+          <>
+            <div className="px-4 py-2 border-b border-border bg-surface">
+              <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">
+                AI 분석
+              </span>
+            </div>
+            {aiAlerts.map((alert) => (
+              <AiAlertCard key={alert.id} alert={alert} />
+            ))}
+          </>
+        )}
+
+        {totalCount === 0 && (
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
             <span className="text-[13px] text-text-secondary">모든 항목 처리 완료</span>
             <span className="text-[12px] text-text-muted mt-1">확인이 필요한 항목이 없습니다</span>
@@ -170,6 +195,52 @@ const RiskCard = ({
           확인했습니다
         </button>
       )}
+    </div>
+  )
+}
+
+const AiAlertCard = ({ alert }: { alert: AiAlert }) => {
+  const reasonLabel = triggerReasonLabels[alert.triggerReason] ?? alert.triggerReason
+  const confidencePct = Math.round(alert.confidence * 100)
+
+  return (
+    <div className="px-4 py-3 border-b border-border-subtle border-l-2 border-l-info bg-info/5">
+      {/* 전략명 + 트리거 사유 */}
+      <div className="flex items-center gap-1.5 mb-1">
+        <Brain className="w-3.5 h-3.5 text-info shrink-0" />
+        <span className="text-[12px] font-semibold text-text-primary truncate">
+          {alert.strategyName}
+        </span>
+        <span className="ml-auto text-[11px] font-medium text-info shrink-0">
+          {reasonLabel}
+        </span>
+      </div>
+
+      {/* 요약 (1줄) */}
+      <div className="text-[12px] text-text-secondary mb-2 line-clamp-2">
+        {alert.summary}
+      </div>
+
+      {/* 신뢰도 뱃지 + 파라미터 제안 표시 */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
+          confidencePct >= 70 ? 'bg-profit/10 text-profit' :
+          confidencePct >= 40 ? 'bg-warning/10 text-warning' :
+          'bg-text-muted/10 text-text-muted'
+        }`}>
+          신뢰도 {confidencePct}%
+        </span>
+        {alert.hasParamSuggestions && (
+          <span className="text-[11px] text-info">
+            파라미터 제안 포함
+          </span>
+        )}
+      </div>
+
+      {/* 상세 보기 안내 */}
+      <span className="text-[11px] text-text-faint">
+        연구 페이지에서 상세 보기
+      </span>
     </div>
   )
 }

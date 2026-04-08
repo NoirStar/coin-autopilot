@@ -245,4 +245,13 @@ export interface OperatorHomeResponse {
     currentLossPct: number
     limitPct: number
   }
+  aiAlerts: Array<{
+    id: string
+    strategyName: string
+    triggerReason: string
+    summary: string
+    confidence: number
+    hasParamSuggestions: boolean
+    createdAt: string
+  }>
 }

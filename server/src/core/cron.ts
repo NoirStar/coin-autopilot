@@ -222,13 +222,21 @@ export function startCronJobs(): void {
     // 대시보드 캐시 먼저 채움 — 프론트엔드가 즉시 데이터를 받을 수 있도록
     await preSeedOperatorHomeCache()
 
-    console.log('[크론] 서버 시작 — 최초 파이프라인 실행')
-    try {
-      await runMainPipeline()
-      cycleFailCount = 0
-    } catch (err) {
-      cycleFailCount++
-      console.error('[크론] 최초 파이프라인 실패:', err)
+    // RUN_RESEARCH_ON_START=false 로 설정하면 서버 시작 시 파이프라인 스킵
+    // 개발 중 재시작 시 무거운 backfill+연구 사이클을 방지
+    const runOnStart = (process.env.RUN_RESEARCH_ON_START ?? 'true').toLowerCase() !== 'false'
+
+    if (runOnStart) {
+      console.log('[크론] 서버 시작 — 최초 파이프라인 실행')
+      try {
+        await runMainPipeline()
+        cycleFailCount = 0
+      } catch (err) {
+        cycleFailCount++
+        console.error('[크론] 최초 파이프라인 실패:', err)
+      }
+    } else {
+      console.log('[크론] 서버 시작 — RUN_RESEARCH_ON_START=false → 최초 파이프라인 스킵')
     }
   }, 3_000) // 3초 대기 (DB 연결 안정화)
 

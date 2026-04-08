@@ -122,7 +122,8 @@ export class BacktestWorkerPool {
   private destroyed = false
 
   private constructor(poolSize?: number) {
-    this.poolSize = poolSize ?? Math.max(2, os.cpus().length - 2)
+    // 환경변수 BACKTEST_WORKER_POOL_SIZE로 풀 크기 오버라이드 가능
+    this.poolSize = poolSize ?? (Number(process.env.BACKTEST_WORKER_POOL_SIZE || 0) || Math.max(2, os.cpus().length - 2))
   }
 
   static getInstance(): BacktestWorkerPool {
@@ -223,6 +224,10 @@ export class BacktestWorkerPool {
     // 풀 크기 이내면 새 워커 생성
     if (this.workers.length < this.poolSize) {
       const worker = new Worker(WORKER_PATH)
+      // 첫 워커 생성 시 풀 크기 로그
+      if (this.workers.length === 0) {
+        console.log(`[워커풀] 풀 크기: ${this.poolSize} (BACKTEST_WORKER_POOL_SIZE 또는 CPU 기반)`)
+      }
       this.workers.push(worker)
       return worker
     }

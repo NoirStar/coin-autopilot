@@ -15,7 +15,7 @@ import { useResearchStore } from '@/stores/research-store'
 const POLL_INTERVAL_MS = 30_000
 
 export const TradingDashboard = () => {
-  const { systemStatus, heroSummary, assetSlots, decisions, positions, market, isLoading, error, fetchOperatorHome } = useOrchestrationStore()
+  const { systemStatus, heroSummary, assetSlots, decisions, positions, market, aiAlerts, isLoading, error, fetchOperatorHome } = useOrchestrationStore()
   const { queueItems, approveItem, rejectItem, dismissItem, updateFromOperatorHome } = useApprovalStore()
   const { summary: researchSummary, updateFromOperatorHome: updateResearch } = useResearchStore()
 
@@ -78,6 +78,7 @@ export const TradingDashboard = () => {
         <DeploymentMatrix slots={assetSlots} />
         <OperatorQueue
           items={queueItems}
+          aiAlerts={aiAlerts}
           onApprove={approveItem}
           onReject={rejectItem}
           onDismiss={dismissItem}
