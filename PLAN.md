@@ -2,7 +2,32 @@
 
 > 이 문서는 PRD 목표 시스템을 새로 구축하기 위한 실행 계획.
 > 기존 코드 유지보수가 아니라 전면 재설계+재구축.
-> **최종 업데이트: 2026-04-03 디자인 리뷰 2차 반영**
+> **최종 업데이트: 2026-04-08 구현 리뷰 반영**
+
+## 2026-04-08 우선순위 리셋
+
+현재 개발 초점은 `BTC OKX 선물 + Upbit 알트 현물`이다. 한국주식과 멀티유저 플랫폼은 PRD상 장기 방향으로 유지하되, 지금은 구현 범위에서 밀어낸다.
+
+이번 리뷰 결론:
+
+- AI 오케스트레이션은 방향이 맞다. 현재 AI는 매 캔들/매 주문마다 호출되는 구조가 아니라 연구 파이프라인에서 이벤트 기반 리뷰어로 동작한다.
+- 연구 파이프라인은 `param-explorer` + `validation-engine` + 워커 풀 + 조건부 AI 리뷰까지 들어와 있어 PRD의 "백테스트 → 검증 → 페이퍼 후보" 흐름에 가깝다.
+- 오케스트레이터는 아직 자산별 배치기가 아니라 BTC 중심 후보 랭킹기에 가깝다. `initialAssignment()`가 `BTC-USDT` 단일 슬롯을 만든다.
+- 알트는 탐지/전략/백테스트/페이퍼 평가 경로에는 있지만, `UPBIT_ALT_*` 슬롯이나 알트 바스켓 운영 단위가 부족하다.
+- 대시보드는 mock이 아니라 `/api/dash/operator/home` 실데이터 polling으로 전환됐다. 다만 venue, 전략 설명, 슬롯별 EDGE, 포지션 현재가/수익률 매핑은 아직 얇다.
+- 설정 페이지는 보이는 값과 실제 런타임 연결이 다르다. API 키/알림은 DB에 저장돼도 실제 클라이언트는 `.env`를 읽고, 리스크 설정도 대부분 환경변수 기반이다.
+- 운영 승인 API는 DB enum과 충돌할 수 있다. `orchestrator_decisions.status` enum에는 `approved/rejected`가 없는데 라우트는 그 값을 쓰려고 한다.
+
+### 다음 구현 순서
+
+1. DB 계약 수정: `decision_status`에 `approved`, `rejected` 추가 또는 라우트를 기존 enum에 맞게 수정.
+2. 설정 정합성 수정: 설정 페이지에서 실제로 런타임에 반영되는 값과 단순 저장값을 분리 표시.
+3. 자산 슬롯 고도화: `BTC-OKX-SWAP`, `ETH-OKX-SWAP`, `UPBIT_ALT_TOP*` 슬롯을 분리하고 전략 후보를 asset_class/exchange/market_scope별로 랭킹.
+4. 알트 페이퍼 운영: `alt_mean_reversion`, `alt_detection`이 오케스트레이터에 의해 Upbit 알트 슬롯으로 페이퍼 세션 생성되게 연결.
+5. 대시보드 매핑 보강: 서버 DTO에 venue, strategyName, rationale, per-slot edge, currentPrice, pnlPct를 추가.
+6. 사용자 화면 실시간 채널 설계: 포지션/PnL, 승인 큐, 리스크 이벤트, DecisionLedger 신규 로그는 WS/SSE로 push하고 `operator/home` polling은 fallback으로 유지.
+7. 연구 자원 상한: 워커 풀 크기 환경변수, backfill 수동 모드, 파이프라인 동시 실행 제한을 추가.
+8. AI 액션 표시: AI 리뷰 결과를 ResearchPage뿐 아니라 OperatorQueue/DecisionLedger에도 요약 노출.
 
 ## 진행 상태
 
@@ -18,7 +43,7 @@
 - [x] 초보자 UX 개선 (한국어 헤더, 승인 근거, 위험도 표시)
 - [x] 레거시 11개 파일 삭제
 
-### 미완료
+### 최근 완료/연결됨
 - [x] **포지션/세션 패널** — PRD 07 §7.4 ✓
 - [x] **시장 상황 패널** — PRD 07 §7.5 ✓
 - [x] EDGE 스코어 계산 로직 서버 구현 (`calculateEdgeScore()`)
@@ -26,8 +51,17 @@
 - [x] 실시간 업데이트 (30초 polling)
 - [x] 전략 상세 페이지 (store 연결)
 - [x] 스토어 테스트 15개 추가
-- [ ] 접근성 보강
-- [ ] 펀딩비/OI/김프 서버 수집
+- [x] 접근성 보강
+- [x] 펀딩비/OI/김프/롱숏비율 서버 수집
+
+### 남은 핵심 작업
+- [ ] 승인 API와 DB enum 불일치 수정
+- [ ] 설정 페이지 값과 실제 런타임 적용 경로 정리
+- [ ] BTC/ETH OKX 선물 슬롯과 Upbit 알트 슬롯 분리
+- [ ] 후보 랭킹을 asset_class/exchange/market_scope별로 분리
+- [ ] 대시보드 DTO/프론트 매핑 보강
+- [ ] WS/SSE 실시간 채널 설계와 polling fallback 구현
+- [ ] 연구 루프 자원 상한 추가
 
 ## 현재 파일 구조
 
@@ -53,7 +87,6 @@ web/src/
 │   ├── PortfolioPage.tsx     # 포트폴리오
 │   └── SettingsPage.tsx      # 설정
 ├── stores/ (orchestration, approval, research, settings)
-├── mocks/dashboard-data.ts
 ├── types/orchestration.ts
 ├── services/api.ts
 └── index.css                # Terminal Craft Evolved 토큰
@@ -113,9 +146,9 @@ web/src/
 └────────────────────────────┴─────────────────────────────┘
 ```
 
-## Phase 2.5: 누락 패널 추가 (다음 우선)
+## Phase 2.5: 포지션/시장 패널
 
-PRD 07에 명시되었지만 현재 구현에 없는 2개 패널. 승인 판단의 배경 정보로 필수.
+PRD 07에 명시된 2개 패널은 현재 구현되어 있다. 다음 우선순위는 패널 존재 여부가 아니라 `정확한 실데이터 매핑`이다.
 
 ### 2.5a. 포지션/세션 패널
 
@@ -161,7 +194,7 @@ PRD 07 §7.5: "오케스트레이터 판단 배경을 사용자가 이해할 수
 [판단 기록] [연구 현황] [포지션] [시장 상황]
 ```
 
-→ 구현 시점에 결정. 화면 밀도와 실제 데이터 양에 따라.
+현재 구현은 옵션 B에 가깝다. 운영 데이터가 늘어나면 하단 2행 구조를 유지하되, 포지션 현재가/수익률/전략명과 시장 데이터 stale 상태를 먼저 보강한다.
 
 ## EDGE 스코어 정의 (초안)
 
@@ -229,7 +262,7 @@ EDGE = weighted_average(
 | DecisionLedger: 한글 요약 + 머신 로그 2줄 | 초보자는 한글, 파워유저는 로그. |
 | 모든 섹션 한국어 헤더 | 영문 전용은 진입장벽. 내부명 영문은 유지하되 UI는 한국어. |
 | AuthGuard 제거 | 1인 사용 단계. 멀티유저 시 재도입. |
-| Mock → 스토어 → API | UI 먼저, 데이터 나중. 스토어 setter만 교체하면 전환. |
+| 집계 API → 스토어 → 대시보드 | 현재는 `/api/dash/operator/home` 스냅샷을 30초 polling. |
 
 ## 접근성 TODO
 
@@ -243,7 +276,9 @@ EDGE = weighted_average(
 
 | 리스크 | 영향 | 대응 |
 |--------|------|------|
-| API 엔드포인트 미정의 | 데이터 연결 불가 | Mock → API 전환은 스토어 setter 교체 |
-| EDGE 계산 방법 | 의미 불명확 | 초안 정의됨. 서버 구현 시 정제. |
-| 서버 오케스트레이터 미구현 | 실시간 데이터 없음 | Static mock → WebSocket |
-| 포지션/시장 패널 미구현 | 승인 배경 부족 | Phase 2.5로 다음 우선순위 |
+| 승인 API와 DB enum 불일치 | approve/reject 런타임 실패 가능 | `decision_status` 마이그레이션 또는 라우트 상태값 수정 |
+| 설정 페이지와 런타임 불일치 | 사용자가 저장한 값이 실제 엔진에 반영됐다고 오해 | env 기반/DB 저장 기반 설정을 UI에서 분리하고 서버 적용 경로 확정 |
+| 오케스트레이터 BTC 단일 슬롯 | 알트 전략이 자산별로 배치되지 않음 | asset_class/exchange/market_scope 기준 슬롯/랭킹 분리 |
+| 대시보드 매핑 얇음 | 전략 이유, 포지션 손익률, 거래소 상태가 빈값으로 보임 | operator/home DTO 확장 |
+| 실시간 데이터 polling 의존 | 포지션/PnL/승인/리스크 반응이 늦거나 불필요한 집계 API 호출이 반복됨 | WS/SSE push 채널 + 30초 polling fallback |
+| 연구 루프 자원 사용량 | 서버 시작 시 backfill+검증이 과도해질 수 있음 | 워커 수 env 상한, backfill 수동화, 연구 쿨다운/큐 고도화 |

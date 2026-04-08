@@ -1,357 +1,217 @@
-# HANDOFF.md — 2026-04-04 집에서 이어서 할 작업
+# HANDOFF.md — 2026-04-08 집에서 이어서 할 작업
 
 ## 이 프로젝트를 한 줄로
 
-`coin-autopilot`은 단일 전략 봇이 아니라, 전략을 계속 연구하고 검증해서 "어떤 전략을 언제 신뢰할지"를 판단하는 전략 오케스트레이션 운영실이다.
+`coin-autopilot`은 단일 전략 봇이 아니라, 백테스트와 페이퍼 운용 데이터를 계속 쌓아 "어떤 전략을 언제 신뢰할지" 판단하는 전략 오케스트레이션 운영실이다.
 
-핵심은 아래 3개다.
+지금 우선 범위:
 
-- 연구 루프: 전략 후보와 파라미터를 자동으로 검증
-- 오케스트레이터: 현재 시장과 최근 성과를 보고 전략 배치/유지/교체 판단
-- 운영실 홈: 지금 상태, 리스크, 승인 필요 항목을 한눈에 보여주는 UI
+- `BTC OKX 선물`
+- `Upbit 알트 현물`
+- 한국주식과 멀티유저는 후순위
 
-## 이번 세션 결론
+## 이번 리뷰 결론
 
-- `PRD/`, `PLAN.md`, `DESIGN.md` 기준 제품 방향은 꽤 선명하다.
-- 이 프로젝트는 **실현 가능**하다. 다만 `Stage 1`에 강하게 집중해야 한다.
-- 현재 가장 큰 병목은 전략 로직 부족이 아니라 **프론트 mock 상태와 서버 실제 상태 사이의 연결 부재**다.
-- 다음 세션 우선순위는 새 기능 추가가 아니라 **계약 정리 + 대시보드 실데이터 연결**이다.
+현재 구조는 PRD 방향과 완전히 어긋난 것은 아니다. 연구 루프, 페이퍼 엔진, 오케스트레이터, 대시보드 집계 API까지 꽤 많이 구현되어 있다.
 
-## 내 평가
+다만 지금 위험한 부분은 "기능이 없다"보다 "화면이 실제보다 더 완성된 것처럼 보이는 것"이다. 특히 설정 페이지, 승인 흐름, 알트 슬롯 운영은 바로 손봐야 한다.
 
-### 좋은 점
+## 추가 전체 감사에서 더 확인된 P0/P1
 
-- 방향성이 분명하다. "좋은 전략 하나 찾기"가 아니라 "전략을 신뢰하는 시스템"을 만들려는 점이 차별점이다.
-- 초보 운영자를 고려한 설계가 좋다. 수익률만이 아니라 승인, 리스크, 판단 이유를 전면에 둔 점이 좋다.
-- 문서화가 꽤 잘 되어 있다. PRD, PLAN, DESIGN이 같은 방향을 보고 있다.
-- 백엔드 코어는 생각보다 많이 와 있다. 연구 루프, 오케스트레이터, 리스크, 실행, API 골격이 이미 있다.
+- **쓰기 API 인증 구멍**: `/api/dash/decisions/:id/approve`, `/api/dash/decisions/:id/reject`, `/api/dash/risk/events/:id/resolve`는 쓰기 작업인데 현재 라우트에 `authMiddleware`가 없다. 프론트는 POST에 토큰을 붙이지만 서버가 강제하지 않는다. 외부 노출 전에 반드시 막아야 한다.
+- **승인 상태 enum 불일치**: DB `decision_status` enum에는 `approved/rejected`가 없는데 approve/reject 라우트가 해당 값을 쓴다. 인증을 붙이기 전에 상태 머신부터 고쳐야 한다.
+- **포트폴리오 청산가 계약 오류**: `live_positions`에는 `exit_price` 컬럼이 없는데 `/api/portfolio/trades`는 `p.exit_price`를 읽는다. 거래 내역 청산가가 0 또는 빈값으로 표시될 수 있다.
+- **대시보드 집계 비용**: `/api/dash/operator/home`은 30초 캐시가 있지만 캐시 미스 때 많은 DB 쿼리와 `getCircuitBreakerStatus()`를 호출한다. 이 함수는 대시보드 조회 중에도 OKX 잔고 조회를 시도한다. 거래소가 느리거나 키가 없으면 홈 응답이 느려질 수 있다.
+- **탐지 스캔 공개 고비용**: `/api/detection/scan`, `/api/detection/refresh`, `/api/detection/scan/stream`이 전체 Upbit KRW 심볼을 순차 스캔한다. 각 심볼마다 sleep + 캔들 + 오더북 요청이 들어가므로 인증/운영자 토큰/쿨다운 없이 공개로 두면 쉽게 부하가 걸린다.
+- **프론트 타입 계약 불일치**: 서버의 circuit breaker DTO는 `currentLossPct/limitPct/triggered`인데 프론트 타입은 `dailyLossPct`를 기대한다. 지금은 크게 쓰이지 않지만 DTO 기준을 맞춰야 한다.
+- **연구 CPU 비용**: 백테스트 엔진은 slice 비용은 줄였지만, 전략 내부가 매 캔들마다 close/high/low 배열을 만들고 EMA/ADX 등을 재계산한다. 워커 풀만으로 해결된 상태는 아니다. 지표 캐시 또는 증분 지표 계산이 다음 최적화다.
+- **웹 lint 실패**: build/test는 통과하지만 `npm run lint`가 4건 실패한다. SettingsPage의 effect 안 동기 setState는 작은 성능 냄새라 같이 정리한다.
+- **감사 취약점**: server audit은 `hono`, `@hono/node-server`, transitive `vite`에서 2 moderate + 1 high. web audit은 `vite` high 1건. dev-server 계열이라도 외부 노출 개발 서버를 피하고 업데이트를 검토한다.
 
-### 부족한 점
+## 1. AI 오케스트레이션 상태
 
-- 범위가 크다. 암호화폐 + 한국주식 + 멀티유저 + AI 재분석까지 한 번에 가면 쉽게 흐려진다.
-- 검증 품질이 아직 충분히 강하지 않다. 현재 구현은 임계치 기반 승격이 중심이라 과최적화 리스크를 더 줄여야 한다.
-- 프론트와 서버 계약이 아직 맞물리지 않는다. 화면은 좋아졌지만 실제 운영 상태를 반영하지 못한다.
-- 인증 정책이 문서와 코드에서 어긋난다. UI는 1인 사용 무인증 방향인데 서버 `/api/*`는 인증을 요구한다.
-- 실전 readiness는 아직 낮다. 구조는 있지만 "신뢰 가능한 운영 제품" 단계는 아니다.
+의도한 구조와 맞는 점:
 
-### 체감 점수
+- AI가 매번 매매 판단을 직접 내리는 구조가 아니다.
+- 연구 파이프라인에서 이벤트 기반으로만 AI를 부른다.
+- `AI_COOLDOWN_H`, `AI_DAILY_TOKEN_BUDGET`, 동일 트리거 중복 방지로 토큰을 아끼는 장치가 있다.
+- AI는 파라미터 재탐색 범위, 실패 분석, 후보 비교를 제안하고, 최종 승격은 백테스트/검증 데이터가 통과해야 한다.
 
-- 제품 방향 선명도: `8/10`
-- 문서 정합성: `8/10`
-- 백엔드 코어 구현도: `7/10`
-- 프론트 UX 구현도: `7/10`
-- 프론트-백엔드 연결도: `4/10`
-- 실전 투입 준비도: `2/10`
+아직 부족한 점:
 
-## 현재 구현 수준 — 코드 기준 솔직한 상태
+- AI는 현재 연구 리뷰에 가깝고, 운영 중 "사람처럼 대응"하는 액션 센터까지는 아니다.
+- AI 리뷰 결과가 ResearchPage에만 보이고, OperatorQueue/DecisionLedger에는 연결이 약하다.
+- 실전 배치 승인이나 리스크 대응은 AI가 아니라 룰 기반 오케스트레이터/리스크 매니저가 처리한다.
 
-### 1. 백엔드
+추천 방향:
 
-- 크론 메인 파이프라인은 이미 존재한다.
-  - `4시간`: 캔들 수집 → 연구 루프 → 오케스트레이터 → 페이퍼 → 실전 동기화 → 리스크 체크
-  - `1시간`: 알트 탐지
-  - 파일: `server/src/core/cron.ts`
+- 이 구조는 유지한다. AI를 상시 호출하는 쪽으로 바꾸지 말 것.
+- 대신 AI 리뷰가 나온 이유와 추천 행동을 운영 큐에 요약 노출한다.
 
-- 연구 루프는 이미 돈다.
-  - 등록 전략 순회
-  - 캔들 로드
-  - 백테스트 실행
-  - `research_runs`, `research_run_metrics` 저장
-  - 기준 통과 시 `paper_candidate` 승격
-  - 파일: `server/src/research/research-loop.ts`
+## 2. 백테스트/연구 파이프라인
 
-- 오케스트레이터 핵심도 있다.
-  - 레짐 판정
-  - 후보 랭킹
-  - go_flat 판단
-  - 슬롯별 배치/교체 판단
-  - 슬롯 상태 조회 API용 함수 존재
-  - 파일: `server/src/orchestrator/orchestrator.ts`
+좋은 점:
 
-- V2 API도 이미 꽤 있다.
-  - `/api/dashboard`
-  - `/api/slots`
-  - `/api/decisions`
-  - `/api/research/runs`
-  - `/api/research/candidates`
-  - `/api/risk/status`
-  - `/api/positions`
-  - 파일: `server/src/routes/api.ts`
+- `RESEARCH_MODE=pipeline` 기본값으로 파라미터 그리드 탐색을 돈다.
+- 스크리닝 → IS/OOS 70/30 → 3-fold WF 검증 → 승격 전 AI 리뷰 → `paper_candidate` 승격 흐름이 있다.
+- 백테스트 엔진은 레짐 사전 계산과 증분 candle map으로 이전 O(n²) slice 비용을 줄였다.
+- Worker Thread 풀을 써서 CPU 작업을 메인 이벤트 루프 밖으로 보낸다.
 
-### 2. 프론트
+주의할 점:
 
-- 운영실 홈 레이아웃과 UX는 많이 올라와 있다.
-  - `SystemStrip`
-  - `HeroStrip`
-  - `DeploymentMatrix`
-  - `OperatorQueue`
-  - `PositionPanel`
-  - `MarketPanel`
-  - `DecisionLedger`
-  - `ResearchStatus`
+- 서버 시작 3초 뒤 `ensureMinimumCandles()`가 30개월 backfill을 확인하고, 이후 전체 연구 루프가 자동 실행된다.
+- 전략별 grid가 최대 100개이고, 검증 단계에서 후보별 IS/OOS/WF 세그먼트를 다시 돌리므로 VPS 자원 사용량이 커질 수 있다.
+- 워커 풀 크기가 `max(2, cpu - 2)`라 고코어 머신에서는 생각보다 많은 워커가 뜰 수 있다.
+- 알트 연구 대상은 `ETH/XRP/SOL/DOGE` 고정 목록 위주다. 실제 Upbit 알트 유니버스 운용과는 아직 거리가 있다.
 
-- 연구 페이지는 API 연결 시도를 이미 하고 있다.
-  - 파일: `web/src/pages/ResearchPage.tsx`
+집에서 먼저 할 일:
 
-- 포트폴리오 / 설정 페이지는 기존 API를 사용한다.
-  - 파일: `web/src/pages/PortfolioPage.tsx`
-  - 파일: `web/src/pages/SettingsPage.tsx`
+- `BACKTEST_WORKER_POOL_SIZE` 같은 env 상한 추가
+- `RUN_PIPELINE_ON_START=false` 또는 `RUN_CRON_ON_START=false` 같은 시작 보호 플래그 검토
+- 알트 유니버스를 설정값/DB로 빼기
 
-### 3. 아직 mock 이거나 얇은 부분
+## 3. 오케스트레이터/페이퍼/실전
 
-- `TradingDashboard`는 아직 store + mock 데이터 중심이다.
-  - `systemStatus`, `heroSummary`, `assetSlots`, `decisions`는 Zustand mock store
-  - `positions`, `market`은 페이지에서 직접 mock import
-  - 파일: `web/src/pages/TradingDashboard.tsx`
+현재 상태:
 
-- `orchestration-store`, `approval-store`, `research-store`는 아직 mock 초기값만 쓴다.
-  - 파일: `web/src/stores/orchestration-store.ts`
-  - 파일: `web/src/stores/approval-store.ts`
-  - 파일: `web/src/stores/research-store.ts`
+- 오케스트레이터는 최근 연구 결과를 레짐/방향 기준으로 점수화한다.
+- `strategy_assign`, `strategy_switch`, `go_flat`, `rebalance` 판단을 만들 수 있다.
+- 전략 배치/교체는 페이퍼 세션 생성/종료로 이어진다.
+- 실전 엔진은 `LIVE_TRADING=true`일 때만 OKX 주문을 실행한다.
 
-- `StrategyDetail`은 완전 mock 기반이다.
-  - 파일: `web/src/pages/StrategyDetail.tsx`
+큰 갭:
 
-- 승인 큐는 서버 실데이터가 아니라 프론트 로컬 삭제만 된다.
-  - 실제 approve/reject API 없음
-  - 실제 pending decision / unresolved risk event 집계 endpoint 없음
+- `initialAssignment()`가 아직 `BTC-USDT` 단일 슬롯을 만든다.
+- 후보 랭킹이 `asset_class`, `exchange`, `market_scope`별로 분리되지 않아 OKX 선물 전략과 Upbit 알트 전략이 같은 후보 풀에 섞일 수 있다.
+- 실전 엔진은 Phase 7 초기 구현 그대로 BTC 단일 진입에 가깝다. 알트 실전은 범위 밖이고, 지금은 페이퍼 중심으로 봐야 한다.
+- 승인 API가 DB enum과 안 맞을 가능성이 높다. `decision_status` enum에는 `approved/rejected`가 없는데 라우트는 해당 값을 업데이트한다.
+- 승인/거부/리스크 해결 쓰기 라우트에 인증 미들웨어가 없다.
 
-- 시장 상황 패널용 API가 없다.
-  - PRD상 필요한 펀딩비, OI, 롱숏 비율, 김프 요약 endpoint 부재
+최우선 수정:
 
-- EDGE 스코어는 문서상 중요하지만 서버 계산/노출이 아직 없다.
+1. `decision_status` enum 수정 또는 approve/reject 라우트 수정
+2. 슬롯을 `BTC-OKX-SWAP`, `ETH-OKX-SWAP`, `UPBIT_ALT_TOP*`로 분리
+3. 랭킹 쿼리에 `asset_class`, `exchange`, `market_scope` 조건 추가
+4. 알트 전략은 Upbit 알트 슬롯에만 배치되게 제한
 
-## 중요한 구현 차이 / 함정
+## 4. 대시보드 리뷰
 
-### 1. "서버 API 없음"은 이제 정확한 표현이 아님
+좋은 점:
 
-기존 HANDOFF는 "서버 API 엔드포인트 추가"라고 되어 있었는데, 지금은 **대시보드용 V2 API가 이미 일부 존재한다**.
+- 첫 화면이 실제 트레이딩 대시보드다.
+- `SystemStrip`, `HeroStrip`, `DeploymentMatrix`, `OperatorQueue`, `PositionPanel`, `MarketPanel`, `DecisionLedger`, `ResearchStatus` 구성이 PRD 07과 잘 맞는다.
+- `/api/dash/operator/home` + 30초 polling으로 mock 중심 상태는 벗어났다.
+- 실전/모의 포지션을 구분하고, 승인 큐와 리스크 큐를 한곳에 모으는 방향도 좋다.
 
-정확한 표현은 아래다.
+보강할 점:
 
-- API는 이미 부분적으로 있다
-- 하지만 대시보드가 아직 그 API를 거의 사용하지 않는다
-- 그리고 대시보드에 꼭 필요한 `queue`, `market summary`, `hero EDGE` 계약은 비어 있다
-
-### 2. 인증 정책이 충돌한다
-
-- 프론트 계획은 `1인 사용 단계`, `AuthGuard 제거`, `무인증 UX` 쪽이다
-- 그런데 서버는 API 전체에 `authMiddleware`를 걸고 있다
-- 파일: `server/src/index.ts`
-
-이 상태면:
-
-- 대시보드를 실데이터로 붙이면 인증이 걸려서 바로 안 맞을 수 있다
-- 집에서 이어서 할 때 가장 먼저 **무인증 운영실로 갈지, 가벼운 인증을 유지할지** 결정해야 한다
-
-### 3. ResearchPage는 "연결된 것처럼 보이지만" 계약이 아직 안 맞을 수 있다
-
-- `web/src/pages/ResearchPage.tsx`는 배열 형태를 기대하고 있다
-- `server/src/routes/api.ts`는 `{ data: ..., rankedAt: ... }` 형태를 반환한다
-- 즉 프론트에서 응답 unwrap / transform이 필요하다
-
-## 지금 프로젝트를 어디까지 현실적으로 볼지
-
-### Stage 1은 현실적이다
-
-지금 목표는 아래까지만 확실히 하면 된다.
-
-- 암호화폐 중심
-- 연구 루프 작동
-- 오케스트레이터 작동
-- 페이퍼 작동
-- 운영실 홈에서 현재 상태를 실데이터로 보여줌
-- 승인/리스크 흐름이 보임
-
-### Stage 2부터는 난도가 확 오른다
-
-- 한국주식
-- 더 정교한 실행 정책
-- 더 많은 전략군
-
-### Stage 3는 사실상 다른 제품이다
-
-- 멀티유저
-- 사용자별 전략 선택
-- 플랫폼화
-
-지금은 여기에 신경 쓰지 말 것.
-
-## 다음 세션 권장 순서
-
-### 1. 인증 정책 먼저 결정
+- `orchestration-store`에 TODO가 남아 있다: 거래소 연결 상태, venue, 슬롯별 EDGE, 포지션 매핑.
+- `PositionPanel`은 현재가를 `peak_price`로 대체하고, `unrealizedPnlPct`는 0으로 둔다.
+- `DeploymentMatrix`의 `rationale`이 비어 있고, `rationaleDetail`도 "배분/레짐" 정도라 사용자가 "왜?"를 충분히 이해하기 어렵다.
+- `ResearchStatus` 후보의 asset이 빈 문자열이다.
+- OperatorQueue 폭 260px은 길어진 전략명/근거가 들어오면 답답할 수 있다.
+- 현재 대시보드는 30초 polling만 사용한다. 사용자 화면에서 자주 바뀌는 값은 WebSocket 또는 SSE 후보로 올리는 게 좋다.
 
 추천:
 
-- `운영실 읽기 API`는 1인 사용 단계에서 무인증 또는 로컬 운영자 토큰 기반으로 단순화
-- `설정 변경`, `실전 관련 쓰기 작업`만 인증 유지
+- 서버 DTO를 먼저 보강하고 프론트 TODO 매핑 제거
+- 포지션 현재가/PnL%는 서버에서 계산해 내려주기
+- 대시보드 하단은 지금 구조를 유지하되, AI 리뷰 요약과 stale 데이터 경고를 추가
+- 실시간 업데이트는 하이브리드로 간다. `operator/home`은 최초 스냅샷과 fallback polling으로 유지하고, 포지션 현재가/PnL, 거래소 연결 상태, 승인 큐, 리스크 이벤트, DecisionLedger 신규 로그는 WS/SSE로 push한다.
 
-이걸 먼저 결정하지 않으면 프론트 연결하다가 계속 막힌다.
+### WebSocket/SSE 적용 기준
 
-대상 파일:
+WS/SSE로 우선 보낼 것:
 
-- `server/src/index.ts`
-- `server/src/core/auth.ts`
-- `web/src/services/api.ts`
+- 포지션 현재가, 미실현 PnL, PnL%
+- 거래소 연결 상태와 데이터 수집 stale 경고
+- 승인 큐 신규 항목과 승인/거부 상태 변경
+- 리스크 이벤트 신규 발생/해결
+- DecisionLedger 신규 로그
+- AI 리뷰 완료 알림 요약
 
-### 2. 대시보드 DTO를 고정
+API/polling으로 남길 것:
 
-추천 방향은 둘 중 하나:
+- 연구 실행 이력 전체 테이블
+- 전략 후보 랭킹 전체 조회
+- 설정 페이지
+- 포트폴리오 거래 내역
+- 긴 히스토리/리포트성 데이터
 
-- 기존 endpoint들을 조합해서 프론트에서 가공
-- 또는 `GET /api/operator/home` 같은 집계 endpoint를 새로 만든다
+구현 방향:
 
-내 추천은 **집계 endpoint 1개 추가**다.
-이유:
+- 서버에는 `/api/dash/operator/home` 스냅샷을 유지한다.
+- 새 실시간 채널은 `GET /api/dash/stream` SSE 또는 `WS /api/dash/ws` 중 하나로 시작한다. 단방향 대시보드 업데이트만 필요하면 SSE가 단순하다.
+- 클라이언트는 연결 성공 시 push 이벤트로 store를 patch하고, 연결 끊김/백그라운드 복귀 시 30초 polling으로 fallback한다.
+- 실전 주문/승인 같은 쓰기 명령은 WS로 받지 말고 기존 POST API + 인증을 사용한다.
 
-- 대시보드가 원하는 정보가 동기화된 스냅샷 형태다
-- 프론트 store가 단순해진다
-- polling도 쉬워진다
+## 5. 설정 페이지 리뷰
 
-최소 포함 필드:
+가장 조심해야 한다.
 
-- system strip 상태
-- hero summary
-- asset slots
-- queue items
-- open positions
-- market summary
-- recent decisions
-- research summary
+현재 설정 페이지에서 보이는 것:
 
-대상 파일:
+- Upbit/OKX API 키 등록
+- 리스크 파라미터
+- Telegram/Discord 알림 토글
+- 서버 상태
+- 데이터 관리 위험 영역
 
-- `server/src/routes/api.ts`
-- `web/src/types/orchestration.ts`
+실제 코드 기준:
 
-### 3. TradingDashboard를 실데이터로 전환
+- 읽기는 무인증으로 된다.
+- 쓰기는 `authMiddleware`가 필요하다. 로그인/토큰이 없으면 저장이 401로 실패할 수 있다.
+- API 키는 `user_settings`에 저장되지만, OKX/Upbit 클라이언트와 포트폴리오 조회는 `.env` 키를 읽는다.
+- Telegram/Discord도 DB 설정이 아니라 `.env`를 읽는다.
+- 리스크 매니저는 설정 페이지 값이 아니라 `DAILY_LOSS_LIMIT_PCT`, `CIRCUIT_BREAKER_PCT`, `MAX_*` 환경변수를 읽는다.
+- "API 키는 서버에 암호화되어 저장됩니다"라는 문구는 현재 코드 기준으로 사실이라고 보기 어렵다. 평문 컬럼 저장으로 보인다.
+- DangerZone의 삭제 버튼은 실제 삭제 API 없이 확인 UI만 있다.
 
-순서:
+추천:
 
-1. `orchestration-store`에 fetch 액션 추가
-2. `approval-store`에 queue fetch 액션 추가
-3. `research-store`에 summary fetch 액션 추가
-4. `TradingDashboard`에서 mock import 제거
+- 설정 페이지를 "런타임 적용 설정"과 "저장만 되는 설정"으로 나눠라.
+- API 키 저장 정책은 `.env only`로 갈지, DB 암호화 저장으로 갈지 먼저 결정.
+- 1인 사용이면 쓰기 API도 운영자 토큰 방식으로 단순화하거나, 프론트 로그인 흐름을 다시 붙여라.
+- 암호화 문구는 구현 전까지 제거하거나 "저장 정책 확정 전"으로 바꿔라.
 
-대상 파일:
+## 6. 검증 결과
 
-- `web/src/stores/orchestration-store.ts`
-- `web/src/stores/approval-store.ts`
-- `web/src/stores/research-store.ts`
-- `web/src/pages/TradingDashboard.tsx`
+이번 세션에서 실행한 것:
 
-### 4. StrategyDetail mock 제거
+- `server`: `npm ci` 후 `npm run build` 통과
+- `server`: `npm test` 통과, 8 files / 78 tests
+- `web`: `npm run build` 통과
+- `web`: 기본 `npm test`는 `VITE_SUPABASE_URL` 미설정으로 실패
+- `web`: `VITE_SUPABASE_URL=http://localhost VITE_SUPABASE_ANON_KEY=test npm test` 통과, 3 files / 15 tests
 
-현재 이 페이지는 대시보드 drill-down 역할인데 가장 중요한데도 아직 mock이다.
+추가 메모:
 
-최소 필요 데이터:
+- server `npm ci`에서 취약점 3개가 보고됐다: 2 moderate, 1 high.
+- web build는 559KB chunk warning이 있다. 당장 치명적이지는 않지만 코드 스플리팅 후보.
+- web `npm run lint`는 실패한다. `Toast.tsx`, `PortfolioPage.tsx`, `SettingsPage.tsx`, `api.ts` 4건.
+- `npm audit --json` 기준 server는 `hono`, `@hono/node-server`, transitive `vite`, web은 `vite` 취약점이 남아 있다.
 
-- slot 단건
-- 관련 decision history
-- 현재 open position
-- rationale / score snapshot
-
-대상 파일:
-
-- `web/src/pages/StrategyDetail.tsx`
-- `server/src/routes/api.ts`
-
-### 5. ResearchPage 계약 수정
-
-현재는 API는 불러도 shape가 안 맞을 가능성이 크다.
-
-할 일:
-
-- `api.request()` 응답에서 `data` unwrap
-- 서버 응답 필드명과 UI 필드명 맞추기
-- 필요하면 `select` 또는 transform 함수 추가
-
-대상 파일:
-
-- `web/src/pages/ResearchPage.tsx`
-- `web/src/services/api.ts`
-
-### 6. 마지막에 polling 붙이기
-
-추천 주기:
-
-- dashboard home: 15~30초
-- research: 30~60초
-- settings/portfolio: 수동 또는 느린 polling
-
-WebSocket은 지금 바로 안 해도 된다. polling으로 먼저 끝내는 게 맞다.
-
-## 서버에서 추가로 필요한 계약
-
-아래 3개는 사실상 꼭 필요하다.
-
-- `queue endpoint`
-  - pending orchestrator decisions
-  - unresolved risk events
-  - 승인/거부에 필요한 최소 설명
-
-- `market summary endpoint`
-  - volatility
-  - funding
-  - OI
-  - long/short ratio
-  - kimchi premium
-  - stale 여부
-
-- `hero/edge summary`
-  - 총 자산
-  - 오늘 손익
-  - live / paper count
-  - pending approvals
-  - EDGE score
-
-## 지금 하지 말 것
-
-- 한국주식 붙이기
-- 멀티유저 다시 고민하기
-- 전략 종류 더 늘리기
-- AI 재분석 기능 확장하기
-- 실전 자동화 범위 넓히기
-
-지금은 "운영실 홈이 실데이터로 신뢰 가능하게 보이는가"가 최우선이다.
-
-## 집에서 시작할 때 열 파일
+## 7. 집에서 바로 열 파일
 
 우선순위대로:
 
-1. `server/src/index.ts`
+1. `supabase/migrations/20260404_schema.sql`
 2. `server/src/routes/api.ts`
-3. `web/src/services/api.ts`
-4. `web/src/stores/orchestration-store.ts`
-5. `web/src/stores/approval-store.ts`
-6. `web/src/stores/research-store.ts`
-7. `web/src/pages/TradingDashboard.tsx`
-8. `web/src/pages/StrategyDetail.tsx`
-9. `web/src/pages/ResearchPage.tsx`
+3. `server/src/orchestrator/orchestrator.ts`
+4. `server/src/paper/paper-engine.ts`
+5. `server/src/execution/execution-engine.ts`
+6. `server/src/routes/settings.ts`
+7. `server/src/risk/risk-manager.ts`
+8. `web/src/stores/orchestration-store.ts`
+9. `web/src/pages/SettingsPage.tsx`
+10. `web/src/components/dashboard/PositionPanel.tsx`
 
-## 이번 세션에서 바뀐 문서
+## 8. 지금 하지 말 것
 
-- `README.md`
-- `TODOS.md`
-- `CLAUDE.md`
-- `HANDOFF.md`
+- 한국주식 붙이기
+- 멀티유저 다시 설계하기
+- 실전 알트 자동매매 확장하기
+- AI를 상시 판단 루프로 바꾸기
+- 전략 종류만 더 늘리기
 
-모두 **기준 문서(PRD / PLAN / DESIGN / HANDOFF)** 에 맞춰 정리했다.
-
-## 아직 안 한 것
-
-- 코드 변경 없음
-- 테스트/빌드 재실행 안 함
-- 문서 정리와 현재 구현 수준 리뷰만 수행
-
-## 마지막 메모
-
-이 프로젝트의 승부처는 "전략을 더 많이 추가하는 것"이 아니다.
-
-승부처는 아래 3개다.
-
-- 운영실 홈이 실데이터로 믿을 만하게 보이는가
-- 연구 → 승격 → 배치 흐름이 문서와 코드에서 일치하는가
-- 실전으로 가기 전에 어디서 멈춰야 하는지가 명확한가
-
-다음 세션에서는 새 아이디어보다 **연결, 계약, 신뢰도**를 우선할 것.
+지금은 `BTC 선물 + Upbit 알트 페이퍼` 흐름을 실제로 신뢰 가능하게 만드는 게 먼저다.
