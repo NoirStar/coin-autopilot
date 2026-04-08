@@ -175,7 +175,7 @@ async function callOpenAI(request: AiRequest): Promise<AiResponse | null> {
   try {
     const response = await openaiClient.chat.completions.create({
       model,
-      max_tokens: maxTokens,
+      max_completion_tokens: maxTokens,
       messages: [
         { role: 'system', content: request.system },
         { role: 'user', content: request.userMessage },
